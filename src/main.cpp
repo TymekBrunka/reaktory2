@@ -1,42 +1,37 @@
-// This file is part of the OGRE project.
-// It is subject to the license terms in the LICENSE file found in the top-level
-// directory of this distribution and at https://www.ogre3d.org/licensing.
-// SPDX-License-Identifier: MIT
-
-#include "Ogre.h"
-#include "OgreApplicationContext.h"
-#include "OgreStaticPluginLoader.h"
-
-//! [key_handler]
-class KeyHandler : public OgreBites::InputListener {
-  bool keyPressed(const OgreBites::KeyboardEvent &evt) override {
-    if (evt.keysym.sym == OgreBites::SDLK_ESCAPE) {
-      Ogre::Root::getSingleton().queueEndRendering();
-    }
-    return true;
-  }
-};
-//! [key_handler]
+#include <Ogre.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_syswm.h>
+#include <iostream>
 
 int main(int argc, char *argv[]) {
-  //! [constructor]
-  OgreBites::ApplicationContext ctx("OgreTutorialApp");
-  ctx.initApp();
-  //! [constructor]
+  // 1. Initialize SDL2
+  SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
+  SDL_Window *sdlWindow =
+      SDL_CreateWindow("Reaktory", SDL_WINDOWPOS_CENTERED,
+                       SDL_WINDOWPOS_CENTERED, 1024, 768, SDL_WINDOW_SHOWN);
 
-  //! [setup]
-  // get a pointer to the already created root
-  Ogre::Root *root = ctx.getRoot();
+  // 2. Extract Native Window Handle for Windows (Win32)
+  SDL_SysWMinfo wmInfo;
+  SDL_VERSION(&wmInfo.version);
+  SDL_GetWindowWMInformation(sdlWindow, &wmInfo);
+  std::string winHandle = std::to_string((size_with_t)wmInfo.info.win.window);
 
-  // Automatically instantiates and registers all available RenderSystems
-  OgreBites::StaticPluginLoader pluginLoader;
-  pluginLoader.load();
+  // 3. Setup Ogre3D
+  Ogre::Root *root = new Ogre::Root("", "", "Ogre.log");
+  // (Load plugins dynamically or via StaticPluginLoader here)
 
-  // Select the first available system or define a preferred choice
-  if (!root->getAvailableRenderers().empty()) {
-    root->setRenderSystem(root->getAvailableRenderers().front());
-  }
+  Ogre::RenderSystem *renderSystem = root->getAvailableRenderers()[0];
+  root->setRenderSystem(renderSystem);
+  root->initialise(false); // Do not create a default window
 
+  // 4. Create Ogre Window tied to the SDL Window
+  Ogre::NameValuePairList params;
+  params["externalWindowHandle"] =
+      winHandle; // Embeds Ogre inside the SDL window
+  Ogre::RenderWindow *window =
+      root->createRenderWindow("Reaktory", 1024, 768, false, &params);
+
+  // 5. Setup your Scene, Camera, Viewport, and RTSS here...
   Ogre::SceneManager *scnMgr = root->createSceneManager();
 
   // register our scene with the RTSS
@@ -64,20 +59,32 @@ int main(int argc, char *argv[]) {
 
   // and tell it to render into the main window
   ctx.getRenderWindow()->addViewport(cam);
+  // 6. Complete Context-Free Main Loop
+  bool running = true;
+  SDL_Event event;
 
-  // finally something to render
-  // Ogre::Entity* ent = scnMgr->createEntity("Sinbad.mesh");
-  // Ogre::SceneNode* node = scnMgr->getRootSceneNode()->createChildSceneNode();
-  // node->attachObject(ent);
-  //! [setup]
+  while (running) {
+    // Pump and process OS/Input events completely via SDL
+    while (SDL_PollEvent(&event)) {
+      if (event.type == SDL_QUIT) {
+        running = false;
+      }
+      if (event.type == SDL_KEYDOWN) {
+        if (event.key.keysym.sym == SDLK_ESCAPE) {
+          running = false;
+        }
+      }
+    }
 
-  //! [main]
-  // register for input events
-  KeyHandler keyHandler;
-  ctx.addInputListener(&keyHandler);
+    // Render the frame
+    if (!root->renderOneFrame()) {
+      running = false;
+    }
+  }
 
-  ctx.getRoot()->startRendering();
-  ctx.closeApp();
-  //! [main]
+  // Clean up
+  delete root;
+  SDL_DestroyWindow(sdlWindow);
+  SDL_Quit();
   return 0;
 }
