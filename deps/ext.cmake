@@ -14,6 +14,7 @@ if (CCACHE_PROGRAM)
   set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM} base_dir=${PROJECT_SOURCE_DIR} hash_dir=false)
 endif()
 
+message(zlib)
 CPMAddPackage(
   NAME zlib
   VERSION 1.3.1.2
@@ -32,16 +33,17 @@ add_library(ZLIB::ZLIB ALIAS zlibstatic)
 get_target_property(zlibincludes zlibstatic INCLUDE_DIRECTORIES)
 set(ZLIB_INCLUDE_DIR ${zlibincludes} CACHE PATH "" FORCE)
 
-# CPMAddPackage(
-#   NAME rpmalloc
-#   VERSION 2.0.0
-#   GITHUB_REPOSITORY mjansson/rpmalloc
-#   GIT_TAG 2.0.0
-#   DOWNLOAD_ONLY
-# )
-#
-# add_library(rpmalloc ${rpmalloc_SOURCE_DIR}/rpmalloc/rpmalloc.c)
-# target_include_directories(rpmalloc PUBLIC ${rpmalloc_SOURCE_DIR}/rpmalloc/)
+message(rpmalloc)
+CPMAddPackage(
+  NAME rpmalloc
+  VERSION 2.0.0
+  GITHUB_REPOSITORY mjansson/rpmalloc
+  GIT_TAG 2.0.0
+  DOWNLOAD_ONLY
+)
+
+add_library(rpmalloc ${rpmalloc_SOURCE_DIR}/rpmalloc/rpmalloc.c)
+target_include_directories(rpmalloc PUBLIC ${rpmalloc_SOURCE_DIR}/rpmalloc/)
 
 add_library(yyjson deps/yyjson/yyjson.c)
 target_include_directories(yyjson PUBLIC deps/yyjson/)
