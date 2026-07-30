@@ -21,7 +21,7 @@ enum LOG_TAG {
 struct Message {
   LOG_TAG tag;
   const char* context;
-  std::basic_string<char, char, Allocators::ArenaAllocator<char>> message;
+  // std::basic_string<char, char, Allocators::ArenaAllocator<char>> message;
 };
 
 class MessageQueue {

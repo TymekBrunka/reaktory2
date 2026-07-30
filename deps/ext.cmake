@@ -15,6 +15,13 @@ if (CCACHE_PROGRAM)
 endif()
 
 message(zlib)
+
+set(ZLIB_FOUND TRUE CACHE BOOL "" FORCE) # the long way since minizpi is built inside zlib cmake script so there is no access to zlibstatic target yet
+add_library(ZLIB::ZLIB UNKNOWN IMPORTED)
+set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}z${CMAKE_DEBUG_POSTFIX}${CMAKE_STATIC_LIBRARY_SUFFIX}" CACHE PATH "" FORCE)
+set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE ARRAY "" FORCE)
+set_target_properties(ZLIB::ZLIB PROPERTIES IMPORTED_LOCATION "${ZLIB_LIBRARY}" INTERFACE_INCLUDE_DIRECTORIES "${zlib_INCLUDE_DIR}")
+
 CPMAddPackage(
   NAME zlib
   VERSION 1.3.1.2
@@ -23,12 +30,19 @@ CPMAddPackage(
   OPTIONS
     "ZLIB_BUILD_SHARED OFF"
     "ZLIB_BUILD_STATIC ON"
+    "ZLIB_BUILD_MINIZIP ON"
     "ZLIB_BUILD_TESTING OFF"
     "ZLIB_INSTALL OFF"
+
+    "ZLIB_BUILD_MINIZIP ON"
+    "MINIZIP_BUILD_SHARED OFF"
+    "MINIZIP_INSTALL OFF"
+    "MINIZIP_BUILD_TESTING OFF"
 )
 
-set(ZLIB_FOUND TRUE CACHE BOOL "" FORCE)
-add_library(ZLIB::ZLIB ALIAS zlibstatic)
+# add_library(ZLIB::ZLIB ALIAS zlibstatic)
+# set(minizip_FOUND TRUE CACHE BOOL "" FORCE)
+# add_library(minizip::minizip ALIAS libminizipstatic)
 
 get_target_property(zlibincludes zlibstatic INCLUDE_DIRECTORIES)
 set(ZLIB_INCLUDE_DIR ${zlibincludes} CACHE PATH "" FORCE)

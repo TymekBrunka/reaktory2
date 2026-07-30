@@ -62,6 +62,9 @@ CPMAddPackage(
     "ASSIMP_BUILD_DOCS OFF"
     "ASSIMP_BUILD_ZLIB OFF"
     "ASSIMP_WARNINGS_AS_ERRORS OFF" #set but unused error causes assimp not to build
+
+    "ASSIMP_BUILD_M3D_IMPORTER ON"
     # "ZLIB_LIBRARY ${zlib_LIBRARIES}"
     # "ZLIB_INCLUDE_DIR ${zlib_INCLUDE_DIRS}"
 )
+target_link_libraries(assimp libminizipstatic) # assimp forgets to link with minizip in this case
