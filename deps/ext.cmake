@@ -14,6 +14,34 @@ if (CCACHE_PROGRAM)
   set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM} base_dir=${PROJECT_SOURCE_DIR} hash_dir=false)
 endif()
 
+message(bzip2)
+CPMAddPackage(
+  NAME bzip2
+  VERSION 1.0
+  GIT_REPOSITORY git://sourceware.org/git/bzip2.git
+  GIT_TAG master
+)
+
+set(cmpath ${CMAKE_MODULE_PATH})
+list(PREPEND cmpath "${CMAKE_CURRENT_SOURCE_DIR}/deps/cmake-off/")
+set(CMAKE_MODULE_PATH ${cmpath} CACHE ARRAY "" FORCE)
+
+message(zstd)
+CPMAddPackage(
+  NAME zstd
+  VERSION 0.4.2
+  GITHUB_REPOSITORY facebook/zstd
+  GIT_TAG 5c7b7bad26808e6b40ac3b3d0075466e27738a9d
+  OPTIONS
+    "ZSTD_BUILD_STATIC ON"
+    "ZSTD_BUILD_SHARED ON"
+    "ZSTD_BUILD_PROGRAMS OFF"
+    "BUILD_TESTING OFF"
+)
+
+set(ZSTD_FOUND TRUE CACHE BOOL "" FORCE)
+add_library(zstd::libzstd_static ALIAS libzstd_static)
+
 message(zlib)
 
 if(WIN32)
@@ -25,13 +53,6 @@ add_library(ZLIB::ZLIB UNKNOWN IMPORTED)
 set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}z${zlib_static_suffix}${CMAKE_DEBUG_POSTFIX}${CMAKE_STATIC_LIBRARY_SUFFIX}" CACHE PATH "" FORCE)
 set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE ARRAY "" FORCE)
 set_target_properties(ZLIB::ZLIB PROPERTIES IMPORTED_LOCATION "${ZLIB_LIBRARY}" INTERFACE_INCLUDE_DIRECTORIES "${zlib_INCLUDE_DIR}")
-
-CPMAddPackage(
-  NAME bzip2
-  VERSION 1.0
-  GIT_REPOSITORY git://sourceware.org/git/bzip2.git
-  GIT_TAG master
-)
 
 CPMAddPackage(
   NAME zlib

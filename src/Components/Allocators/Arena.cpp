@@ -50,23 +50,22 @@ void *Arena::alloc(uint32_t size) {
   uint_fast32_t offset_ = 0;
   uint_fast32_t old_offset = 0;
   do {
-    if (atomic_load_explicit(&arena->is_locked, memory_order_acq_rel)) {
-      atomic_wait_explicit(&arena->is_locked, true,
-                           memory_order_acq_rel); // put thread to sleep until
-                                                  // new page is allocated
+    if (atomic_load(&arena->is_locked)) {
+      atomic_wait(&arena->is_locked,
+                  true); // put thread to sleep until new page is allocated
     }
     // if (arena->get_page_free_size() <= size) {
     //   arena->offset += size;
     //   return memory + arena->offset - size;
     // }
-    offset_ = atomic_load_explicit(&arena->offset, memory_order_acq_rel);
+    offset_ = atomic_load(&arena->offset);
     old_offset = offset_;
     while (offset_ == old_offset + size) {
       if (offset_ + size >
           arena->page_size) // if there is not enough space, check other pages
         break;
-      if (atomic_compare_exchange_weak(&arena->offset, &offset_, offset_ + size,
-                                       memory_order_acq_rel)) {
+      if (atomic_compare_exchange_weak(&arena->offset, &offset_,
+                                       offset_ + size)) {
         break;
       }
       old_offset = offset_;

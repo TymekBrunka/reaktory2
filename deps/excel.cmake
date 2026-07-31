@@ -40,7 +40,33 @@ set(EXPAT_INCLUDE_DIR ${zlibincludes} CACHE PATH "" FORCE)
 #
 # target_link_libraries(archive_static zlibstatic)
 
-# add_library(ZLIB::ZLIB alias zlib_static)
+message(bzip2)
+CPMAddPackage(
+  NAME bzip2
+  VERSION 1.0
+  GIT_REPOSITORY git://sourceware.org/git/bzip2.git
+  GIT_TAG master
+)
+
+set(cmpath ${CMAKE_MODULE_PATH})
+list(PREPEND cmpath "${CMAKE_CURRENT_SOURCE_DIR}/deps/cmake-off/")
+set(CMAKE_MODULE_PATH ${cmpath} CACHE ARRAY "" FORCE)
+
+message(zstd)
+CPMAddPackage(
+  NAME zstd
+  VERSION 0.4.2
+  GITHUB_REPOSITORY facebook/zstd
+  GIT_TAG 5c7b7bad26808e6b40ac3b3d0075466e27738a9d
+  OPTIONS
+    "ZSTD_BUILD_STATIC ON"
+    "ZSTD_BUILD_SHARED ON"
+    "ZSTD_BUILD_PROGRAMS OFF"
+    "BUILD_TESTING OFF"
+)
+
+set(ZSTD_FOUND TRUE CACHE BOOL "" FORCE)
+# add_library(zstd::libzstd_static ALIAS libzstd_static)
 
 message(libzip)
 CPMAddPackage(
@@ -56,7 +82,7 @@ CPMAddPackage(
     "ENABLE_COMMONCRYPTO OFF"
     "ENABLE_GNUTLS OFF"
     "ENABLE_MBEDTLS OFF"
-    "ENABLE_BZIP2 OFF"
+    "ENABLE_BZIP2 ON"
     "ENABLE_FDOPEN OFF"
     "BUILD_SHARED_LIBS OFF"
     "BUILD_TOOLS OFF"
