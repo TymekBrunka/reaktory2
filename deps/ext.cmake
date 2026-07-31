@@ -16,11 +16,22 @@ endif()
 
 message(zlib)
 
+if(WIN32)
+  set(zlib_static_suffix "s")
+endif()
+
 set(ZLIB_FOUND TRUE CACHE BOOL "" FORCE) # the long way since minizpi is built inside zlib cmake script so there is no access to zlibstatic target yet
 add_library(ZLIB::ZLIB UNKNOWN IMPORTED)
-set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}z${CMAKE_DEBUG_POSTFIX}${CMAKE_STATIC_LIBRARY_SUFFIX}" CACHE PATH "" FORCE)
+set(ZLIB_LIBRARY "${zlib_BINARY_DIR}/${CMAKE_STATIC_LIBRARY_PREFIX}z${zlib_static_suffix}${CMAKE_DEBUG_POSTFIX}${CMAKE_STATIC_LIBRARY_SUFFIX}" CACHE PATH "" FORCE)
 set(ZLIB_INCLUDE_DIR "${zlib_SOURCE_DIR};${zlib_BINARY_DIR}" CACHE ARRAY "" FORCE)
 set_target_properties(ZLIB::ZLIB PROPERTIES IMPORTED_LOCATION "${ZLIB_LIBRARY}" INTERFACE_INCLUDE_DIRECTORIES "${zlib_INCLUDE_DIR}")
+
+CPMAddPackage(
+  NAME bzip2
+  VERSION 1.0
+  GIT_REPOSITORY git://sourceware.org/git/bzip2.git
+  GIT_TAG master
+)
 
 CPMAddPackage(
   NAME zlib

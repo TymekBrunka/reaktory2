@@ -50,9 +50,9 @@ CPMAddPackage(
   GIT_TAG v1.11.4
   OPTIONS
     "ENABLE_LZMA ON"
+    "ENABLE_ZSTD ON"
     "ENABLE_OPENSSL OFF"
     "ENABLE_COVERAGE OFF"
-    "ENABLE_ZSTD OFF"
     "ENABLE_COMMONCRYPTO OFF"
     "ENABLE_GNUTLS OFF"
     "ENABLE_MBEDTLS OFF"
@@ -67,10 +67,11 @@ CPMAddPackage(
     "LIBZIP_DO_INSTALL OFF"
     "BUILD_SHARED_LIBS OFF"
 
-    "CFLAGS -I${libzip_SOURCE_DIR}"
+    # "CFLAGS -I${libzip_SOURCE_DIR}"
 )
 
-target_include_directories(zip PUBLIC ${libzip_SOURCE_DIR})
+# target_include_directories(zip PUBLIC ${libzip_SOURCE_DIR})
+target_link_libraries(zip PRIVATE zlibstatic)
 
 get_target_property(LIBZIP_INCLUDES libzip::zip INCLUDE_DIRECTORIES)
 list(APPEND LIBZIP_INCLUDES $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/deps> $<BUILD_INTERFACE:${libzip_BINARY_DIR}>)
