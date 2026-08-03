@@ -14,6 +14,18 @@ add_library(arena OBJECT
 )
 target_include_directories(arena PUBLIC src/Components/Allocators)
 
+add_library(renderer STATIC
+  src/Renderer/Renderer.cpp
+  src/Renderer/Renderer_impl.cpp
+  src/Renderer/Renderer.hpp
+  src/Renderer/Renderer_internal.hpp
+)
+target_include_directories(renderer PUBLIC
+  src/Renderer
+  src/Components
+)
+target_link_libraries(renderer PRIVATE glad glfw)
+
 add_executable(main src/main.cpp)
 target_include_directories(main PRIVATE src src/Components)
-target_link_libraries(main PRIVATE arena ZLIB::ZLIB)
+target_link_libraries(main PRIVATE renderer ZLIB::ZLIB)
