@@ -107,6 +107,14 @@ void Render::SetWindowIcon(const Image &icon_) {
   glfwSetWindowIcon(impl->window, 1, icon);
 }
 
+rect_size Render::GetRenderSize() const {
+  return impl->window_size;
+}
+
+float Render::GetDelta() const {
+  return impl->deltatime;
+}
+
 bool Render::WindowShouldClose() const { return glfwWindowShouldClose(impl->window); }
 
 Result<rProgram, no_error> Render::LoadProgram(const char *name, const char *vs,
@@ -117,6 +125,10 @@ Result<rProgram, no_error> Render::LoadProgram(const char *name, const char *vs,
 void Render::UnloadProgram(rProgram program) { glDeleteProgram(program); }
 
 void Render::BeginFrame() {
+  double current_frame_time = glfwGetTime();
+  impl->deltatime = current_frame_time - impl->last_frame_time;
+  impl->last_frame_time = current_frame_time;
+
   glViewport(0, 0, impl->window_size.width, impl->window_size.height);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   ImGui::SetCurrentContext(impl->imctx);

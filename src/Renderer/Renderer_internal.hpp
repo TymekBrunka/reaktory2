@@ -8,9 +8,11 @@
 namespace Renderer {
 
 struct Render::Impl {
-  rect_size window_size;
-  GLFWwindow *window;
-  ImGuiContext *imctx;
+  float deltatime = 0;
+  double last_frame_time = 0;
+  rect_size window_size = {0, 0};
+  GLFWwindow *window = nullptr;
+  ImGuiContext *imctx = nullptr;
 
   Result<rShader, no_error> CreateShader(GLenum shader_type, const char *src);
   Result<rProgram, no_error> LinkProgram(rProgram program, const char *name);
