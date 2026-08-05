@@ -7,6 +7,24 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(deps/ext.cmake)
+add_subdirectory(src/BuildTools)
+
+imgpack_(
+  OUTPUT images
+  CHANNELS 4
+  FLIP y
+  SOURCES
+    assets/images/icons.png
+    assets/images/placeholder.png
+)
+
+imgpack_(
+  OUTPUT icon_img
+  CHANNELS 4
+  FLIP n
+  SOURCES
+    assets/images/icon.png
+)
 
 add_library(arena OBJECT
   src/Components/Allocators/Arena.cpp
@@ -24,8 +42,8 @@ target_include_directories(renderer PUBLIC
   src/Renderer
   src/Components
 )
-target_link_libraries(renderer PRIVATE glad glfw)
+target_link_libraries(renderer PRIVATE glad glfw imgui)
 
 add_executable(main src/main.cpp)
 target_include_directories(main PRIVATE src src/Components)
-target_link_libraries(main PRIVATE renderer ZLIB::ZLIB)
+target_link_libraries(main PRIVATE icon_img renderer imgui ZLIB::ZLIB)

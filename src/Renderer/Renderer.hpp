@@ -43,33 +43,47 @@ struct Image {
 class Camera;
 
 class Render { // singleton since not all glfw callbacks provide user-data
-                 // paramether
+               // paramether
 private:
   struct Impl;
-  static Impl *impl;
+  Impl *impl = nullptr;
 
 public:
   static bool Init();
   static void Cleanup();
-  static inline Impl *get_impl() { return impl; }
+  void makeContextCurrent();
+  inline Impl *get_impl() { return impl; }
 
-  static void SetWindowTitle(const char *title);
-  static void SetWindowIcon(const Image &icon);
-  static void SetCamera(const Camera *camera = nullptr);
+  Render() = default;
+  ~Render();
+  Render(const char *title, rect_size window_size);
+  Render(const Render &other) = delete;
+  Render &operator=(const Render &other) = delete;
+  Render(Render &&other);
+  Render &operator=(Render &&other);
 
-  static Result<rProgram, no_error> LoadProgram(const char* vs, const char* fs);
+  void SetWindowTitle(const char *title);
+  void SetWindowIcon(const Image &icon_);
+  void SetCamera(const Camera *camera = nullptr);
 
-  static Result<rTexture2D, no_error> LoadTexture(const Image& image);
-  static void UnloadTexture(rTexture2D id);
+  Result<rProgram, no_error> LoadProgram(const char *name, const char *vs,
+                                         const char *fs);
+  void UnloadProgram(rProgram program);
 
-  static rect_size GetRenderSize();
-  static float GetDelta();
+  Result<rTexture2D, no_error> LoadTexture(const Image &image);
+  void UnloadTexture(rTexture2D id);
 
-  static bool WindowShouldClose();
-  static void BeginRenderPass(rFBO id, const rect_size viewport_size);
-  static void EndRenderPass();
-  static void BeginFrame();
-  static void EndFrame();
+  rect_size GetRenderSize();
+  float GetDelta();
+
+  bool WindowShouldClose();
+  void BeginRenderPass(rFBO id, const rect_size viewport_size);
+  void EndRenderPass();
+  void BeginFrame();
+  void EndFrame();
+  void ClearBackground();
+  void ClearColor();
+  void ClearDepth();
 };
 
 } // namespace Renderer

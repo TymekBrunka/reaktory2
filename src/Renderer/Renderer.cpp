@@ -1,53 +1,120 @@
 #include <Renderer.hpp>
 #include <glad/gl.h>
+#include <stdexcept>
 
 #include <GLFW/glfw3.h>
 #include <Renderer_internal.hpp>
+
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
 namespace Renderer {
 
-Render::Impl *Render::impl = nullptr;
-
 bool Render::Init() {
-  impl = new Render::Impl;
-
   if (!glfwInit())
     return false;
+
+  return true;
+}
+
+void Render::Cleanup() {
+  ImGui_ImplOpenGL3_Shutdown();
+  ImGui_ImplGlfw_Shutdown();
+  ImGui::DestroyContext();
+  glfwTerminate();
+}
+
+Render::Render(const char *title, rect_size window_size) {
+  impl = new Render::Impl;
 
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
   impl->window_size = rect_size{640, 480};
-  impl->window = glfwCreateWindow(640, 480, "Render", NULL, NULL);
+  impl->window = glfwCreateWindow(window_size.width, window_size.height, title, NULL, NULL);
 
   if (!impl->window) {
-    glfwTerminate();
-    return false;
+    delete[] impl;
+    throw std::runtime_error("Failed to create window");
   }
 
   glfwMakeContextCurrent(impl->window);
   glfwSwapInterval(1); // vsync: on
   gladLoadGL(glfwGetProcAddress);
 
-  return true;
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  ImGui::StyleColorsDark();
+  ImGui_ImplGlfw_InitForOpenGL(impl->window, true);
+  ImGui_ImplOpenGL3_Init("#version 330");
+}
+
+Render::~Render() {
+  if (impl) {
+    glfwDestroyWindow(impl->window);
+    delete[] impl;
+  }
+}
+
+Render::Render(Render &&other) {
+  impl = other.impl;
+  other.impl = nullptr;
+}
+
+Render &Render::operator=(Render &&other) {
+  if (this != &other) {
+    impl = other.impl;
+    other.impl = nullptr;
+  }
+  return *this;
+}
+
+void Render::makeContextCurrent() { glfwMakeContextCurrent(impl->window); }
+
+void Render::SetWindowTitle(const char *title) {
+  glfwSetWindowTitle(impl->window, title);
+}
+
+void Render::SetWindowIcon(const Image &icon_) {
+  GLFWimage icon[1];
+  icon[0].width = icon_.width;
+  icon[0].height = icon_.height;
+  icon[0].pixels = icon_.pixels;
+  glfwSetWindowIcon(impl->window, 1, icon);
 }
 
 bool Render::WindowShouldClose() { return glfwWindowShouldClose(impl->window); }
 
+Result<rProgram, no_error> Render::LoadProgram(const char *name, const char *vs,
+                                               const char *fs) {
+  return impl->CreateProgram(name, vs, fs);
+}
+
+void Render::UnloadProgram(rProgram program) { glDeleteProgram(program); }
+
 void Render::BeginFrame() {
   glViewport(0, 0, impl->window_size.width, impl->window_size.height);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  ImGui_ImplOpenGL3_NewFrame();
+  ImGui_ImplGlfw_NewFrame();
+  ImGui::NewFrame();
 }
 
 void Render::EndFrame() {
+  ImGui::Render();
+  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
   glfwSwapBuffers(impl->window);
   glfwPollEvents();
 }
 
-void Render::Cleanup() {
-  glfwDestroyWindow(impl->window);
-  glfwTerminate();
-  delete impl;
+void Render::ClearBackground() {
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
+
+void Render::ClearColor() { glClear(GL_COLOR_BUFFER_BIT); }
+
+void Render::ClearDepth() { glClear(GL_DEPTH_BUFFER_BIT); }
 
 } // namespace Renderer

@@ -10,6 +10,10 @@ template <typename T, typename E> struct Result {
     E error;
   } value;
 
+  Result() {
+    is_ok = false;
+  }
+
   static Result OK(T success) {
     Result res;
     res.is_ok = true;

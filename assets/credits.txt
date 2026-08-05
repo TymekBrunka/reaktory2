@@ -1,0 +1,3 @@
+@HolyBlackCat - pomoc w sprawie ogarnięcia kompilatora
+@dot, @abfish - pomoc z pewnymi problemami w c++
+@deccer - pomoc z ogarnianiem pewnych problemów z macierzami
