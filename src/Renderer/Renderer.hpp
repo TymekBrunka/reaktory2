@@ -46,13 +46,15 @@ class Render { // singleton since not all glfw callbacks provide user-data
                // paramether
 private:
   struct Impl;
+  static void* window_1st;
   Impl *impl = nullptr;
 
 public:
   static bool Init();
   static void Cleanup();
+  static void PullEvents();
   void makeContextCurrent();
-  inline Impl *get_impl() { return impl; }
+  inline Impl *get_impl() const { return impl; }
 
   Render() = default;
   ~Render();
@@ -73,10 +75,10 @@ public:
   Result<rTexture2D, no_error> LoadTexture(const Image &image);
   void UnloadTexture(rTexture2D id);
 
-  rect_size GetRenderSize();
-  float GetDelta();
+  rect_size GetRenderSize() const;
+  float GetDelta() const;
 
-  bool WindowShouldClose();
+  bool WindowShouldClose() const;
   void BeginRenderPass(rFBO id, const rect_size viewport_size);
   void EndRenderPass();
   void BeginFrame();

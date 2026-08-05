@@ -8,21 +8,23 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
+
+#include <placeholder_icon_img.h>
 namespace Renderer {
+
+void *Render::window_1st = nullptr;
 
 bool Render::Init() {
   if (!glfwInit())
     return false;
 
+  IMGUI_CHECKVERSION();
   return true;
 }
 
-void Render::Cleanup() {
-  ImGui_ImplOpenGL3_Shutdown();
-  ImGui_ImplGlfw_Shutdown();
-  ImGui::DestroyContext();
-  glfwTerminate();
-}
+void Render::Cleanup() { glfwTerminate(); }
+
+void Render::PullEvents() { glfwPollEvents(); }
 
 Render::Render(const char *title, rect_size window_size) {
   impl = new Render::Impl;
@@ -32,20 +34,36 @@ Render::Render(const char *title, rect_size window_size) {
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
   impl->window_size = rect_size{640, 480};
-  impl->window = glfwCreateWindow(window_size.width, window_size.height, title, NULL, NULL);
+  impl->window = glfwCreateWindow(
+      window_size.width, window_size.height, title, NULL,
+      Render::window_1st ? (GLFWwindow *)Render::window_1st : NULL);
 
   if (!impl->window) {
     delete[] impl;
     throw std::runtime_error("Failed to create window");
   }
 
+  Image icon{
+      .width = placeholder_png_width,
+      .height = placeholder_png_height,
+      .channels = placeholder_png_channels,
+      .pixels = (unsigned char *)placeholder_png_pixels,
+  };
+
+  SetWindowIcon(icon);
+
   glfwMakeContextCurrent(impl->window);
   glfwSwapInterval(1); // vsync: on
   gladLoadGL(glfwGetProcAddress);
 
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  if (!Render::window_1st)
+    Render::window_1st = impl->window;
+
+  impl->imctx = ImGui::CreateContext();
+  ImGui::SetCurrentContext(impl->imctx);
+  ImGuiIO &io = ImGui::GetIO();
+  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
   ImGui::StyleColorsDark();
   ImGui_ImplGlfw_InitForOpenGL(impl->window, true);
   ImGui_ImplOpenGL3_Init("#version 330");
@@ -53,6 +71,10 @@ Render::Render(const char *title, rect_size window_size) {
 
 Render::~Render() {
   if (impl) {
+    ImGui::SetCurrentContext(impl->imctx);
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext(impl->imctx);
     glfwDestroyWindow(impl->window);
     delete[] impl;
   }
@@ -85,7 +107,7 @@ void Render::SetWindowIcon(const Image &icon_) {
   glfwSetWindowIcon(impl->window, 1, icon);
 }
 
-bool Render::WindowShouldClose() { return glfwWindowShouldClose(impl->window); }
+bool Render::WindowShouldClose() const { return glfwWindowShouldClose(impl->window); }
 
 Result<rProgram, no_error> Render::LoadProgram(const char *name, const char *vs,
                                                const char *fs) {
@@ -97,6 +119,7 @@ void Render::UnloadProgram(rProgram program) { glDeleteProgram(program); }
 void Render::BeginFrame() {
   glViewport(0, 0, impl->window_size.width, impl->window_size.height);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  ImGui::SetCurrentContext(impl->imctx);
   ImGui_ImplOpenGL3_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
@@ -105,8 +128,11 @@ void Render::BeginFrame() {
 void Render::EndFrame() {
   ImGui::Render();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+  // GLFWwindow *backup_current_context = glfwGetCurrentContext();
+  // ImGui::UpdatePlatformWindows();
+  // ImGui::RenderPlatformWindowsDefault();
+  // glfwMakeContextCurrent(backup_current_context);
   glfwSwapBuffers(impl->window);
-  glfwPollEvents();
 }
 
 void Render::ClearBackground() {
