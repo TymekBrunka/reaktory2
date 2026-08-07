@@ -1,8 +1,11 @@
 #pragma once
-#include <Arena.hpp>
-#include <string>
+#include "concurrentqueue.h"
+#include <RPmallocator.hpp>
+#include <core.hpp>
 namespace Log {
-using Arena = Allocators::Arena;
+
+using string = std::basic_string<char, std::char_traits<char>,
+                                 Allocators::RPmallocator<char>>;
 
 enum LOG_TAG {
   LOG_INFO = 1u << 0,
@@ -20,15 +23,12 @@ enum LOG_TAG {
 
 struct Message {
   LOG_TAG tag;
-  const char* context;
-  // std::basic_string<char, char, Allocators::ArenaAllocator<char>> message;
+  const char *context;
+  string message;
 };
 
 class MessageQueue {
-  Arena *public_data;
-  Arena *private_data;
-  std::vector<Message> public_queue;
-  std::vector<Message> private_queue;
+  moodycamel::ConcurrentQueue<Message> messages;
 };
 
 } // namespace Log

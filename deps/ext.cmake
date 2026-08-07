@@ -88,6 +88,28 @@ CPMAddPackage(
   DOWNLOAD_ONLY
 )
 
+message(moodycamel_concurentqueue)
+CPMAddPackage(
+  NAME moodycamel_concurentqueue
+  VERSION 1.0.5
+  GITHUB_REPOSITORY cameron314/concurrentqueue
+  GIT_TAG v1.0.5
+)
+
+message(asio)
+CPMAddPackage(
+  NAME asio
+  VERSION 1.38.2
+  GITHUB_REPOSITORY chriskohlhoff/asio
+  GIT_TAG asio-1-38-2
+  DOWNLOAD_ONLY
+)
+
+add_library(asio STATIC ${asio_SOURCE_DIR}/src/asio.cpp)
+target_include_directories(asio PUBLIC ${asio_SOURCE_DIR}/include)
+target_compile_definitions(asio PRIVATE -DASIO_SEPARATE_COMPILATION -D_WIN32_WINNT=0x0A00)
+target_precompile_headers(asio PUBLIC ${asio_SOURCE_DIR}/include/asio.hpp)
+
 add_library(rpmalloc ${rpmalloc_SOURCE_DIR}/rpmalloc/rpmalloc.c)
 target_include_directories(rpmalloc PUBLIC ${rpmalloc_SOURCE_DIR}/rpmalloc/)
 

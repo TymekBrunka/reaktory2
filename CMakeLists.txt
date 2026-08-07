@@ -34,11 +34,28 @@ imgpack_(
     assets/images/placeholder.png
 )
 
-add_library(arena OBJECT
+add_library(pch_core STATIC
+  src/precompiled_headers/core.hpp
+  src/precompiled_headers/core.cpp
+)
+target_include_directories(pch_core PUBLIC src/precompiled_headers)
+target_link_libraries(pch_core PUBLIC concurrentqueue)
+target_precompile_headers(pch_core PUBLIC src/precompiled_headers/core.hpp)
+
+add_library(allocators STATIC
   src/Components/Allocators/Arena.cpp
   src/Components/Allocators/Arena.hpp
 )
-target_include_directories(arena PUBLIC src/Components/Allocators)
+target_include_directories(allocators PUBLIC src/Components/Allocators)
+target_link_libraries(allocators PUBLIC rpmalloc)
+
+add_library(logging STATIC
+  src/Components/Logging/Logging.cpp
+  src/Components/Logging/Logging.hpp
+)
+target_include_directories(logging PUBLIC src/Components/Logging)
+target_link_libraries(logging PUBLIC pch_core allocators concurrentqueue)
+target_precompile_headers(logging REUSE_FROM pch_core)
 
 add_library(renderer STATIC
   src/Renderer/Renderer.cpp
