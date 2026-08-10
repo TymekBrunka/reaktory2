@@ -5,11 +5,15 @@
 
 #include <FontsAwesome/IconsFontAwesome6.h>
 #include <FontsAwesome/RobotoRegular.h>
+#include <Logging.hpp>
 using namespace Renderer;
 
 static ImFont *font1;
 
 int main() {
+  Log::Logger log{Log::LANG_PL, {Log::ConsoleLog_Callback}};
+  Log::Logger::Global = &log;
+
   Render::Init();
   Render::SetTargetFPS(30);
   {

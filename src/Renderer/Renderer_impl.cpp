@@ -1,3 +1,5 @@
+#include "Logging.hpp"
+#include "Translations.hpp"
 #include <Errors/Errors.hpp>
 #include <Renderer.hpp>
 #include <Renderer_internal.hpp>
@@ -35,11 +37,9 @@ Result<rShader, no_error> Render::Impl::CreateShader(GLenum shader_type,
       break;
     }
 
-    char message[522] = {0};
-    snprintf(message, 522, "%s linking error: ", shader_type_s);
-    int offset = strlen(message);
-    glGetShaderInfoLog(shader, 522 - offset, NULL, &message[offset]);
-    fprintf(stderr, "%s\n", message);
+    char message[512] = {0};
+    glGetShaderInfoLog(shader, 512, NULL, message);
+    Log::log(Log::ERROR | Log::SEV_LOW, 0, "GL", Log::MSG_GL_ERROR_SHADER, std::make_format_args(message));
 
     glDeleteShader(shader);
     return Result<rShader, no_error>::ERR(false);
@@ -55,12 +55,9 @@ Result<rProgram, no_error> Render::Impl::LinkProgram(rProgram program,
   glGetProgramiv(program, GL_LINK_STATUS, &linking_status);
 
   if (!linking_status) {
-    char message[590] = {0};
-    snprintf(message, 590,
-             "program '%s' linking error: ", name ? name : "(no name)");
-    int offset = strlen(message);
-    glGetProgramInfoLog(program, 590 - offset, NULL, &message[offset]);
-    fprintf(stderr, "%s\n", message);
+    char message[512] = {0};
+    glGetProgramInfoLog(program, 512, NULL, message);
+    Log::log(Log::ERROR | Log::SEV_LOW, 0, "GL", Log::MSG_GL_ERROR_PROGRAM, std::make_format_args(message));
 
     glDeleteProgram(program);
     return Result<rProgram, no_error>::ERR(false);
@@ -77,6 +74,7 @@ bool Render::Impl::ValidateProgram(rProgram program, char *const message,
 
   if (!validation_status) {
     glGetProgramInfoLog(program, buflen, NULL, message);
+    Log::log(Log::ERROR | Log::SEV_LOW, 0, "GL", Log::MSG_GL_ERROR_VALIDATION, std::make_format_args(message));
     return false;
   }
 

@@ -53,9 +53,22 @@ add_library(logging STATIC
   src/Components/Logging/Logging.cpp
   src/Components/Logging/Logging.hpp
 )
+
+add_library(translations STATIC
+  src/Components/Logging/Translations.cpp
+  src/Components/Logging/Translations.hpp
+)
+
+target_include_directories(translations PUBLIC src/Components/Logging)
+target_link_libraries(translations PUBLIC pch_core)
+# target_precompile_headers(translations REUSE_FROM pch_core)
+
 target_include_directories(logging PUBLIC src/Components/Logging)
-target_link_libraries(logging PUBLIC pch_core allocators concurrentqueue)
-target_precompile_headers(logging REUSE_FROM pch_core)
+target_link_libraries(logging PUBLIC translations)
+# target_precompile_headers(logging REUSE_FROM pch_core)
+target_precompile_headers(logging PUBLIC src/Components/Logging/Logging.hpp)
+
+target_precompile_headers(translations REUSE_FROM logging)
 
 add_library(renderer STATIC
   src/Renderer/Renderer.cpp
@@ -67,8 +80,17 @@ target_include_directories(renderer PUBLIC
   src/Renderer
   src/Components
 )
-target_link_libraries(renderer PRIVATE placeholder_icon_img glad glfw imgui)
+target_link_libraries(renderer
+  PRIVATE
+  placeholder_icon_img glad glfw imgui
+  PUBLIC
+  logging
+)
+# target_precompile_headers(renderer REUSE_FROM pch_core)
+target_precompile_headers(renderer REUSE_FROM logging)
 
 add_executable(main src/main.cpp)
 target_include_directories(main PRIVATE src src/Components)
 target_link_libraries(main PRIVATE icon_img renderer imgui ZLIB::ZLIB)
+# target_precompile_headers(main REUSE_FROM pch_core)
+target_precompile_headers(main REUSE_FROM logging)

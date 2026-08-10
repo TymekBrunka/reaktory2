@@ -5,11 +5,13 @@
 #include <GLFW/glfw3.h>
 #include <Renderer_internal.hpp>
 
-#include "Errors/Errors.hpp"
+#include "Translations.hpp"
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+#include <Errors/Errors.hpp>
+#include <Logging.hpp>
 #include <placeholder_icon_img.h>
 
 #include "FontsAwesome/RobotoRegular.cpp"
@@ -20,10 +22,14 @@ void *Render::window_1st = nullptr;
 double Render::timeout = 0.016; // 60 fps
 
 bool Render::Init() {
-  if (!glfwInit())
+  if (!glfwInit()) {
+    Log::log_uform(Log::ERROR | Log::SEV_HIGH, 0, "RENDER",
+                   Log::MSG_RENDER_INIT_ERROR);
     return false;
+  }
 
   IMGUI_CHECKVERSION();
+  Log::log_uform(Log::DEFAULT, 0, "RENDER", Log::MSG_RENDER_INIT_SUCCESS);
   return true;
 }
 
@@ -45,8 +51,13 @@ Render::Render(const char *title, rect_size window_size) {
 
   if (!impl->window) {
     delete[] impl;
+    Log::log_uform(Log::ERROR | Log::SEV_HIGH, 0, "RENDER",
+                   Log::MSG_RENDER_CREATE_WINDOW_FAILURE);
     throw std::runtime_error("Failed to create window");
   }
+
+  Log::log_uform(Log::DEFAULT, 0, "RENDER",
+                 Log::MSG_RENDER_CREATE_WINDOW_SUCCESS);
 
   Image icon{
       .width = placeholder_png_width,
@@ -116,9 +127,14 @@ Render::Render(const char *title, rect_size window_size) {
     if (render.impl->drop_callback)
       (*render.impl->drop_callback)(render, path_count, paths);
   });
+  Log::log_uform(Log::DEFAULT, 0, "RENDER",
+                 Log::MSG_RENDER_SET_WINDOW_CALLBACKS);
 
-  if (!Render::window_1st)
+  if (!Render::window_1st) {
     Render::window_1st = impl->window;
+    Log::log_uform(Log::DEFAULT, 0, "RENDER",
+                   Log::MSG_RENDER_SET_GLOBAL_GL_CTX);
+  }
 
   impl->imctx = ImGui::CreateContext();
   ImGui::SetCurrentContext(impl->imctx);
@@ -129,6 +145,7 @@ Render::Render(const char *title, rect_size window_size) {
   ImGui::StyleColorsDark();
   ImGui_ImplGlfw_InitForOpenGL(impl->window, true);
   ImGui_ImplOpenGL3_Init("#version 330");
+  Log::log_uform(Log::DEFAULT, 0, "RENDER", Log::MSG_RENDER_CREATE_IMGUI_CTX);
 }
 
 Render::~Render() {
@@ -173,9 +190,7 @@ void Render::SetTargetFPS(double fps) { timeout = 1.0 / fps; }
 
 GLFWwindow *Render::GetGLFWWindow() { return impl->window; }
 
-bool Render::IsMinimised() const {
-  return impl->minimised;
-}
+bool Render::IsMinimised() const { return impl->minimised; }
 
 void Render::SetResizeCallback(Render::RENDERframebuffersizefun *callback) {
   impl->resize_callback = callback;
@@ -246,8 +261,7 @@ Result<rTexture2D, no_error> Render::LoadTexture(const Image &image,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER,
                     GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, image.mipmap_levels);
-  }
-  else
+  } else
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, interp_mode);
 
   GLenum color_format = GL_RGBA;
