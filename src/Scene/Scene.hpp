@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <filesystem>
 #include <Renderer>
 
 class Scene {
@@ -7,6 +8,8 @@ class Scene {
 
   Renderer::rect_size size;
   std::string name;
+  std::filesystem::path current_folder;
+  // std::string current_folder;
   Renderer::rCubeMap skybox_texture;
   Renderer::rTexture2D screen_canvas;
   Renderer::rTexture2D color_canvas;

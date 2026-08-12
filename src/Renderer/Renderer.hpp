@@ -50,6 +50,7 @@ private:
   struct Impl;
   static void *window_1st;
   static double timeout;
+  static bool initialised;
 
 public:
   typedef void (*RENDERframebuffersizefun)(Render &window, int width,
@@ -79,7 +80,8 @@ public:
 
   Render() = default;
   ~Render();
-  Render(const char *title, rect_size window_size);
+  bool init(const char *title, rect_size window_size);
+  void cleanup();
   Render(const Render &other) = delete;
   Render &operator=(const Render &other) = delete;
   Render(Render &&other);

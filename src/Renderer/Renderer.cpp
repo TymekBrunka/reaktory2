@@ -20,8 +20,12 @@ namespace Renderer {
 
 void *Render::window_1st = nullptr;
 double Render::timeout = 0.016; // 60 fps
+bool Render::initialised = false;
 
 bool Render::Init() {
+  if (initialised)
+    return true;
+
   if (!glfwInit()) {
     Log::log_uform(Log::ERROR | Log::SEV_HIGH, 0, "RENDER",
                    Log::MSG_RENDER_INIT_ERROR);
@@ -30,14 +34,20 @@ bool Render::Init() {
 
   IMGUI_CHECKVERSION();
   Log::log_uform(Log::DEFAULT, 0, "RENDER", Log::MSG_RENDER_INIT_SUCCESS);
+  initialised = true;
   return true;
 }
 
-void Render::Cleanup() { glfwTerminate(); }
+void Render::Cleanup() {
+  if (initialised) {
+    glfwTerminate();
+    initialised = false;
+  }
+}
 
 void Render::PullEvents() { glfwWaitEventsTimeout(timeout); }
 
-Render::Render(const char *title, rect_size window_size) {
+bool Render::init(const char *title, rect_size window_size) {
   impl = new Render::Impl;
 
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -53,7 +63,7 @@ Render::Render(const char *title, rect_size window_size) {
     delete[] impl;
     Log::log_uform(Log::ERROR | Log::SEV_HIGH, 0, "RENDER",
                    Log::MSG_RENDER_CREATE_WINDOW_FAILURE);
-    throw std::runtime_error("Failed to create window");
+    return false;
   }
 
   Log::log_uform(Log::DEFAULT, 0, "RENDER",
@@ -146,17 +156,24 @@ Render::Render(const char *title, rect_size window_size) {
   ImGui_ImplGlfw_InitForOpenGL(impl->window, true);
   ImGui_ImplOpenGL3_Init("#version 330");
   Log::log_uform(Log::DEFAULT, 0, "RENDER", Log::MSG_RENDER_CREATE_IMGUI_CTX);
+
+  return true;
 }
 
-Render::~Render() {
+void Render::cleanup() {
   if (impl) {
     ImGui::SetCurrentContext(impl->imctx);
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext(impl->imctx);
     glfwDestroyWindow(impl->window);
-    delete[] impl;
+    delete impl;
+    impl = nullptr;
   }
+}
+
+Render::~Render() {
+  cleanup();
 }
 
 Render::Render(Render &&other) {

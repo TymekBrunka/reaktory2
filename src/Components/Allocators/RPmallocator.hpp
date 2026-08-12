@@ -17,7 +17,6 @@ template <class T> struct RPmallocator {
       throw std::bad_array_new_length();
 
     if (auto p = static_cast<T *>(rpmalloc(n * sizeof(T)))) {
-      report(p, n);
       return p;
     }
 
