@@ -1,13 +1,59 @@
-#include "Components/Logging/Logging.hpp"
-#include "Renderer/Renderer.hpp"
 #include <App.hpp>
+#include <FileUtils.hpp>
+#include <Logging.hpp>
+#include <Renderer.hpp>
+#include <Translations.hpp>
 
 #include <FontsAwesome/IconsFontAwesome6.h>
 #include <FontsAwesome/RobotoRegular.h>
 #include <icon_img.h>
 #include <imgui.h>
+#include <iostream>
+
+// [app statup] -----
+// //
+bool App::set_directory_globals() {
+#ifdef _WIN32
+  const char *home_dir = getenv("USERPROFILE");
+#else
+  const char *home_dir = getenv("HOME");
+#endif
+
+  if (!home_dir) {
+    std::cerr << LOG_MSG(Log::LANG_PL, Log::MSG_APP_HOME_DIR_ERROR, Log::)
+              << "\n";
+  }
+
+  FileUtils::HOME_DIR = home_dir;
+  FileUtils::APP_ROOT = FileUtils::HOME_DIR / ".reaktory";
+  return true;
+}
+
+bool App::make_directories(const std::filesystem::path &path) {
+  try {
+    std::filesystem::create_directory(path);
+    std::filesystem::create_directory(path / "scenes");
+    std::filesystem::create_directory(path / "tmp");
+    std::filesystem::create_directory(path / "logs");
+  } catch (std::filesystem::filesystem_error &err) {
+    std::string path = err.path1().string();
+    std::cerr << LOG_FMT(Log::LANG_PL, Log::MSG_APP_ROOT_SUBDIR_CREATE_ERROR,
+                         Log::, std::make_format_args(path), true)
+              << "\n";
+    return false;
+  }
+  return true;
+}
+// \\
+// [app statup] -----
 
 bool App::init() {
+  if (!set_directory_globals())
+    return false;
+
+  if (!make_directories(FileUtils::APP_ROOT))
+    return false;
+
   logger = Log::Logger{Log::LANG_PL, {Log::ConsoleLog_Callback}};
   Log::Logger::Global = &logger;
 

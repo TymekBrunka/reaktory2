@@ -1,0 +1,17 @@
+{
+  "MSG_APP_HOME_DIR_ERROR": ["Cannot find home directory."],
+  "MSG_APP_ROOT_CREATE_ERROR": ["Cannot create app root directory."],
+  "MSG_APP_ROOT_SUBDIR_CREATE_ERROR": ["Cannot create directory '{}'."],
+
+  "MSG_RENDER_INIT_ERROR": ["Couldn't initialise renderer."],
+  "MSG_RENDER_INIT_SUCCESS": ["Initialised renderer"],
+  "MSG_RENDER_CREATE_WINDOW_SUCCESS": ["Created new window"],
+  "MSG_RENDER_CREATE_WINDOW_FAILURE": ["Couldn't create new window."],
+  "MSG_RENDER_SET_WINDOW_CALLBACKS": ["Set window callbacks"],
+  "MSG_RENDER_SET_GLOBAL_GL_CTX": ["Set global opengl context (for imgui)"],
+  "MSG_RENDER_CREATE_IMGUI_CTX": ["Created imgui context"],
+
+  "MSG_GL_ERROR_SHADER": ["Cannot compile {} shader: {}."],
+  "MSG_GL_ERROR_PROGRAM": ["Cannot link opengl program \"{}\" : {}."],
+  "MSG_GL_ERROR_VALIDATION": ["Opengl program validation returned error: {}."]
+}

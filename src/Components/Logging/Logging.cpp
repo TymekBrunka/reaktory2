@@ -53,7 +53,7 @@ Callback ConsoleLog_Callback = Callback{
 
       std::cerr << "[\x1b[33m" << timestamp << "\x1b[0m][" << context << "]["
                 << log_level << "][" << severity << "] "
-                << LOG_FMT(user_lang, message_idx, , args, is_formatted)
+                << LOG_FMT(user_lang, message_idx, , *args, is_formatted)
                 << "\n";
     }};
 

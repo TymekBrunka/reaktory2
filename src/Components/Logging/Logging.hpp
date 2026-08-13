@@ -90,7 +90,7 @@ inline void log_uform(uint8_t tag, uintptr_t additional_data,
                                : namespac messages_en)[(idx)])
 
 #define LOG_FMT(lang, idx, namespac, args, do_fmt)                             \
-  ((do_fmt) ? std::vformat(LOG_MSG(lang, idx, namespac), *(args))              \
+  ((do_fmt) ? std::vformat(LOG_MSG(lang, idx, namespac), (args))              \
             : LOG_MSG(lang, idx, namespac))
 
 extern Callback ConsoleLog_Callback;

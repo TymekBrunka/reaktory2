@@ -93,15 +93,18 @@ add_library(fileutils STATIC
   src/Components/FileUtils/FileUtils.cpp
   src/Components/FileUtils/FileUtils.hpp
 )
-target_include_directories(fileutils PUBLIC src/Components/FileUtils)
+target_include_directories(fileutils PUBLIC
+  src/Components/FileUtils
+  src/Components
+)
 
 add_library(App STATIC src/App.hpp src/App.cpp)
 target_include_directories(App PUBLIC src)
-target_link_libraries(App PUBLIC icon_img renderer imgui fileutils)
+target_link_libraries(App PUBLIC icon_img renderer imgui allocators fileutils)
 target_precompile_headers(App REUSE_FROM logging)
 
 add_executable(main src/main.cpp)
-target_link_libraries(main PRIVATE App rpmalloc)
+target_link_libraries(main PRIVATE App)
 # target_include_directories(main PRIVATE src src/Components)
 # target_precompile_headers(main REUSE_FROM pch_core)
 target_precompile_headers(main REUSE_FROM logging)

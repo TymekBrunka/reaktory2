@@ -1,27 +1,38 @@
 #pragma once
+#include <Errors/Errors.hpp>
 #include <cstddef>
 #include <filesystem>
 #include <functional>
 #include <memory>
 namespace FileUtils {
 
-std::filesystem::path HOME_DIR;
-std::filesystem::path APP_ROOT;
+template <typename T, typename E> using Result = Errors::Result<T, E>;
+using no_error = Errors::no_error;
+
+extern std::filesystem::path HOME_DIR;
+extern std::filesystem::path APP_ROOT;
 
 typedef unsigned char *(*alloc_fun)(void *alloc, size_t n);
 
-bool ReadFilex(const std::filesystem::path &filepath, unsigned char *outbuffer,
-               alloc_fun alloc = nullptr, void *allocator = nullptr);
+Result<unsigned char *, int> ReadFilex(const std::filesystem::path &filepath,
+                                       alloc_fun alloc = nullptr,
+                                       void *allocator = nullptr);
 
 template <class Allocator = std::allocator<unsigned char>>
-bool ReadFile(const std::filesystem::path &filepath, unsigned char *outbuffer,
-                        const Allocator &alloc) {
+Result<unsigned char *, int> ReadFile(const std::filesystem::path &filepath,
+                                      const Allocator &alloc) {
 
   alloc_fun allo = [](void *aloc, size_t n) {
     return std::allocator_traits<Allocator>::allocate((Allocator &)aloc, n);
   };
 
-  return ReadFilex(filepath, outbuffer, allo, (void *)&alloc);
+  return ReadFilex(filepath, allo, (void *)&alloc);
 }
+
+Result<no_error, int> WriteFile(const std::filesystem::path &filepath,
+                                void *data, size_t size);
+
+Result<no_error, int> WriteFileIfNotExists(const std::filesystem::path &filepath,
+                                void *data, size_t size);
 
 } // namespace FileUtils

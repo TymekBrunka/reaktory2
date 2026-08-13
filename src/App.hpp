@@ -1,7 +1,8 @@
 #pragma once
 #include <Logging.hpp>
-#include <Renderer/Renderer.hpp>
-#include <imgui.h>
+#include <Renderer.hpp>
+// #include <imgui.h>
+#include <filesystem>
 
 class App {
 private:
@@ -17,6 +18,9 @@ public:
   App &operator=(const App &other) = delete;
   App(App &&other) = delete;
   App &operator=(App &&other) = delete;
+
+  static bool set_directory_globals();
+  static bool make_directories(const std::filesystem::path &path);
 
   bool init();
   void run();

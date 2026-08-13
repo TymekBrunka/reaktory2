@@ -1,0 +1,17 @@
+{
+  "MSG_APP_HOME_DIR_ERROR": ["Nie można znaleźć folderu użytkownika."],
+  "MSG_APP_ROOT_CREATE_ERROR": ["Nie można utworzyć folderu aplikacji."],
+  "MSG_APP_ROOT_SUBDIR_CREATE_ERROR": ["Nie można utworzyć folderu '{}'."],
+
+  "MSG_RENDER_INIT_ERROR": ["Nie można zainicjować renderowania."],
+  "MSG_RENDER_INIT_SUCCESS": ["Zainicjowano renderer"],
+  "MSG_RENDER_CREATE_WINDOW_SUCCESS": ["Utworzono nowe okno"],
+  "MSG_RENDER_CREATE_WINDOW_FAILURE": ["Nie można utworzyć nowego okna."],
+  "MSG_RENDER_SET_WINDOW_CALLBACKS": ["Ustawiono zdarzenia okna"],
+  "MSG_RENDER_SET_GLOBAL_GL_CTX": ["Ustawiono globalny kontekst opengl (dla imgui)"],
+  "MSG_RENDER_CREATE_IMGUI_CTX": ["Utworzono kontekst imgui"],
+
+  "MSG_GL_ERROR_SHADER": ["Nie można skompilować {} shader'a: {}."],
+  "MSG_GL_ERROR_PROGRAM": ["Nie można podlinkować programu opengl \"{}\" : {}."],
+  "MSG_GL_ERROR_VALIDATION": ["Wystąpił błąd podczas walidacji programu opengl: {}."]
+}
