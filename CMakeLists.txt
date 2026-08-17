@@ -60,7 +60,7 @@ add_library(translations STATIC
 )
 
 target_include_directories(translations PUBLIC src/Components/Logging)
-target_link_libraries(translations PUBLIC pch_core)
+target_link_libraries(translations PUBLIC pch_core yyjson)
 # target_precompile_headers(translations REUSE_FROM pch_core)
 
 target_include_directories(logging PUBLIC src/Components/Logging)
@@ -100,7 +100,7 @@ target_include_directories(fileutils PUBLIC
 
 add_library(App STATIC src/App.hpp src/App.cpp)
 target_include_directories(App PUBLIC src)
-target_link_libraries(App PUBLIC icon_img renderer imgui allocators fileutils)
+target_link_libraries(App PUBLIC icon_img logging renderer imgui allocators fileutils)
 target_precompile_headers(App REUSE_FROM logging)
 
 add_executable(main src/main.cpp)

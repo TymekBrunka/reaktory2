@@ -2,10 +2,12 @@
 #include <iostream>
 namespace Log {
 
+translations_map_t messages[2];
+
 Logger *Logger::Global = nullptr;
 
 void Logger::log(uint8_t tag, uintptr_t additional_data, const char *context,
-                 uint32_t message_idx, std::format_args &&args) {
+                 translations_key_t message_idx, std::format_args &&args) {
 
   std::chrono::time_point<std::chrono::system_clock> now =
       std::chrono::system_clock::now();
@@ -17,7 +19,7 @@ void Logger::log(uint8_t tag, uintptr_t additional_data, const char *context,
 }
 
 void Logger::log_uform(uint8_t tag, uintptr_t additional_data,
-                       const char *context, uint32_t message_idx) {
+                       const char *context, translations_key_t message_idx) {
 
   std::chrono::time_point<std::chrono::system_clock> now =
       std::chrono::system_clock::now();
@@ -32,7 +34,7 @@ Callback ConsoleLog_Callback = Callback{
     .tag = ACCEPT_DEFAULTS,
     .data = nullptr,
     .write = [](std::chrono::time_point<std::chrono::system_clock> timestamp,
-                uint32_t user_lang, uint8_t tag, uint32_t message_idx,
+                uint32_t user_lang, uint8_t tag, translations_key_t message_idx,
                 const char *context, bool is_formatted, std::format_args *args,
                 void *data) {
       const char *log_level = "INFO";
@@ -48,7 +50,7 @@ Callback ConsoleLog_Callback = Callback{
       const char *severity = "LOW";
       if (tag & SEV_HIGH)
         severity = "\x1b[31mHIGH\x1b[0m";
-      if (tag & SEV_MED)
+      else if (tag & SEV_MED)
         severity = "\x1b[33mMEDIUM\x1b[0m";
 
       std::cerr << "[\x1b[33m" << timestamp << "\x1b[0m][" << context << "]["

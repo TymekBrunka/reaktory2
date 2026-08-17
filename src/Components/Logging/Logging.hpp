@@ -1,4 +1,5 @@
 #pragma once
+#include <Translations.hpp>
 #include <core.hpp>
 #include <cstdint>
 #include <format>
@@ -10,8 +11,7 @@ enum LOG_LANG {
   LANG_EN,
 };
 
-extern std::string_view messages_pl[];
-extern std::string_view messages_en[];
+extern translations_map_t messages[];
 
 // using string = std::basic_string<char, std::char_traits<char>,
 //                                  Allocators::RPmallocator<char>>;
@@ -39,13 +39,15 @@ enum LOG_TAG {
 //   std::string message;
 // };
 
+typedef void (*write_fun)(
+    std::chrono::time_point<std::chrono::system_clock> timestamp,
+    uint32_t user_lang, uint8_t tag, translations_key_t message_idx,
+    const char *context, bool is_formatted, std::format_args *args, void *data);
+
 struct Callback {
   uint8_t tag = DEFAULT;
   void *data;
-  void (*write)(std::chrono::time_point<std::chrono::system_clock> timestamp,
-                uint32_t user_lang, uint8_t tag, uint32_t message_idx,
-                const char *context, bool is_formatted, std::format_args *args,
-                void *data);
+  write_fun write;
 };
 
 class Logger {
@@ -66,32 +68,31 @@ public:
       : user_lang(user_lang_), callbacks(callbacks_) {};
 
   void log(uint8_t tag, uintptr_t additional_data, const char *context,
-           uint32_t message_idx, std::format_args &&args);
+           translations_key_t message_idx, std::format_args &&args);
 
   void log_uform(uint8_t tag, uintptr_t additional_data, const char *context,
-                 uint32_t message_idx);
+                 translations_key_t message_idx);
 };
 
 inline void log(uint8_t tag, uintptr_t additional_data, const char *context,
-                uint32_t message_idx, std::format_args &&args) {
+                translations_key_t message_idx, std::format_args &&args) {
 
   Logger::Global->log(tag, additional_data, context, message_idx,
                       std::move(args));
 }
 
 inline void log_uform(uint8_t tag, uintptr_t additional_data,
-                      const char *context, uint32_t message_idx) {
+                      const char *context, translations_key_t message_idx) {
 
   Logger::Global->log_uform(tag, additional_data, context, message_idx);
 }
 
-#define LOG_MSG(lang, idx, namespac)                                           \
-  (((lang) == namespac LANG_PL ? namespac messages_pl                          \
-                               : namespac messages_en)[(idx)])
+// #define LOG_MSG(lang, idx, namespac) \
+//   namespac messages[namespac id] ...
 
 #define LOG_FMT(lang, idx, namespac, args, do_fmt)                             \
-  ((do_fmt) ? std::vformat(LOG_MSG(lang, idx, namespac), (args))              \
-            : LOG_MSG(lang, idx, namespac))
+  ((do_fmt) ? std::vformat(namespac messages[lang][idx], (args))      \
+            : namespac messages[lang][idx])
 
 extern Callback ConsoleLog_Callback;
 

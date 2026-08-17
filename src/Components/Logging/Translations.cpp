@@ -1,48 +1,57 @@
-#include "Translations.hpp"
-#include <string_view>
+#include <Translations.hpp>
+#include <sstream>
 namespace Log {
 
-std::string_view messages_pl[MSG_S_COUNT] = {
-    [MSG_RAW] = "{}",
+#ifndef NDEBUG
 
-    [MSG_APP_HOME_DIR_ERROR] = "Nie można znaleźć folderu użytkownika.",
-    [MSG_APP_ROOT_CREATE_ERROR] = "Nie można utworzyć folderu aplikacji.",
-    [MSG_APP_ROOT_SUBDIR_CREATE_ERROR] = "Nie można utworzyć folderu '{}'.",
+#define json_assert(x)                                                         \
+  if (!(x)) {                                                                  \
+    yyjson_doc_free(doc);                                                      \
+    return false;                                                              \
+  }
 
-    [MSG_RENDER_INIT_ERROR] = "Nie można zainicjować renderowania.",
-    [MSG_RENDER_INIT_SUCCESS] = "Zainicjowano renderer",
-    [MSG_RENDER_CREATE_WINDOW_SUCCESS] = "Utworzono nowe okno",
-    [MSG_RENDER_CREATE_WINDOW_FAILURE] = "Nie można utworzyć nowego okna.",
-    [MSG_RENDER_SET_WINDOW_CALLBACKS] = "Ustawiono zdarzenia okna",
-    [MSG_RENDER_SET_GLOBAL_GL_CTX] =
-        "Ustawiono globalny kontekst opengl (dla imgui)",
-    [MSG_RENDER_CREATE_IMGUI_CTX] = "Utworzono kontekst imgui",
+bool LoadTranslation(translations_map_t *translations,
+                     const char *filepath) {
 
-    [MSG_GL_ERROR_SHADER] = "Nie można skompilować {} shader'a: {}.",
-    [MSG_GL_ERROR_PROGRAM] =
-        "Nie można podlinkować programu opengl \"{}\" : {}.",
-    [MSG_GL_ERROR_VALIDATION] =
-        "Wystąpił błąd podczas walidacji programu opengl: {}.",
-};
+  yyjson_read_err err;
+  yyjson_doc *doc = yyjson_read_file(
+      filepath, YYJSON_READ_ALLOW_COMMENTS | YYJSON_READ_ALLOW_TRAILING_COMMAS,
+      0, &err);
 
-std::string_view messages_en[MSG_S_COUNT] = {
-    [MSG_RAW] = "{}",
+  if (!doc)
+    return false;
 
-    [MSG_APP_HOME_DIR_ERROR] = "Cannot find home directory.",
-    [MSG_APP_ROOT_CREATE_ERROR] = "Cannot create app root directory.",
-    [MSG_APP_ROOT_SUBDIR_CREATE_ERROR] = "Cannot create directory '{}'.",
+  yyjson_val *root_val = yyjson_doc_get_root(doc);
+  json_assert(root_val != nullptr);
+  json_assert(yyjson_is_obj(root_val));
 
-    [MSG_RENDER_INIT_ERROR] = "Couldn't initialise renderer.",
-    [MSG_RENDER_INIT_SUCCESS] = "Initialised renderer",
-    [MSG_RENDER_CREATE_WINDOW_SUCCESS] = "Created new window",
-    [MSG_RENDER_CREATE_WINDOW_FAILURE] = "Couldn't create new window.",
-    [MSG_RENDER_SET_WINDOW_CALLBACKS] = "Set window callbacks",
-    [MSG_RENDER_SET_GLOBAL_GL_CTX] = "Set global opengl context (for imgui)",
-    [MSG_RENDER_CREATE_IMGUI_CTX] = "Created imgui context",
+  yyjson_val *key, *val;
+  yyjson_obj_iter iter = yyjson_obj_iter_with(root_val);
+  while ((key = yyjson_obj_iter_next(&iter))) {
+    val = yyjson_obj_iter_get_val(key);
+    json_assert(yyjson_is_arr(val));
 
-    [MSG_GL_ERROR_SHADER] = "Cannot compile {} shader: {}.",
-    [MSG_GL_ERROR_PROGRAM] = "Cannot link opengl program \"{}\" : {}.",
-    [MSG_GL_ERROR_VALIDATION] = "Opengl program validation returned error: {}.",
-};
+    yyjson_val *el;
+    yyjson_arr_iter iter = yyjson_arr_iter_with(val);
+    std::stringstream ss;
+    while ((el = yyjson_arr_iter_next(&iter))) {
+      json_assert(yyjson_is_str(el));
+      ss << yyjson_get_str(el) << "\n";
+    }
+    std::string str = ss.str();
+    str.pop_back();
+
+    translations->data[yyjson_get_str(key)] = str;
+  }
+
+  return true;
+}
+#else
+
+bool LoadTranslation(const translations_map_t &translations,
+                     const char *filepath) {
+  return true;
+}
+#endif
 
 } // namespace Log

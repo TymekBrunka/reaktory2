@@ -10,8 +10,22 @@
 #include <imgui.h>
 #include <iostream>
 
+#include "LogFileWriter.cpp"
+
 // [app statup] -----
 // //
+bool App::translations_initialised = false;
+
+void App::init_translations() {
+  if (!translations_initialised) {
+    Log::LoadTranslation(&Log::messages[Log::LANG_EN],
+                         "assets/translations/en_US.json");
+    Log::LoadTranslation(&Log::messages[Log::LANG_PL],
+                         "assets/translations/pl_PL.json");
+    translations_initialised = true;
+  }
+}
+
 bool App::set_directory_globals() {
 #ifdef _WIN32
   const char *home_dir = getenv("USERPROFILE");
@@ -20,7 +34,7 @@ bool App::set_directory_globals() {
 #endif
 
   if (!home_dir) {
-    std::cerr << LOG_MSG(Log::LANG_PL, Log::MSG_APP_HOME_DIR_ERROR, Log::)
+    std::cerr << Log::messages[Log::LANG_PL][TL(MSG_APP_HOME_DIR_ERROR)]
               << "\n";
   }
 
@@ -37,8 +51,8 @@ bool App::make_directories(const std::filesystem::path &path) {
     std::filesystem::create_directory(path / "logs");
   } catch (std::filesystem::filesystem_error &err) {
     std::string path = err.path1().string();
-    std::cerr << LOG_FMT(Log::LANG_PL, Log::MSG_APP_ROOT_SUBDIR_CREATE_ERROR,
-                         Log::, std::make_format_args(path), true)
+    std::cerr << LOG_FMT(Log::LANG_PL, TL(MSG_APP_ROOT_SUBDIR_CREATE_ERROR), Log::,
+                         std::make_format_args(path), true)
               << "\n";
     return false;
   }
@@ -48,6 +62,8 @@ bool App::make_directories(const std::filesystem::path &path) {
 // [app statup] -----
 
 bool App::init() {
+  init_translations();
+
   if (!set_directory_globals())
     return false;
 

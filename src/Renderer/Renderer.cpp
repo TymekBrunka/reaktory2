@@ -28,12 +28,12 @@ bool Render::Init() {
 
   if (!glfwInit()) {
     Log::log_uform(Log::ERROR | Log::SEV_HIGH, 0, "RENDER",
-                   Log::MSG_RENDER_INIT_ERROR);
+                   TL(MSG_RENDER_INIT_ERROR));
     return false;
   }
 
   IMGUI_CHECKVERSION();
-  Log::log_uform(Log::DEFAULT, 0, "RENDER", Log::MSG_RENDER_INIT_SUCCESS);
+  Log::log_uform(Log::DEFAULT, 0, "RENDER", TL(MSG_RENDER_INIT_SUCCESS));
   initialised = true;
   return true;
 }
@@ -62,12 +62,12 @@ bool Render::init(const char *title, rect_size window_size) {
   if (!impl->window) {
     delete[] impl;
     Log::log_uform(Log::ERROR | Log::SEV_HIGH, 0, "RENDER",
-                   Log::MSG_RENDER_CREATE_WINDOW_FAILURE);
+                   TL(MSG_RENDER_CREATE_WINDOW_FAILURE));
     return false;
   }
 
   Log::log_uform(Log::DEFAULT, 0, "RENDER",
-                 Log::MSG_RENDER_CREATE_WINDOW_SUCCESS);
+                 TL(MSG_RENDER_CREATE_WINDOW_SUCCESS));
 
   Image icon{
       .width = placeholder_png_width,
@@ -138,12 +138,11 @@ bool Render::init(const char *title, rect_size window_size) {
       (*render.impl->drop_callback)(render, path_count, paths);
   });
   Log::log_uform(Log::DEFAULT, 0, "RENDER",
-                 Log::MSG_RENDER_SET_WINDOW_CALLBACKS);
+                 TL(MSG_RENDER_SET_WINDOW_CALLBACKS));
 
   if (!Render::window_1st) {
     Render::window_1st = impl->window;
-    Log::log_uform(Log::DEFAULT, 0, "RENDER",
-                   Log::MSG_RENDER_SET_GLOBAL_GL_CTX);
+    Log::log_uform(Log::DEFAULT, 0, "RENDER", TL(MSG_RENDER_SET_GLOBAL_GL_CTX));
   }
 
   impl->imctx = ImGui::CreateContext();
@@ -155,7 +154,7 @@ bool Render::init(const char *title, rect_size window_size) {
   ImGui::StyleColorsDark();
   ImGui_ImplGlfw_InitForOpenGL(impl->window, true);
   ImGui_ImplOpenGL3_Init("#version 330");
-  Log::log_uform(Log::DEFAULT, 0, "RENDER", Log::MSG_RENDER_CREATE_IMGUI_CTX);
+  Log::log_uform(Log::DEFAULT, 0, "RENDER", TL(MSG_RENDER_CREATE_IMGUI_CTX));
 
   return true;
 }
@@ -172,9 +171,7 @@ void Render::cleanup() {
   }
 }
 
-Render::~Render() {
-  cleanup();
-}
+Render::~Render() { cleanup(); }
 
 Render::Render(Render &&other) {
   impl = other.impl;
