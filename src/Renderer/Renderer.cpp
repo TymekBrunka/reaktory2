@@ -4,6 +4,8 @@
 
 #include <GLFW/glfw3.h>
 #include <Renderer_internal.hpp>
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 #include "Translations.hpp"
 #include "imgui.h"
@@ -70,10 +72,10 @@ bool Render::init(const char *title, rect_size window_size) {
                  TL(MSG_RENDER_CREATE_WINDOW_SUCCESS));
 
   Image icon{
-      .width = placeholder_png_width,
-      .height = placeholder_png_height,
-      .channels = placeholder_png_channels,
-      .pixels = (unsigned char *)placeholder_png_pixels,
+      .width = placeholder2_png_width,
+      .height = placeholder2_png_height,
+      .channels = placeholder2_png_channels,
+      .pixels = (unsigned char *)placeholder2_png_pixels,
   };
 
   SetWindowIcon(icon);
@@ -90,52 +92,52 @@ bool Render::init(const char *title, rect_size window_size) {
         glViewport(0, 0, width, height);
 
         if (render.impl->resize_callback)
-          (*render.impl->resize_callback)(render, width, height);
+          render.impl->resize_callback(render, width, height);
       });
   glfwSetWindowIconifyCallback(
       impl->window, [](GLFWwindow *window, int iconified) {
         Render &render = *(Render *)glfwGetWindowUserPointer(window);
         render.impl->minimised = iconified;
         if (render.impl->minimise_callback)
-          (*render.impl->minimise_callback)(render, iconified);
+          render.impl->minimise_callback(render, iconified);
       });
   glfwSetWindowMaximizeCallback(
       impl->window, [](GLFWwindow *window, int maximised) {
         Render &render = *(Render *)glfwGetWindowUserPointer(window);
         if (render.impl->maximise_callback)
-          (*render.impl->maximise_callback)(render, maximised);
+          render.impl->maximise_callback(render, maximised);
       });
   glfwSetKeyCallback(impl->window, [](GLFWwindow *window, int key, int scancode,
                                       int action, int mods) {
     Render &render = *(Render *)glfwGetWindowUserPointer(window);
     if (render.impl->key_callback)
-      (*render.impl->key_callback)(render, key, scancode, action, mods);
+      render.impl->key_callback(render, key, scancode, action, mods);
   });
   glfwSetCursorPosCallback(
       impl->window, [](GLFWwindow *window, double xpos, double ypos) {
         Render &render = *(Render *)glfwGetWindowUserPointer(window);
         if (render.impl->mouse_move_callback) {
-          (*render.impl->mouse_move_callback)(render, xpos, ypos);
+          render.impl->mouse_move_callback(render, xpos, ypos);
         }
       });
   glfwSetMouseButtonCallback(
       impl->window, [](GLFWwindow *window, int button, int action, int mods) {
         Render &render = *(Render *)glfwGetWindowUserPointer(window);
         if (render.impl->mouse_button_callback)
-          (*render.impl->mouse_button_callback)(render, button, action, mods);
+          render.impl->mouse_button_callback(render, button, action, mods);
       });
   glfwSetScrollCallback(
       impl->window, [](GLFWwindow *window, double xoffset, double yoffset) {
         Render &render = *(Render *)glfwGetWindowUserPointer(window);
         if (render.impl->scroll_callback) {
-          (*render.impl->scroll_callback)(render, xoffset, yoffset);
+          render.impl->scroll_callback(render, xoffset, yoffset);
         }
       });
   glfwSetDropCallback(impl->window, [](GLFWwindow *window, int path_count,
                                        const char *paths[]) {
     Render &render = *(Render *)glfwGetWindowUserPointer(window);
     if (render.impl->drop_callback)
-      (*render.impl->drop_callback)(render, path_count, paths);
+      render.impl->drop_callback(render, path_count, paths);
   });
   Log::log_uform(Log::DEFAULT, 0, "RENDER",
                  TL(MSG_RENDER_SET_WINDOW_CALLBACKS));
@@ -206,35 +208,35 @@ GLFWwindow *Render::GetGLFWWindow() { return impl->window; }
 
 bool Render::IsMinimised() const { return impl->minimised; }
 
-void Render::SetResizeCallback(Render::RENDERframebuffersizefun *callback) {
+void Render::SetResizeCallback(Render::RENDERframebuffersizefun callback) {
   impl->resize_callback = callback;
 }
 
-void Render::SetMinimiseCallback(Render::RENDERwindowminimisefun *callback) {
+void Render::SetMinimiseCallback(Render::RENDERwindowminimisefun callback) {
   impl->minimise_callback = callback;
 }
 
-void Render::SetMaximiseCallback(Render::RENDERwindowmaximizefun *callback) {
+void Render::SetMaximiseCallback(Render::RENDERwindowmaximizefun callback) {
   impl->maximise_callback = callback;
 }
 
-void Render::SetKeyCallback(Render::RENDERkeyfun *callback) {
+void Render::SetKeyCallback(Render::RENDERkeyfun callback) {
   impl->key_callback = callback;
 }
 
-void Render::SetMouseMoveCallback(Render::RENDERcursorposfun *callback) {
+void Render::SetMouseMoveCallback(Render::RENDERcursorposfun callback) {
   impl->mouse_move_callback = callback;
 }
 
-void Render::SetMouseButtonCallback(Render::RENDERmousebuttonfun *callback) {
+void Render::SetMouseButtonCallback(Render::RENDERmousebuttonfun callback) {
   impl->mouse_button_callback = callback;
 }
 
-void Render::SetScrollCallback(Render::RENDERscrollfun *callback) {
+void Render::SetScrollCallback(Render::RENDERscrollfun callback) {
   impl->scroll_callback = callback;
 }
 
-void Render::SetDropCallback(Render::RENDERdropfun *callback) {
+void Render::SetDropCallback(Render::RENDERdropfun callback) {
   impl->drop_callback = callback;
 }
 
@@ -252,6 +254,21 @@ Result<rProgram, no_error> Render::LoadProgram(const char *name, const char *vs,
 }
 
 void Render::UnloadProgram(rProgram program) { glDeleteProgram(program); }
+
+Result<Image, no_error> Render::LoadImageFromMemory(const unsigned char *data,
+                                            int length,
+                                            int desired_channels) {
+
+  Image image;
+  image.pixels =
+      stbi_load_from_memory(data, length, &image.width, &image.height,
+                            &image.channels, desired_channels);
+
+  if (!image.pixels)
+    return Result<Image, no_error>::ERR(false);
+  
+  return Result<Image, no_error>::OK(image);
+}
 
 Result<rTexture2D, no_error> Render::LoadTexture(const Image &image,
                                                  bool pixelated, bool repeat) {

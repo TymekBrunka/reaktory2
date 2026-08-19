@@ -1,11 +1,12 @@
 #pragma once
 #include <string>
 #include <filesystem>
-#include <Renderer>
+#include <Renderer.hpp>
 
 class Scene {
   static Renderer::rProgram skybox_program;
 
+  bool can_rename;
   Renderer::rect_size size;
   std::string name;
   std::filesystem::path current_folder;
@@ -16,7 +17,7 @@ class Scene {
 
 public:
   Scene() = default;
-  ~Scene();
+  // ~Scene();
 
   void resize(Renderer::rect_size size);
   void updateMousePos(double xoffset, double yoffset);

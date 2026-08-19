@@ -18,6 +18,12 @@ imgpack_(
     assets/images/placeholder.png
 )
 
+bytepack_(
+  OUTPUT images_bigger
+  SOURCES
+    assets/images/scene_new.png
+)
+
 imgpack_(
   OUTPUT icon_img
   CHANNELS 4
@@ -31,7 +37,7 @@ imgpack_(
   CHANNELS 4
   FLIP n
   SOURCES
-    assets/images/placeholder.png
+    assets/images/placeholder2.png
 )
 
 add_library(pch_core STATIC
@@ -98,9 +104,14 @@ target_include_directories(fileutils PUBLIC
   src/Components
 )
 
+add_library(Scene STATIC src/Scene/Scene.hpp src/Scene/Scene.cpp)
+target_include_directories(Scene PUBLIC src/Scene/)
+target_link_libraries(Scene PUBLIC logging renderer allocators fileutils)
+target_precompile_headers(Scene REUSE_FROM logging)
+
 add_library(App STATIC src/App.hpp src/App.cpp)
 target_include_directories(App PUBLIC src)
-target_link_libraries(App PUBLIC icon_img logging renderer imgui allocators fileutils)
+target_link_libraries(App PUBLIC Scene icon_img logging renderer imgui allocators fileutils images images_bigger)
 target_precompile_headers(App REUSE_FROM logging)
 
 add_executable(main src/main.cpp)

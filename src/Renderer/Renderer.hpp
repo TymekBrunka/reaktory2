@@ -94,19 +94,22 @@ public:
   template <typename T> T &GetUserData() { return *(T *)userdata; }
   GLFWwindow *GetGLFWWindow();
   bool IsMinimised() const;
-  void SetResizeCallback(RENDERframebuffersizefun *callback);
-  void SetMinimiseCallback(RENDERwindowminimisefun *callback);
-  void SetMaximiseCallback(RENDERwindowmaximizefun *callback);
-  void SetKeyCallback(RENDERkeyfun *callback);
-  void SetMouseMoveCallback(RENDERcursorposfun *callback);
-  void SetMouseButtonCallback(RENDERmousebuttonfun *callback);
-  void SetScrollCallback(RENDERscrollfun *callback);
-  void SetDropCallback(RENDERdropfun *callback);
+  void SetResizeCallback(RENDERframebuffersizefun callback);
+  void SetMinimiseCallback(RENDERwindowminimisefun callback);
+  void SetMaximiseCallback(RENDERwindowmaximizefun callback);
+  void SetKeyCallback(RENDERkeyfun callback);
+  void SetMouseMoveCallback(RENDERcursorposfun callback);
+  void SetMouseButtonCallback(RENDERmousebuttonfun callback);
+  void SetScrollCallback(RENDERscrollfun callback);
+  void SetDropCallback(RENDERdropfun callback);
 
   Result<rProgram, no_error> LoadProgram(const char *name, const char *vs,
                                          const char *fs);
   void UnloadProgram(rProgram program);
 
+  Result<Image, no_error> LoadImageFromMemory(const unsigned char *data,
+                                              int length,
+                                              int desired_channels = 0);
   Result<rTexture2D, no_error>
   LoadTexture(const Image &image, bool pixelated = false, bool repeat = false);
   void BindTexture(rTexture2D id, int slot);

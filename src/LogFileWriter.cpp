@@ -21,9 +21,13 @@ Log::write_fun App::log_file_writer =
 
       if (self->last_day < today) {
         self->file.close();
+        self->file_en.close();
         self->filepath = std::format("{}" SEP "logs" SEP "{}.log",
                                      FileUtils::APP_ROOT.string(), today);
-        self->file.open(self->filepath);
+        self->filepath_en = std::format("{}" SEP "logs" SEP "{}.en.log",
+                                     FileUtils::APP_ROOT.string(), today);
+        self->file.open(self->filepath, std::ios_base::app);
+        self->file_en.open(self->filepath_en, std::ios_base::app);
       }
 
       const char *log_level = "INFO";
@@ -43,7 +47,12 @@ Log::write_fun App::log_file_writer =
         severity = "MEDIUM";
 
       self->file << "[" << timestamp << "][" << context << "][" << log_level << "]["
-           << severity << "]"
+           << severity << "] "
            << LOG_FMT(user_lang, message_idx, Log::, *args, is_formatted)
+           << std::endl;
+
+      self->file_en << "[" << timestamp << "][" << context << "][" << log_level << "]["
+           << severity << "] "
+           << LOG_FMT(Log::LANG_EN, message_idx, Log::, *args, is_formatted)
            << std::endl;
     };
