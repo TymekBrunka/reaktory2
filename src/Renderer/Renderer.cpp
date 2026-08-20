@@ -84,6 +84,9 @@ bool Render::init(const char *title, rect_size window_size) {
   glfwSwapInterval(1); // vsync: on
   gladLoadGL(glfwGetProcAddress);
 
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
   glfwSetWindowUserPointer(impl->window, this);
   glfwSetFramebufferSizeCallback(
       impl->window, [](GLFWwindow *window, int width, int height) {

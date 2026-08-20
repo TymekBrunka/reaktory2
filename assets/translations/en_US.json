@@ -1,7 +1,12 @@
 {
   "MSG_APP_HOME_DIR_ERROR": ["Cannot find home directory."],
   "MSG_APP_ROOT_CREATE_ERROR": ["Cannot create app root directory."],
-  "MSG_APP_ROOT_SUBDIR_CREATE_ERROR": ["Cannot create directory '{}'."],
+  "MSG_APP_ROOT_SUBDIR_CREATE_ERROR": ["Cannot create app directory '{}'."],
+
+  "MSG_GENERIC_OPEN_ERROR": ["Cannot open file '{}'."],
+  "MSG_GENERIC_WRITE_ERROR": ["Cannot save file '{}'."],
+
+  "MSG_SCENE_DIR_CREATE_ERROR": ["Cannot create scene directory '{}'."],
 
   "MSG_RENDER_INIT_ERROR": ["Couldn't initialise renderer."],
   "MSG_RENDER_INIT_SUCCESS": ["Initialised renderer"],

@@ -30,9 +30,9 @@ Result<unsigned char *, int> ReadFile(const std::filesystem::path &filepath,
 }
 
 Result<no_error, int> WriteFile(const std::filesystem::path &filepath,
-                                void *data, size_t size);
+                                const void *data, size_t size);
 
 Result<no_error, int> WriteFileIfNotExists(const std::filesystem::path &filepath,
-                                void *data, size_t size);
+                                const void *data, size_t size);
 
 } // namespace FileUtils

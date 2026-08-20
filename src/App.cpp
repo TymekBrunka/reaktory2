@@ -12,9 +12,13 @@
 #include <images_bigger.h>
 #include <imgui.h>
 #include <iostream>
+// #include <stdatomic.h>
+#include <cstring>
 
 #include "GLFW/glfw3.h"
 #include "LogFileWriter.cpp"
+
+static char name_buffer[200] = {0};
 
 // [app statup] -----
 // //
@@ -273,15 +277,64 @@ void App::run() {
           if (CenteredButton("Otwórz albo utwórz jedną."))
             add_scene();
           ImGui::PopStyleColor(1);
+        } else {
+
+          for (auto &scene : scenes) {
+            scene.render();
+          }
         }
       }
       ImGui::End();
+
+      // [modals] -----
+      // //
+      if (current_modal)
+        ImGui::OpenPopup(current_modal);
+
+      ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+      ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+      do {
+        if (ImGui::BeginPopupModal("Nowa scena", NULL,
+                                   ImGuiWindowFlags_AlwaysAutoResize)) {
+
+          ImGui::InputText("Nazwa sceny", name_buffer, 200);
+          if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            memset(name_buffer, 0, 200);
+            ImGui::CloseCurrentPopup();
+            current_modal = nullptr;
+          }
+
+          if (ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+            std::filesystem::path path = FileUtils::APP_ROOT / "scenes" /
+                                         std::filesystem::path(name_buffer);
+
+            if (std::filesystem::exists(path)) {
+              ImGui::EndPopup();
+              continue;
+            }
+
+            add_scene(name_buffer);
+            memset(name_buffer, 0, 200);
+            ImGui::CloseCurrentPopup();
+            current_modal = nullptr;
+          }
+          ImGui::EndPopup();
+        }
+      } while (0);
+      // \\
+      // [modals] -----
 
       render.EndFrame();
     }
   }
 }
 
-void App::add_scene() {
-  scenes.push_back(Scene{});
+void App::add_scene(const std::string &name) {
+  if (name.empty()) {
+    current_modal = "Nowa scena";
+    return;
+  }
+  Scene scene{name};
+  scene.init(render);
+  scenes.push_back(std::move(scene));
 }

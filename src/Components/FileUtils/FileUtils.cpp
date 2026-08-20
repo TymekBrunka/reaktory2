@@ -29,20 +29,22 @@ Result<unsigned char *, int> ReadFilex(const std::filesystem::path &filepath,
 }
 
 Result<no_error, int> WriteFile(const std::filesystem::path &filepath,
-                                void *data, size_t size) {
+                                const void *data, size_t size) {
 
   FILE *file = fopen(filepath.string().c_str(), "wb");
   if (!file)
     return Result<no_error, int>::ERR(-1);
 
-  if (fwrite(data, 1, size, file))
+  if (fwrite(data, 1, size, file) < size)
     return Result<no_error, int>::ERR(1);
+
+  fclose(file);
 
   return Result<no_error, int>::OK(false);
 }
 
 Result<no_error, int>
-WriteFileIfNotExists(const std::filesystem::path &filepath, void *data,
+WriteFileIfNotExists(const std::filesystem::path &filepath, const void *data,
                      size_t size) {
 
   FILE *file = fopen(filepath.string().c_str(), "rb");

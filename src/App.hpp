@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <imgui.h>
+// #include <stdatomic.h>
 
 struct LogFileWriterData {
   std::chrono::year_month_day last_day;
@@ -21,12 +22,12 @@ private:
   static bool logger_initialised;
   static Log::write_fun log_file_writer;
 
-  bool has_modal = false;
   static Log::Logger logger;
   static LogFileWriterData file_logger_data;
   Renderer::rTexture2D icon_tex;
   Renderer::rTexture2D new_scene_tex;
   Renderer::rTexture2D icons;
+  const char *current_modal;
   Renderer::Image new_scene_img;
   Renderer::Render render;
 
@@ -46,7 +47,7 @@ public:
   static void init_logger();
 
   inline bool does_have_modal() const {
-    return has_modal;
+    return current_modal;
   }
 
   bool IconMenuItem(int idx, const char *label);
@@ -56,5 +57,5 @@ public:
   void run();
   void shutdown();
 
-  void add_scene();
+  void add_scene(const std::string &name = std::string());
 };

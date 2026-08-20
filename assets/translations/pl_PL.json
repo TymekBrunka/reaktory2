@@ -1,7 +1,12 @@
 {
   "MSG_APP_HOME_DIR_ERROR": ["Nie można znaleźć folderu użytkownika."],
   "MSG_APP_ROOT_CREATE_ERROR": ["Nie można utworzyć folderu aplikacji."],
-  "MSG_APP_ROOT_SUBDIR_CREATE_ERROR": ["Nie można utworzyć folderu '{}'."],
+  "MSG_APP_ROOT_SUBDIR_CREATE_ERROR": ["Nie można utworzyć folderu '{}' aplikacji."],
+
+  "MSG_GENERIC_OPEN_ERROR": ["Nie można otworzyć pliku '{}'."],
+  "MSG_GENERIC_WRITE_ERROR": ["Nie można zapisać pliku '{}'."],
+
+  "MSG_SCENE_DIR_CREATE_ERROR": ["Nie można utworzyć folderu '{}' sceny."],
 
   "MSG_RENDER_INIT_ERROR": ["Nie można zainicjować renderowania."],
   "MSG_RENDER_INIT_SUCCESS": ["Zainicjowano renderer"],

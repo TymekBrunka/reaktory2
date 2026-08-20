@@ -40,7 +40,7 @@ Result<rShader, no_error> Render::Impl::CreateShader(GLenum shader_type,
     char message[512] = {0};
     glGetShaderInfoLog(shader, 512, NULL, message);
     Log::log(Log::ERROR | Log::SEV_LOW, 0, "GL", TL(MSG_GL_ERROR_SHADER),
-             std::make_format_args(message));
+             std::make_format_args(shader_type_s, message));
 
     glDeleteShader(shader);
     return Result<rShader, no_error>::ERR(false);
@@ -59,7 +59,7 @@ Result<rProgram, no_error> Render::Impl::LinkProgram(rProgram program,
     char message[512] = {0};
     glGetProgramInfoLog(program, 512, NULL, message);
     Log::log(Log::ERROR | Log::SEV_LOW, 0, "GL", TL(MSG_GL_ERROR_PROGRAM),
-             std::make_format_args(message));
+             std::make_format_args(name, message));
 
     glDeleteProgram(program);
     return Result<rProgram, no_error>::ERR(false);

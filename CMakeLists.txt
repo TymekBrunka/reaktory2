@@ -9,6 +9,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(deps/ext.cmake)
 add_subdirectory(src/BuildTools)
 
+bytepack_(
+  OUTPUT shaders
+  SOURCES
+    assets/shaders/simple.vs
+    assets/shaders/simple.fs
+)
+
+bytepack_(
+  OUTPUT staticassets_scene
+  SOURCES
+    assets/example/document.json
+    assets/example/scene.json
+    assets/example/skybox.png
+    assets/example/excel_sheets/data.xlsx
+)
+
 imgpack_(
   OUTPUT images
   CHANNELS 4
@@ -88,9 +104,9 @@ target_include_directories(renderer PUBLIC
 )
 target_link_libraries(renderer
   PRIVATE
-  placeholder_icon_img glad glfw imgui
+  placeholder_icon_img glad imgui
   PUBLIC
-  logging
+  glfw logging
 )
 # target_precompile_headers(renderer REUSE_FROM pch_core)
 target_precompile_headers(renderer REUSE_FROM logging)
@@ -106,7 +122,7 @@ target_include_directories(fileutils PUBLIC
 
 add_library(Scene STATIC src/Scene/Scene.hpp src/Scene/Scene.cpp)
 target_include_directories(Scene PUBLIC src/Scene/)
-target_link_libraries(Scene PUBLIC logging renderer allocators fileutils)
+target_link_libraries(Scene PUBLIC logging renderer allocators fileutils PRIVATE staticassets_scene shaders glad imgui)
 target_precompile_headers(Scene REUSE_FROM logging)
 
 add_library(App STATIC src/App.hpp src/App.cpp)

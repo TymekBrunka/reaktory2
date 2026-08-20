@@ -1,7 +1,7 @@
 #pragma once
 #define GLFW_INCLUDE_NONE
-#include "GLFW/glfw3.h"
 #include <Errors/Errors.hpp>
+#include <GLFW/glfw3.h>
 namespace Renderer {
 
 template <typename T, typename E> using Result = Errors::Result<T, E>;
@@ -26,6 +26,13 @@ typedef unsigned int rCubeMap;
 
 typedef unsigned int rProgram;
 typedef unsigned int rShader;
+
+typedef float vec2[2];
+typedef float vec3[3];
+typedef float vec4[4];
+typedef float mat2[4];
+typedef float mat3[9];
+typedef float mat4[16];
 
 typedef int rLocation;
 
