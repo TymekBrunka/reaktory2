@@ -2,7 +2,8 @@
 #include <sstream>
 namespace Log {
 
-#ifndef NDEBUG
+// #ifndef NDEBUG
+#ifndef GEX
 
 #define json_assert(x)                                                         \
   if (!(x)) {                                                                  \

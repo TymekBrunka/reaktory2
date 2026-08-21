@@ -10,20 +10,24 @@ class Scene {
   static Renderer::rFBO tri_fbo;
   static Renderer::rVAO tri_vao;
 
-  bool initialised;
+  bool initialised = false;
   atomic_bool can_rename = true;
-  Renderer::rect_size size;
+  Renderer::rect_size size{640, 480};
   // std::string current_folder;
   Renderer::rCubeMap skybox_texture;
   Renderer::rFBO framebuffer;
   Renderer::rRBO renderbuffer;
+
+public:
   Renderer::rTexture2D screen_canvas;
   Renderer::rTexture2D color_canvas;
+
+private:
   std::string name;
   std::filesystem::path current_folder;
 
   bool create_framebuffer();
-  bool resize_framebuffer(Renderer::rect_size size);
+  void resize_framebuffer(Renderer::rect_size size);
 
 public:
   Scene() = default;
@@ -40,16 +44,15 @@ public:
   static bool create_folder_structure(const std::string &name,
                                       const std::filesystem::path &path);
 
-  inline const std::string &get_name() const {
-    return name;
-  }
+  inline const std::string &get_name() const { return name; }
 
   bool init(Renderer::Render &render);
   bool cleanup();
 
   void render();
 
-  void resize(Renderer::rect_size size);
+  // retuns whether it needs redraw
+  bool resize(Renderer::rect_size size);
   void updateMousePos(double xoffset, double yoffset);
   void updateMouseButtonState(bool left, bool right);
 

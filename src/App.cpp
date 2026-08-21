@@ -278,9 +278,20 @@ void App::run() {
             add_scene();
           ImGui::PopStyleColor(1);
         } else {
-
+          ImVec2 pos = ImGui::GetCursorScreenPos();
+          ImVec2 sregion = ImGui::GetContentRegionAvail();
+          Renderer::rect_size wsize{sregion.x, sregion.y};
           for (auto &scene : scenes) {
-            scene.render();
+            if (scene.resize(wsize)) {
+              std::cerr << "resizing to (" << wsize.width << "," << wsize.height
+                        << ")\n";
+              std::cerr << "canvas: " << scene.screen_canvas << "\n";
+              scene.render();
+            }
+            ImGui::GetWindowDrawList()->AddImage(
+                (ImTextureRef)scene.screen_canvas, pos,
+                ImVec2(pos.x + sregion.x, pos.y + sregion.y), ImVec2(0, 0),
+                ImVec2(1, 1));
           }
         }
       }
@@ -335,6 +346,8 @@ void App::add_scene(const std::string &name) {
     return;
   }
   Scene scene{name};
-  scene.init(render);
+  if (!scene.init(render)) {
+    std::cerr << "failed to init scene\n";
+  }
   scenes.push_back(std::move(scene));
 }

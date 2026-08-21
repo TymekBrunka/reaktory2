@@ -1,6 +1,7 @@
 #pragma once
 
-#ifndef NDEBUG
+// #ifndef NDEBUG
+#ifndef GEX
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -11,7 +12,8 @@
 
 namespace Log {
 
-#ifndef NDEBUG
+// #ifndef NDEBUG
+#ifndef GEX
 struct string_hash {
   using is_transparent = void;
   [[nodiscard]] inline size_t operator()(const char *txt) const {

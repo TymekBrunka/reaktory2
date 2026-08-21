@@ -4,6 +4,7 @@
 #include <Renderer.hpp>
 #include <Renderer_internal.hpp>
 #include <Scene.hpp>
+#include <iostream>
 
 #include <shaders.h>
 #include <staticassets_scene.h>
@@ -17,12 +18,38 @@ Renderer::rVAO Scene::tri_vao = 0;
 Scene::Scene(Scene &&other) {
   bool b = atomic_load_explicit(&other.can_rename, memory_order_seq_cst);
   atomic_store_explicit(&can_rename, b, memory_order_seq_cst);
+
+  size = other.size;
+  skybox_texture = other.skybox_texture;
+  framebuffer = other.framebuffer;
+  renderbuffer = other.renderbuffer;
+  screen_canvas = other.screen_canvas;
+  color_canvas = other.color_canvas;
+  other.size = {640, 480};
+  other.skybox_texture = 0;
+  other.framebuffer = 0;
+  other.renderbuffer = 0;
+  other.screen_canvas = 0;
+  other.color_canvas = 0;
 }
 
 Scene &Scene::operator=(Scene &&other) {
   if (this != &other) {
     bool b = atomic_load_explicit(&other.can_rename, memory_order_seq_cst);
     atomic_store_explicit(&can_rename, b, memory_order_seq_cst);
+
+    size = other.size;
+    skybox_texture = other.skybox_texture;
+    framebuffer = other.framebuffer;
+    renderbuffer = other.renderbuffer;
+    screen_canvas = other.screen_canvas;
+    color_canvas = other.color_canvas;
+    other.size = {640, 480};
+    other.skybox_texture = 0;
+    other.framebuffer = 0;
+    other.renderbuffer = 0;
+    other.screen_canvas = 0;
+    other.color_canvas = 0;
   }
   return *this;
 }
@@ -32,9 +59,9 @@ struct Vertex {
   Renderer::vec3 col;
 };
 
-static const Vertex vertices[3] = {{{-0.6f, -0.4f}, {1.f, 0.f, 0.f}},
-                                   {{0.6f, -0.4f}, {0.f, 1.f, 0.f}},
-                                   {{0.f, 0.6f}, {0.f, 0.f, 1.f}}};
+static const Vertex vertices[3] = {{{0.0f, 1.0f}, {1.f, 0.f, 0.f}},
+                                   {{-1.0f, 0.0f}, {0.f, 1.f, 0.f}},
+                                   {{1.0f, 0.0f}, {0.f, 0.f, 1.f}}};
 
 static bool
 write_file_if_not_exists_reported(const std::filesystem::path &filepath,
@@ -93,36 +120,100 @@ Scene::Scene(const std::string &name) {
 }
 
 bool Scene::create_framebuffer() {
-glGenFramebuffers(1, &framebuffer);
-	glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+  glGenFramebuffers(1, &framebuffer);
+  glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+  glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
 
-	glGenTextures(1, &screen_canvas);
-	glBindTexture(GL_TEXTURE_2D, screen_canvas);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 640, 480, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, screen_canvas, 0);
+  glGenTextures(1, &screen_canvas);
+  glBindTexture(GL_TEXTURE_2D, screen_canvas);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 640, 480, 0, GL_RGBA,
+               GL_UNSIGNED_BYTE, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         screen_canvas, 0);
 
-	glGenRenderbuffers(1, &renderbuffer);
-	glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer);
-	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 640, 480);
-	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, renderbuffer);
+  glGenTextures(1, &color_canvas);
+  glBindTexture(GL_TEXTURE_2D, color_canvas);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 640, 480, 0, GL_RGBA,
+               GL_UNSIGNED_BYTE, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D,
+                         color_canvas, 0);
 
-	// if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-	// 	std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!\n";
+  glGenRenderbuffers(1, &renderbuffer);
+  glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 640, 480);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                            GL_RENDERBUFFER, renderbuffer);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+  unsigned int attachments[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+  glDrawBuffers(3, attachments);
+
+  if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+    Log::log_uform(Log::ERROR | Log::SEV_MED, 0, "Scene",
+                   TL(MSG_SCENE_FRAMEBUFFER_CREATE_ERROR));
+    return false;
+  }
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+  std::cerr << "canvas: " << screen_canvas << "\n";
+
+  return true;
+}
+
+bool Scene::resize(Renderer::rect_size size) {
+  if (this->size.width == size.width && this->size.height == size.height)
+    return false;
+
+  this->size = size;
+  resize_framebuffer(size);
+
+  return true;
+}
+
+void Scene::resize_framebuffer(Renderer::rect_size size) {
+  glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+
+  glBindTexture(GL_TEXTURE_2D, screen_canvas);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.width, size.height, 0, GL_RGBA,
+               GL_UNSIGNED_BYTE, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
+                         screen_canvas, 0);
+
+  glBindTexture(GL_TEXTURE_2D, color_canvas);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.width, size.height, 0, GL_RGBA,
+               GL_UNSIGNED_BYTE, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D,
+                         color_canvas, 0);
+
+  glBindRenderbuffer(GL_RENDERBUFFER, renderbuffer);
+  glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, size.width,
+                        size.height);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT,
+                            GL_RENDERBUFFER, renderbuffer);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 bool Scene::init(Renderer::Render &render) {
   if (!tri_program) {
-    Errors::Result<Renderer::rProgram, Errors::no_error> res =
+    Errors::Result<Renderer::rProgram, Errors::no_error> res_shader =
         render.LoadProgram("simple", (const char *)simple_vs_data,
                            (const char *)simple_fs_data);
 
-    if (!res.is_ok)
+    if (!res_shader.is_ok)
+      return false;
+
+    if (!create_framebuffer())
       return false;
 
     glGenBuffers(1, &tri_fbo);
@@ -147,9 +238,19 @@ bool Scene::init(Renderer::Render &render) {
 }
 
 void Scene::render() {
+  glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+  // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
+
+  glViewport(0, 0, size.width, size.height);
+  glClearColor(1.0f, 0.1f, 0.1f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
   glUseProgram(tri_program);
   glBindVertexArray(tri_vao);
   glDrawArrays(GL_TRIANGLES, 0, 3);
+
+  glBindFramebuffer(GL_FRAMEBUFFER, 0);
+  // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 }
 
 void Scene::Cleanup() {

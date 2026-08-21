@@ -7,6 +7,7 @@
   "MSG_GENERIC_WRITE_ERROR": ["Nie można zapisać pliku '{}'."],
 
   "MSG_SCENE_DIR_CREATE_ERROR": ["Nie można utworzyć folderu '{}' sceny."],
+  "MSG_SCENE_FRAMEBUFFER_CREATE_ERROR": ["Nie można utworzyć widoku."],
 
   "MSG_RENDER_INIT_ERROR": ["Nie można zainicjować renderowania."],
   "MSG_RENDER_INIT_SUCCESS": ["Zainicjowano renderer"],
