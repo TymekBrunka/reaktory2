@@ -119,6 +119,7 @@ bool Render::init(const char *title, rect_size window_size) {
   glfwSetCursorPosCallback(
       impl->window, [](GLFWwindow *window, double xpos, double ypos) {
         Render &render = *(Render *)glfwGetWindowUserPointer(window);
+        render.impl->cursor_position = rect_size{xpos, ypos};
         if (render.impl->mouse_move_callback) {
           render.impl->mouse_move_callback(render, xpos, ypos);
         }
@@ -243,6 +244,8 @@ void Render::SetDropCallback(Render::RENDERdropfun callback) {
   impl->drop_callback = callback;
 }
 
+rect_size Render::GetCursorPosition() const { return impl->cursor_position; }
+
 rect_size Render::GetRenderSize() const { return impl->window_size; }
 
 float Render::GetDelta() const { return impl->deltatime; }
@@ -259,8 +262,8 @@ Result<rProgram, no_error> Render::LoadProgram(const char *name, const char *vs,
 void Render::UnloadProgram(rProgram program) { glDeleteProgram(program); }
 
 Result<Image, no_error> Render::LoadImageFromMemory(const unsigned char *data,
-                                            int length,
-                                            int desired_channels) {
+                                                    int length,
+                                                    int desired_channels) {
 
   Image image;
   image.pixels =
@@ -269,7 +272,7 @@ Result<Image, no_error> Render::LoadImageFromMemory(const unsigned char *data,
 
   if (!image.pixels)
     return Result<Image, no_error>::ERR(false);
-  
+
   return Result<Image, no_error>::OK(image);
 }
 
@@ -338,6 +341,7 @@ void Render::BeginFrame() {
   impl->deltatime = current_frame_time - impl->last_frame_time;
   impl->last_frame_time = current_frame_time;
 
+  glClearColor(0, 0, 0, 0);
   glViewport(0, 0, impl->window_size.width, impl->window_size.height);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   ImGui::SetCurrentContext(impl->imctx);

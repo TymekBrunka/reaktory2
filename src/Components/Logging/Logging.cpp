@@ -43,9 +43,9 @@ Callback ConsoleLog_Callback = Callback{
       else if (tag & WARNING)
         log_level = "\x1b[33mWARNING\x1b[0m";
       else if (tag & VERBOSE)
-        log_level = "\x1b[39VERBOSE\x1b[0m";
+        log_level = "\x1b[39mVERBOSE\x1b[0m";
       else if (tag & DEBUG)
-        log_level = "\x1b[38DEBUG\x1b[0m";
+        log_level = "\x1b[38mDEBUG\x1b[0m";
 
       const char *severity = "LOW";
       if (tag & SEV_HIGH)

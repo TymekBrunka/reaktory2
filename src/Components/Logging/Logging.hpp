@@ -27,7 +27,7 @@ enum LOG_TAG {
   SEV_MED = 1u << 6,
   SEV_HIGH = 1u << 7,
 
-  DEFAULT = INFO | SEV_LOW,
+  DEFAULT = INFO,
   ACCEPT_DEFAULTS = 255u & ~VERBOSE,
   ACCEPT_ALL = 255u,
 };

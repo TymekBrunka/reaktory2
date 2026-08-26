@@ -110,6 +110,8 @@ public:
   void SetScrollCallback(RENDERscrollfun callback);
   void SetDropCallback(RENDERdropfun callback);
 
+  rect_size GetCursorPosition() const;
+
   Result<rProgram, no_error> LoadProgram(const char *name, const char *vs,
                                          const char *fs);
   void UnloadProgram(rProgram program);

@@ -13,6 +13,7 @@ class Scene {
   bool initialised = false;
   atomic_bool can_rename = true;
   Renderer::rect_size size{640, 480};
+  Renderer::rect_size mpos{0, 0};
   // std::string current_folder;
   Renderer::rCubeMap skybox_texture;
   Renderer::rFBO framebuffer;
@@ -46,6 +47,7 @@ public:
 
   inline const std::string &get_name() const { return name; }
 
+  static bool Init(Renderer::Render &render);
   bool init(Renderer::Render &render);
   bool cleanup();
 
@@ -53,7 +55,7 @@ public:
 
   // retuns whether it needs redraw
   bool resize(Renderer::rect_size size);
-  void updateMousePos(double xoffset, double yoffset);
+  void updateMousePos(const Renderer::rect_size &pos);
   void updateMouseButtonState(bool left, bool right);
 
   void rename(const std::string &name);

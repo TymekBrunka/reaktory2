@@ -17,6 +17,7 @@
 
 #include "GLFW/glfw3.h"
 #include "LogFileWriter.cpp"
+#include "Scene.hpp"
 
 static char name_buffer[200] = {0};
 
@@ -100,6 +101,9 @@ bool App::init() {
     return false;
 
   if (!render.init("Reaktory", {640, 480}))
+    return false;
+
+  if (!Scene::Init(render))
     return false;
 
   render.userdata = this;
@@ -278,21 +282,39 @@ void App::run() {
             add_scene();
           ImGui::PopStyleColor(1);
         } else {
-          ImVec2 pos = ImGui::GetCursorScreenPos();
-          ImVec2 sregion = ImGui::GetContentRegionAvail();
-          Renderer::rect_size wsize{sregion.x, sregion.y};
-          for (auto &scene : scenes) {
-            if (scene.resize(wsize)) {
-              std::cerr << "resizing to (" << wsize.width << "," << wsize.height
-                        << ")\n";
-              std::cerr << "canvas: " << scene.screen_canvas << "\n";
-              scene.render();
+          ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+
+          ImGui::SetCursorPos(ImVec2(0, 25));
+          if (ImGui::BeginTabBar("scene_tab")) {
+            for (auto &scene : scenes) {
+              if (ImGui::BeginTabItem(scene.get_name().c_str())) {
+                ImVec2 pos = ImGui::GetCursorScreenPos();
+                ImVec2 sregion = ImGui::GetContentRegionMax();
+
+                sregion = ImVec2(sregion.x + 8, sregion.y - 39);
+
+                ImVec2 imTL = ImVec2(pos.x - 8, pos.y - 4);
+                ImVec2 imBR =
+                    ImVec2(pos.x + sregion.x - 8, pos.y + sregion.y - 4);
+
+                Renderer::rect_size sp = render.GetCursorPosition();
+                in_window_cursor_pos = Renderer::rect_size{
+                    sp.width - imTL.x, -1 * (sp.height - imBR.y)};
+
+                scene.updateMousePos(in_window_cursor_pos);
+                scene.resize({sregion.x, sregion.y});
+                scene.render();
+                ImGui::GetWindowDrawList()->AddImage(
+                    (ImTextureRef)scene.screen_canvas, imTL, imBR, ImVec2(0, 1),
+                    ImVec2(1, 0));
+
+                ImGui::EndTabItem();
+              }
             }
-            ImGui::GetWindowDrawList()->AddImage(
-                (ImTextureRef)scene.screen_canvas, pos,
-                ImVec2(pos.x + sregion.x, pos.y + sregion.y), ImVec2(0, 0),
-                ImVec2(1, 1));
+            ImGui::EndTabBar();
           }
+
+          ImGui::PopStyleVar();
         }
       }
       ImGui::End();

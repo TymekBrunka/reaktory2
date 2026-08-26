@@ -8,6 +8,9 @@
 
   "MSG_SCENE_DIR_CREATE_ERROR": ["Nie można utworzyć folderu '{}' sceny."],
   "MSG_SCENE_FRAMEBUFFER_CREATE_ERROR": ["Nie można utworzyć widoku."],
+  "MSG_SCENE_CREATE_SUCCESS": ["Utworzono nową scenę o nazwie '{}'"],
+  "MSG_SCENE_FRAMEBUFFER_CREATE_SUCCESS": ["Id tekstur sceny: {}, {}"],
+  "MSG_SCENE_FRAMEBUFFER_RESIZE": ["Zmiana rozmiaru okna sceny (txt_id: {}, {}) ({}, {})"],
 
   "MSG_RENDER_INIT_ERROR": ["Nie można zainicjować renderowania."],
   "MSG_RENDER_INIT_SUCCESS": ["Zainicjowano renderer"],

@@ -19,12 +19,14 @@ Scene::Scene(Scene &&other) {
   bool b = atomic_load_explicit(&other.can_rename, memory_order_seq_cst);
   atomic_store_explicit(&can_rename, b, memory_order_seq_cst);
 
+  name = other.name;
   size = other.size;
   skybox_texture = other.skybox_texture;
   framebuffer = other.framebuffer;
   renderbuffer = other.renderbuffer;
   screen_canvas = other.screen_canvas;
   color_canvas = other.color_canvas;
+  other.name = std::string();
   other.size = {640, 480};
   other.skybox_texture = 0;
   other.framebuffer = 0;
@@ -38,12 +40,14 @@ Scene &Scene::operator=(Scene &&other) {
     bool b = atomic_load_explicit(&other.can_rename, memory_order_seq_cst);
     atomic_store_explicit(&can_rename, b, memory_order_seq_cst);
 
+    name = other.name;
     size = other.size;
     skybox_texture = other.skybox_texture;
     framebuffer = other.framebuffer;
     renderbuffer = other.renderbuffer;
     screen_canvas = other.screen_canvas;
     color_canvas = other.color_canvas;
+    other.name = std::string();
     other.size = {640, 480};
     other.skybox_texture = 0;
     other.framebuffer = 0;
@@ -60,8 +64,8 @@ struct Vertex {
 };
 
 static const Vertex vertices[3] = {{{0.0f, 1.0f}, {1.f, 0.f, 0.f}},
-                                   {{-1.0f, 0.0f}, {0.f, 1.f, 0.f}},
-                                   {{1.0f, 0.0f}, {0.f, 0.f, 1.f}}};
+                                   {{-1.0f, -1.0f}, {0.f, 1.f, 0.f}},
+                                   {{1.0f, -1.0f}, {0.f, 0.f, 1.f}}};
 
 static bool
 write_file_if_not_exists_reported(const std::filesystem::path &filepath,
@@ -117,6 +121,9 @@ Scene::Scene(const std::string &name) {
   this->name = name;
   current_folder = FileUtils::APP_ROOT / "scenes" / std::filesystem::path(name);
   create_folder_structure(name, current_folder);
+
+  Log::log(Log::DEFAULT, 0, "Scene", TL(MSG_SCENE_CREATE_SUCCESS),
+           std::make_format_args(name));
 }
 
 bool Scene::create_framebuffer() {
@@ -161,7 +168,9 @@ bool Scene::create_framebuffer() {
   glBindTexture(GL_TEXTURE_2D, 0);
   glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
-  std::cerr << "canvas: " << screen_canvas << "\n";
+  Log::log(Log::DEBUG, 0, "Scene",
+           TL(MSG_SCENE_FRAMEBUFFER_CREATE_SUCCESS),
+           std::make_format_args(screen_canvas, color_canvas));
 
   return true;
 }
@@ -202,40 +211,51 @@ void Scene::resize_framebuffer(Renderer::rect_size size) {
                             GL_RENDERBUFFER, renderbuffer);
 
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+  Log::log(Log::VERBOSE, 0, "Scene",
+           TL(MSG_SCENE_FRAMEBUFFER_RESIZE),
+           std::make_format_args(screen_canvas, color_canvas, size.width,
+                                 size.height));
+}
+
+bool Scene::Init(Renderer::Render &render) {
+  Errors::Result<Renderer::rProgram, Errors::no_error> res_shader =
+      render.LoadProgram("simple", (const char *)simple_vs_data,
+                         (const char *)simple_fs_data);
+
+  if (!res_shader.is_ok)
+    return false;
+
+  tri_program = res_shader.ok_unchecked();
+  glGenBuffers(1, &tri_fbo);
+  glBindBuffer(GL_ARRAY_BUFFER, tri_fbo);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+  const Renderer::rLocation position_loc =
+      glGetAttribLocation(tri_program, "position");
+  const Renderer::rLocation color_loc =
+      glGetAttribLocation(tri_program, "color");
+
+  glGenVertexArrays(1, &tri_vao);
+  glBindVertexArray(tri_vao);
+  glEnableVertexAttribArray(position_loc);
+  glVertexAttribPointer(position_loc, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                        (void *)offsetof(Vertex, pos));
+  glEnableVertexAttribArray(color_loc);
+  glVertexAttribPointer(color_loc, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
+                        (void *)offsetof(Vertex, col));
+
+  return true;
 }
 
 bool Scene::init(Renderer::Render &render) {
-  if (!tri_program) {
-    Errors::Result<Renderer::rProgram, Errors::no_error> res_shader =
-        render.LoadProgram("simple", (const char *)simple_vs_data,
-                           (const char *)simple_fs_data);
+  if (!create_framebuffer())
+    return false;
 
-    if (!res_shader.is_ok)
-      return false;
-
-    if (!create_framebuffer())
-      return false;
-
-    glGenBuffers(1, &tri_fbo);
-    glBindBuffer(GL_ARRAY_BUFFER, tri_fbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    const Renderer::rLocation position_loc =
-        glGetAttribLocation(tri_program, "position");
-    const Renderer::rLocation color_loc =
-        glGetAttribLocation(tri_program, "color");
-
-    glGenVertexArrays(1, &tri_vao);
-    glBindVertexArray(tri_vao);
-    glEnableVertexAttribArray(position_loc);
-    glVertexAttribPointer(position_loc, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void *)offsetof(Vertex, pos));
-    glEnableVertexAttribArray(color_loc);
-    glVertexAttribPointer(color_loc, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
-                          (void *)offsetof(Vertex, col));
-  }
   return true;
 }
+
+void Scene::updateMousePos(const Renderer::rect_size &pos) { mpos = pos; }
 
 void Scene::render() {
   glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);

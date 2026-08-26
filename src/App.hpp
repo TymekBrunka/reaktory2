@@ -27,6 +27,7 @@ private:
   Renderer::rTexture2D icon_tex;
   Renderer::rTexture2D new_scene_tex;
   Renderer::rTexture2D icons;
+  Renderer::rect_size in_window_cursor_pos{0, 0};
   const char *current_modal;
   Renderer::Image new_scene_img;
   Renderer::Render render;
@@ -46,9 +47,7 @@ public:
   static bool make_directories(const std::filesystem::path &path);
   static void init_logger();
 
-  inline bool does_have_modal() const {
-    return current_modal;
-  }
+  inline bool does_have_modal() const { return current_modal; }
 
   bool IconMenuItem(int idx, const char *label);
   void AddIconToDrawlist(int idx, ImVec2 offset = ImVec2(0, 0));

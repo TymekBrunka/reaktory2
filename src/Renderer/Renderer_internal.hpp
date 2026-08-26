@@ -12,6 +12,7 @@ struct Render::Impl {
   float deltatime = 0;
   double last_frame_time = 0;
   rect_size window_size = {0, 0};
+  rect_size cursor_position = {0, 0};
   GLFWwindow *window = nullptr;
   ImGuiContext *imctx = nullptr;
 
