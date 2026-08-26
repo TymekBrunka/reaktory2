@@ -56,5 +56,6 @@ public:
   void run();
   void shutdown();
 
-  void add_scene(const std::string &name = std::string());
+  bool add_scene(const std::string &name = std::string());
+  bool open_scene(const std::string &name = std::string());
 };

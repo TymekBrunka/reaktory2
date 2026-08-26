@@ -20,6 +20,7 @@
 #include "Scene.hpp"
 
 static char name_buffer[200] = {0};
+static std::string owned_string;
 
 // [app statup] -----
 // //
@@ -114,8 +115,9 @@ bool App::init() {
       return;
 
     if (action == GLFW_PRESS) {
+      std::cerr << "key: " << key << " ctrl: " << (mods & GLFW_MOD_CONTROL) << "\n";
       if (key == GLFW_KEY_O && mods & GLFW_MOD_CONTROL) {
-        std::cerr << "CTRL+O\n";
+        app->open_scene();
       }
     }
   });
@@ -267,7 +269,7 @@ void App::run() {
         if (scenes.size() <= 0) {
           ImVec2 wsize = ImGui::GetWindowSize();
           float min_axis = wsize.x < wsize.y ? wsize.x : wsize.y;
-          float img_size = min_axis > 400 ? 250 : min_axis - 150;
+          float img_size = min_axis > 400 ? 200 : min_axis - 200;
 
           ImGui::SetCursorPos(
               ImVec2((wsize.x - img_size) / 2, (wsize.y - img_size) / 2));
@@ -278,8 +280,10 @@ void App::run() {
             add_scene();
           if (CenteredButton("Brak otwartej sceny."))
             add_scene();
-          if (CenteredButton("Otwórz albo utwórz jedną."))
+          if (CenteredButton("Stwórz scenę."))
             add_scene();
+          if (CenteredButton("Otwórz scenę."))
+            open_scene();
           ImGui::PopStyleColor(1);
         } else {
           ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
@@ -341,16 +345,59 @@ void App::run() {
             std::filesystem::path path = FileUtils::APP_ROOT / "scenes" /
                                          std::filesystem::path(name_buffer);
 
-            if (std::filesystem::exists(path)) {
+            if (!add_scene(name_buffer)) {
               ImGui::EndPopup();
-              continue;
+              break;
             }
-
-            add_scene(name_buffer);
             memset(name_buffer, 0, 200);
             ImGui::CloseCurrentPopup();
             current_modal = nullptr;
           }
+          ImGui::EndPopup();
+        }
+
+        if (ImGui::BeginPopupModal("Wybór sceny", NULL,
+                                   ImGuiWindowFlags_AlwaysAutoResize)) {
+
+          if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+            ImGui::CloseCurrentPopup();
+            current_modal = nullptr;
+          }
+
+          if (ImGui::BeginCombo("Scena", owned_string.c_str())) {
+            static ImGuiTextFilter filter;
+            if (ImGui::IsWindowAppearing()) {
+              ImGui::SetKeyboardFocusHere();
+              filter.Clear();
+            }
+
+            filter.Draw("Wybierz scenę");
+
+            for (const auto &ent : std::filesystem::directory_iterator(
+                     FileUtils::APP_ROOT / "scenes")) {
+              if (std::filesystem::is_directory(ent.path())) {
+                std::string path_str = ent.path().string();
+                if (filter.PassFilter(path_str.c_str())) {
+                  if (ImGui::Selectable(path_str.c_str(), false)) {
+                    owned_string = path_str;
+                  }
+                }
+              }
+            }
+            ImGui::EndCombo();
+          }
+
+          if (ImGui::Button("Otwórz")) {
+            if (!open_scene(owned_string.substr(
+                    (FileUtils::APP_ROOT / "scenes").string().size() + 1))) {
+              ImGui::EndPopup();
+              break;
+            }
+            owned_string = std::string();
+            ImGui::CloseCurrentPopup();
+            current_modal = nullptr;
+          }
+
           ImGui::EndPopup();
         }
       } while (0);
@@ -362,14 +409,52 @@ void App::run() {
   }
 }
 
-void App::add_scene(const std::string &name) {
+bool App::add_scene(const std::string &name) {
   if (name.empty()) {
     current_modal = "Nowa scena";
-    return;
+    return true;
   }
-  Scene scene{name};
+
+  if (std::filesystem::exists(FileUtils::APP_ROOT / "scenes" / name)) {
+    return false;
+  }
+
+  Scene scene;
+  try {
+    scene = std::move(Scene{name});
+  } catch (const std::exception &err) {
+    return false;
+  }
+
   if (!scene.init(render)) {
     std::cerr << "failed to init scene\n";
   }
   scenes.push_back(std::move(scene));
+
+  return true;
+}
+
+bool App::open_scene(const std::string &name) {
+  if (name.empty()) {
+    current_modal = "Wybór sceny";
+    return true;
+  }
+
+  if (!std::filesystem::exists(FileUtils::APP_ROOT / "scenes" / name)) {
+    return false;
+  }
+
+  Scene scene;
+  try {
+    scene = std::move(Scene{name});
+  } catch (const std::exception &err) {
+    return false;
+  }
+
+  if (!scene.init(render)) {
+    std::cerr << "failed to init scene\n";
+  }
+  scenes.push_back(std::move(scene));
+
+  return true;
 }

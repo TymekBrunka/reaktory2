@@ -7,8 +7,11 @@
   "MSG_GENERIC_WRITE_ERROR": ["Nie można zapisać pliku '{}'."],
 
   "MSG_SCENE_DIR_CREATE_ERROR": ["Nie można utworzyć folderu '{}' sceny."],
+  "MSG_SCENE_CREATE_ERROR": ["Nie można utworzyć nowej sceny '{}'."],
+  "MSG_SCENE_CREATE_SUCCESS": ["Utworzono nową scenę '{}'"],
+  "MSG_SCENE_OPEN_ERROR": ["Nie można otworzyć sceny '{}'."],
+  "MSG_SCENE_OPEN_SUCCESS": ["Otwarto scenę '{}'"],
   "MSG_SCENE_FRAMEBUFFER_CREATE_ERROR": ["Nie można utworzyć widoku."],
-  "MSG_SCENE_CREATE_SUCCESS": ["Utworzono nową scenę o nazwie '{}'"],
   "MSG_SCENE_FRAMEBUFFER_CREATE_SUCCESS": ["Id tekstur sceny: {}, {}"],
   "MSG_SCENE_FRAMEBUFFER_RESIZE": ["Zmiana rozmiaru okna sceny (txt_id: {}, {}) ({}, {})"],
 

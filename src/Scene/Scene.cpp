@@ -120,10 +120,19 @@ bool Scene::create_folder_structure(const std::string &name,
 Scene::Scene(const std::string &name) {
   this->name = name;
   current_folder = FileUtils::APP_ROOT / "scenes" / std::filesystem::path(name);
-  create_folder_structure(name, current_folder);
+  if (!std::filesystem::exists(current_folder)) {
+    if (!create_folder_structure(name, current_folder)) {
+      Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+               TL(MSG_SCENE_CREATE_ERROR), std::make_format_args(name));
+      throw std::runtime_error("");
+    }
 
-  Log::log(Log::DEFAULT, 0, "Scene", TL(MSG_SCENE_CREATE_SUCCESS),
-           std::make_format_args(name));
+    Log::log(Log::DEFAULT, 0, "Scene", TL(MSG_SCENE_CREATE_SUCCESS),
+             std::make_format_args(name));
+  } else {
+    Log::log(Log::DEFAULT, 0, "Scene", TL(MSG_SCENE_OPEN_SUCCESS),
+             std::make_format_args(name));
+  }
 }
 
 bool Scene::create_framebuffer() {
@@ -168,8 +177,7 @@ bool Scene::create_framebuffer() {
   glBindTexture(GL_TEXTURE_2D, 0);
   glBindRenderbuffer(GL_RENDERBUFFER, 0);
 
-  Log::log(Log::DEBUG, 0, "Scene",
-           TL(MSG_SCENE_FRAMEBUFFER_CREATE_SUCCESS),
+  Log::log(Log::DEBUG, 0, "Scene", TL(MSG_SCENE_FRAMEBUFFER_CREATE_SUCCESS),
            std::make_format_args(screen_canvas, color_canvas));
 
   return true;
@@ -212,8 +220,7 @@ void Scene::resize_framebuffer(Renderer::rect_size size) {
 
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-  Log::log(Log::VERBOSE, 0, "Scene",
-           TL(MSG_SCENE_FRAMEBUFFER_RESIZE),
+  Log::log(Log::VERBOSE, 0, "Scene", TL(MSG_SCENE_FRAMEBUFFER_RESIZE),
            std::make_format_args(screen_canvas, color_canvas, size.width,
                                  size.height));
 }
@@ -262,7 +269,7 @@ void Scene::render() {
   // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
 
   glViewport(0, 0, size.width, size.height);
-  glClearColor(1.0f, 0.1f, 0.1f, 1.0f);
+  glClearColor(0, 0, 0, 0);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   glUseProgram(tri_program);

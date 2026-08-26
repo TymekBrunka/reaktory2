@@ -7,8 +7,11 @@
   "MSG_GENERIC_WRITE_ERROR": ["Cannot save file '{}'."],
 
   "MSG_SCENE_DIR_CREATE_ERROR": ["Cannot create scene directory '{}'."],
+  "MSG_SCENE_CREATE_ERROR": ["Couldn't create new scene '{}'."],
+  "MSG_SCENE_CREATE_SUCCESS": ["Created new scene '{}'"],
+  "MSG_SCENE_OPEN_ERRPR": ["Couldn't open scene '{}'."],
+  "MSG_SCENE_OPEN_SUCCESS": ["Opened scene '{}'"],
   "MSG_SCENE_FRAMEBUFFER_CREATE_ERROR": ["Cannot create scene view."],
-  "MSG_SCENE_CREATE_SUCCESS": ["Created new scene named '{}'"],
   "MSG_SCENE_FRAMEBUFFER_CREATE_SUCCESS": ["Scene texture id's: {}, {}"],
   "MSG_SCENE_FRAMEBUFFER_RESIZE": ["Scene window resized to (txt_id: {}, {}) ({}, {})"],
 
