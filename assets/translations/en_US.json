@@ -4,6 +4,7 @@
   "MSG_APP_ROOT_SUBDIR_CREATE_ERROR": ["Cannot create app directory '{}'."],
 
   "MSG_GENERIC_OPEN_ERROR": ["Cannot open file '{}'."],
+  "MSG_GENERIC_READ_ERROR": ["Cannot read file '{}'."],
   "MSG_GENERIC_WRITE_ERROR": ["Cannot save file '{}'."],
 
   "MSG_SCENE_DIR_CREATE_ERROR": ["Cannot create scene directory '{}'."],
@@ -22,6 +23,7 @@
   "MSG_RENDER_SET_WINDOW_CALLBACKS": ["Set window callbacks"],
   "MSG_RENDER_SET_GLOBAL_GL_CTX": ["Set global opengl context (for imgui)"],
   "MSG_RENDER_CREATE_IMGUI_CTX": ["Created imgui context"],
+  "MSG_RENDER_LOAD_IMAGE_ERROR": ["Cannot load image '{}'."],
 
   "MSG_GL_ERROR_SHADER": ["Cannot compile {} shader: {}."],
   "MSG_GL_ERROR_PROGRAM": ["Cannot link opengl program \"{}\" : {}."],

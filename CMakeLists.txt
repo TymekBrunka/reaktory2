@@ -14,6 +14,8 @@ bytepack_(
   SOURCES
     assets/shaders/simple.vs
     assets/shaders/simple.fs
+    assets/shaders/skybox.vs
+    assets/shaders/skybox.fs
 )
 
 bytepack_(
@@ -122,7 +124,7 @@ target_include_directories(fileutils PUBLIC
 
 add_library(Scene STATIC src/Scene/Scene.hpp src/Scene/Scene.cpp)
 target_include_directories(Scene PUBLIC src/Scene/)
-target_link_libraries(Scene PUBLIC logging renderer allocators fileutils PRIVATE staticassets_scene shaders glad imgui)
+target_link_libraries(Scene PUBLIC logging renderer allocators fileutils glm::glm PRIVATE staticassets_scene shaders glad imgui)
 target_precompile_headers(Scene REUSE_FROM logging)
 
 add_library(App STATIC src/App.hpp src/App.cpp)

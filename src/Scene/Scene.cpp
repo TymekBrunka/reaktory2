@@ -11,9 +11,59 @@
 #include <stdatomic.h>
 
 Renderer::rProgram Scene::skybox_program = 0;
+Renderer::rFBO Scene::skybox_fbo = 0;
+Renderer::rFBO Scene::skybox_ebo = 0;
+Renderer::rVAO Scene::skybox_vao = 0;
 Renderer::rProgram Scene::tri_program = 0;
 Renderer::rFBO Scene::tri_fbo = 0;
 Renderer::rVAO Scene::tri_vao = 0;
+
+GLuint skybox_indiecies[] = {0,  1,  2,  0,  2,  3,  4,  5,  6,  4,  6,  7,
+                             8,  9,  10, 8,  10, 11, 12, 13, 14, 12, 14, 15,
+                             16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23};
+
+struct skybox_vert {
+  Renderer::vec3 pos;
+  Renderer::vec2 uv;
+};
+
+static skybox_vert skybox_verticies[] = {
+    // back
+    {{-1.0, 1.0, -1.0}, {0.75, 0.665}},
+    {{-1.0, -1.0, -1.0}, {0.75, 0.334}},
+    {{1.0, -1.0, -1.0}, {1.00, 0.334}},
+    {{1.0, 1.0, -1.0}, {1.00, 0.665}},
+
+    // front
+    {{1.0, 1.0, 1.0}, {0.25, 0.665}},
+    {{1.0, -1.0, 1.0}, {0.25, 0.334}},
+    {{-1.0, -1.0, 1.0}, {0.50, 0.334}},
+    {{-1.0, 1.0, 1.0}, {0.50, 0.665}},
+
+    // right
+    {{1.0, 1.0, -1.0}, {0.00, 0.665}},
+    {{1.0, -1.0, -1.0}, {0.00, 0.334}},
+    {{1.0, -1.0, 1.0}, {0.25, 0.334}},
+    {{1.0, 1.0, 1.0}, {0.25, 0.665}},
+
+    // left
+    {{-1.0, 1.0, 1.0}, {0.50, 0.665}},
+    {{-1.0, -1.0, 1.0}, {0.50, 0.334}},
+    {{-1.0, -1.0, -1.0}, {0.75, 0.334}},
+    {{-1.0, 1.0, -1.0}, {0.75, 0.665}},
+
+    // bottom
+    {{-1.0, -1.0, -1.0}, {0.499, 0.000}},
+    {{-1.0, -1.0, 1.0}, {0.499, 0.332}},
+    {{1.0, -1.0, 1.0}, {0.251, 0.332}},
+    {{1.0, -1.0, -1.0}, {0.251, 0.000}},
+
+    // top
+    {{-1.0, 1.0, 1.0}, {0.499, 0.667}},
+    {{-1.0, 1.0, -1.0}, {0.499, 1.000}},
+    {{1.0, 1.0, -1.0}, {0.251, 1.000}},
+    {{1.0, 1.0, 1.0}, {0.251, 0.667}},
+};
 
 Scene::Scene(Scene &&other) {
   bool b = atomic_load_explicit(&other.can_rename, memory_order_seq_cst);
@@ -21,11 +71,14 @@ Scene::Scene(Scene &&other) {
 
   name = other.name;
   size = other.size;
+  mpos = other.mpos;
   skybox_texture = other.skybox_texture;
+  skybox_loc = other.skybox_loc;
   framebuffer = other.framebuffer;
   renderbuffer = other.renderbuffer;
   screen_canvas = other.screen_canvas;
   color_canvas = other.color_canvas;
+  initialised = other.initialised;
   other.name = std::string();
   other.size = {640, 480};
   other.skybox_texture = 0;
@@ -33,6 +86,7 @@ Scene::Scene(Scene &&other) {
   other.renderbuffer = 0;
   other.screen_canvas = 0;
   other.color_canvas = 0;
+  other.initialised = false;
 }
 
 Scene &Scene::operator=(Scene &&other) {
@@ -42,11 +96,14 @@ Scene &Scene::operator=(Scene &&other) {
 
     name = other.name;
     size = other.size;
+    mpos = other.mpos;
     skybox_texture = other.skybox_texture;
+    skybox_loc = other.skybox_loc;
     framebuffer = other.framebuffer;
     renderbuffer = other.renderbuffer;
     screen_canvas = other.screen_canvas;
     color_canvas = other.color_canvas;
+    initialised = other.initialised;
     other.name = std::string();
     other.size = {640, 480};
     other.skybox_texture = 0;
@@ -54,6 +111,7 @@ Scene &Scene::operator=(Scene &&other) {
     other.renderbuffer = 0;
     other.screen_canvas = 0;
     other.color_canvas = 0;
+    other.initialised = false;
   }
   return *this;
 }
@@ -234,6 +292,18 @@ bool Scene::Init(Renderer::Render &render) {
     return false;
 
   tri_program = res_shader.ok_unchecked();
+
+  res_shader = render.LoadProgram("skybox", (const char *)skybox_vs_data,
+                                  (const char *)skybox_fs_data);
+
+  if (!res_shader.is_ok) {
+    render.UnloadProgram(tri_program);
+    tri_program = 0;
+    return false;
+  }
+
+  skybox_program = res_shader.ok_unchecked();
+
   glGenBuffers(1, &tri_fbo);
   glBindBuffer(GL_ARRAY_BUFFER, tri_fbo);
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
@@ -251,6 +321,29 @@ bool Scene::Init(Renderer::Render &render) {
   glEnableVertexAttribArray(color_loc);
   glVertexAttribPointer(color_loc, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                         (void *)offsetof(Vertex, col));
+  glBindVertexArray(0);
+
+  glGenBuffers(1, &skybox_fbo);
+  glBindBuffer(GL_ARRAY_BUFFER, skybox_fbo);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(skybox_verticies), skybox_verticies,
+               GL_STATIC_DRAW);
+
+  glGenBuffers(1, &skybox_ebo);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, skybox_ebo);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(skybox_indiecies),
+               skybox_indiecies, GL_STATIC_DRAW);
+
+  const Renderer::rLocation pos_loc = glGetAttribLocation(skybox_program, "pos");
+  const Renderer::rLocation uv_loc = glGetAttribLocation(skybox_program, "uv");
+
+  glGenVertexArrays(1, &skybox_vao);
+  glBindVertexArray(skybox_vao);
+  glEnableVertexAttribArray(pos_loc);
+  glVertexAttribPointer(pos_loc, 3, GL_FLOAT, GL_FALSE, sizeof(skybox_vert),
+                        (void *)offsetof(skybox_vert, pos));
+  glEnableVertexAttribArray(uv_loc);
+  glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, sizeof(skybox_vert),
+                        (void *)offsetof(skybox_vert, uv));
 
   return true;
 }
@@ -259,7 +352,60 @@ bool Scene::init(Renderer::Render &render) {
   if (!create_framebuffer())
     return false;
 
+  std::filesystem::path filepath =
+      FileUtils::APP_ROOT / "scenes" / name / "skybox.png";
+  Errors::Result<Renderer::Image, int> res_img_read =
+      render.LoadImage(filepath.string().c_str());
+
+  if (!res_img_read.is_ok) {
+    std::string path = filepath.string();
+
+    if (res_img_read.value.error == -1)
+      Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+               TL(MSG_GENERIC_OPEN_ERROR), std::make_format_args(path));
+
+    else if (res_img_read.value.error == 1)
+      Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+               TL(MSG_GENERIC_READ_ERROR), std::make_format_args(path));
+
+    else if (res_img_read.value.error == 2)
+      Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+               TL(MSG_RENDER_LOAD_IMAGE_ERROR), std::make_format_args(path));
+
+    glDeleteFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    initialised = false;
+    return false;
+  }
+
+  Errors::Result<Renderer::rTexture2D, Errors::no_error> res_txt =
+      render.LoadTexture(res_img_read.ok_unchecked());
+  if (!res_txt.is_ok) {
+    std::string path = filepath.string();
+    Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+             TL(MSG_RENDER_LOAD_IMAGE_ERROR), std::make_format_args(path));
+
+    delete[] res_img_read.ok_unchecked().pixels;
+
+    glDeleteFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    initialised = false;
+    return false;
+  }
+
+  skybox_texture = res_txt.ok_unchecked();
+  skybox_loc = glGetUniformLocation(skybox_program, "skybox");
+  glUniform1i(skybox_loc, 0);
+  initialised = true;
   return true;
+}
+
+void Scene::cleanup() {
+  if (initialised) {
+    glDeleteFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    initialised = false;
+  }
 }
 
 void Scene::updateMousePos(const Renderer::rect_size &pos) { mpos = pos; }
@@ -271,6 +417,16 @@ void Scene::render() {
   glViewport(0, 0, size.width, size.height);
   glClearColor(0, 0, 0, 0);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  glUseProgram(skybox_program);
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, skybox_texture);
+  glBindVertexArray(skybox_vao);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, skybox_ebo);
+  glDrawElements(GL_TRIANGLES, sizeof(skybox_indiecies) / sizeof(GLuint),
+                 GL_UNSIGNED_INT, 0);
+  glClear(GL_DEPTH_BUFFER_BIT);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
   glUseProgram(tri_program);
   glBindVertexArray(tri_vao);
@@ -287,6 +443,14 @@ void Scene::Cleanup() {
   glDeleteVertexArrays(1, &tri_vao);
   glDeleteBuffers(1, &tri_fbo);
   glDeleteProgram(tri_program);
+
+  if (!skybox_program)
+    return;
+
+  glDeleteVertexArrays(1, &skybox_vao);
+  glDeleteBuffers(1, &skybox_fbo);
+  glDeleteBuffers(1, &skybox_ebo);
+  glDeleteProgram(skybox_program);
 }
 
 Scene::~Scene() {}

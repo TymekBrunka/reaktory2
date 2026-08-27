@@ -4,6 +4,7 @@
   "MSG_APP_ROOT_SUBDIR_CREATE_ERROR": ["Nie można utworzyć folderu '{}' aplikacji."],
 
   "MSG_GENERIC_OPEN_ERROR": ["Nie można otworzyć pliku '{}'."],
+  "MSG_GENERIC_READ_ERROR": ["Nie można odczytać pliku '{}'."],
   "MSG_GENERIC_WRITE_ERROR": ["Nie można zapisać pliku '{}'."],
 
   "MSG_SCENE_DIR_CREATE_ERROR": ["Nie można utworzyć folderu '{}' sceny."],
@@ -22,6 +23,7 @@
   "MSG_RENDER_SET_WINDOW_CALLBACKS": ["Ustawiono zdarzenia okna"],
   "MSG_RENDER_SET_GLOBAL_GL_CTX": ["Ustawiono globalny kontekst opengl (dla imgui)"],
   "MSG_RENDER_CREATE_IMGUI_CTX": ["Utworzono kontekst imgui"],
+  "MSG_RENDER_LOAD_IMAGE_ERROR": ["Nie można załadować zdjęcia '{}'."],
 
   "MSG_GL_ERROR_SHADER": ["Nie można skompilować {} shader'a: {}."],
   "MSG_GL_ERROR_PROGRAM": ["Nie można podlinkować programu opengl \"{}\" : {}."],

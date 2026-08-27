@@ -7,7 +7,7 @@ std::filesystem::path HOME_DIR = "";
 std::filesystem::path APP_ROOT = "";
 
 Result<unsigned char *, int> ReadFilex(const std::filesystem::path &filepath,
-                                       alloc_fun alloc, void *allocator) {
+                                       alloc_fun alloc, free_fun frre, void *allocator) {
 
   FILE *file = fopen(filepath.string().c_str(), "rb");
   if (!file)
@@ -24,6 +24,14 @@ Result<unsigned char *, int> ReadFilex(const std::filesystem::path &filepath,
     outbuffer = alloc(allocator, fsize);
   else
     outbuffer = new unsigned char[fsize];
+
+  if (fread(outbuffer, fsize, 1, file) < fsize) {
+    if (frre)
+      frre(outbuffer, allocator, fsize);
+    else
+      delete[] outbuffer;
+    return Result<unsigned char *, int>::ERR(1);
+  }
 
   return Result<unsigned char *, int>::OK(outbuffer);
 }

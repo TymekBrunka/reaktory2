@@ -28,7 +28,7 @@ private:
   Renderer::rTexture2D new_scene_tex;
   Renderer::rTexture2D icons;
   Renderer::rect_size in_window_cursor_pos{0, 0};
-  const char *current_modal;
+  const char *current_modal = nullptr;
   Renderer::Image new_scene_img;
   Renderer::Render render;
 
@@ -42,7 +42,7 @@ public:
   App(App &&other) = delete;
   App &operator=(App &&other) = delete;
 
-  static void init_translations();
+  static bool init_translations();
   static bool set_directory_globals();
   static bool make_directories(const std::filesystem::path &path);
   static void init_logger();

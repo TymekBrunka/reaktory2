@@ -25,6 +25,8 @@ double Render::timeout = 0.016; // 60 fps
 bool Render::initialised = false;
 
 bool Render::Init() {
+  stbi_set_flip_vertically_on_load(1);
+
   if (initialised)
     return true;
 
@@ -86,6 +88,12 @@ bool Render::init(const char *title, rect_size window_size) {
 
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+  glEnable(GL_DEPTH_TEST);
+  glDepthFunc(GL_LESS);
+
+  glEnable(GL_CULL_FACE);
+  glCullFace(GL_BACK);
 
   glfwSetWindowUserPointer(impl->window, this);
   glfwSetFramebufferSizeCallback(
@@ -274,6 +282,35 @@ Result<Image, no_error> Render::LoadImageFromMemory(const unsigned char *data,
     return Result<Image, no_error>::ERR(false);
 
   return Result<Image, no_error>::OK(image);
+}
+
+Result<Image, int> Render::LoadImage(const char *filepath,
+                                     int desired_channels) {
+  FILE *file = fopen(filepath, "rb");
+  if (!file)
+    return Result<Image, int>::ERR(-1);
+
+  if (fseek(file, 0, SEEK_END))
+    return Result<Image, int>::ERR(1);
+
+  size_t fsize = ftell(file);
+  fseek(file, 0, SEEK_SET);
+  unsigned char *out = new unsigned char[fsize];
+
+  if (fread(out, fsize, 1, file) < fsize) {
+    // delete[] out;
+    // return Result<Image, int>::ERR(1);
+  }
+
+  Result<Image, no_error> res_img =
+      LoadImageFromMemory(out, fsize, desired_channels);
+
+  if (!res_img.is_ok) {
+    delete[] out;
+    return Result<Image, int>::ERR(2);
+  }
+
+  return Result<Image, int>::OK(res_img.value.success);
 }
 
 Result<rTexture2D, no_error> Render::LoadTexture(const Image &image,

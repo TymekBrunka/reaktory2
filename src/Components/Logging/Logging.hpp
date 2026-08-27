@@ -38,8 +38,10 @@ enum LOG_TAG {
 //   const char *context;
 //   std::string message;
 // };
+class Logger;
 
 typedef void (*write_fun)(
+    Logger &logger,
     std::chrono::time_point<std::chrono::system_clock> timestamp,
     uint32_t user_lang, uint8_t tag, translations_key_t message_idx,
     const char *context, bool is_formatted, std::format_args *args, void *data);
@@ -53,6 +55,7 @@ struct Callback {
 class Logger {
 private:
   uint32_t user_lang = 0;
+  int32_t pid;
   std::vector<Callback> callbacks;
 
 public:
@@ -61,11 +64,11 @@ public:
 
   static Logger *Global;
 
-  inline Logger(uint32_t user_lang_, const std::vector<Callback> &callbacks_)
-      : user_lang(user_lang_), callbacks(callbacks_) {};
+  inline int32_t get_pid() const { return pid; }
 
-  inline Logger(uint32_t user_lang_, std::vector<Callback> &&callbacks_)
-      : user_lang(user_lang_), callbacks(callbacks_) {};
+  Logger(uint32_t user_lang_, const std::vector<Callback> &callbacks_);
+
+  Logger(uint32_t user_lang_, std::vector<Callback> &&callbacks_);
 
   void log(uint8_t tag, uintptr_t additional_data, const char *context,
            translations_key_t message_idx, std::format_args &&args);
@@ -91,7 +94,7 @@ inline void log_uform(uint8_t tag, uintptr_t additional_data,
 //   namespac messages[namespac id] ...
 
 #define LOG_FMT(lang, idx, namespac, args, do_fmt)                             \
-  ((do_fmt) ? std::vformat(namespac messages[lang][idx], (args))      \
+  ((do_fmt) ? std::vformat(namespac messages[lang][idx], (args))               \
             : namespac messages[lang][idx])
 
 extern Callback ConsoleLog_Callback;

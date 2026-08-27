@@ -29,14 +29,20 @@ bool App::logger_initialised = false;
 LogFileWriterData App::file_logger_data{};
 Log::Logger App::logger{};
 
-void App::init_translations() {
+bool App::init_translations() {
   if (!translations_initialised) {
-    Log::LoadTranslation(&Log::messages[Log::LANG_EN],
-                         "assets/translations/en_US.json");
-    Log::LoadTranslation(&Log::messages[Log::LANG_PL],
-                         "assets/translations/pl_PL.json");
+    if (!Log::LoadTranslation(&Log::messages[Log::LANG_EN],
+                              "assets/translations/en_US.json"))
+      return false;
+
+    if (!Log::LoadTranslation(&Log::messages[Log::LANG_PL],
+                              "assets/translations/pl_PL.json"))
+      return false;
     translations_initialised = true;
+
+    return true;
   }
+  return true;
 }
 
 bool App::set_directory_globals() {
@@ -88,7 +94,10 @@ void App::init_logger() {
 // [app statup] -----
 
 bool App::init() {
-  init_translations();
+  if (!init_translations()) {
+    std::cerr << "Nie udało się załadować tłumaczeń\n";
+    return false;
+  }
 
   if (!set_directory_globals())
     return false;
@@ -115,9 +124,15 @@ bool App::init() {
       return;
 
     if (action == GLFW_PRESS) {
-      std::cerr << "key: " << key << " ctrl: " << (mods & GLFW_MOD_CONTROL) << "\n";
-      if (key == GLFW_KEY_O && mods & GLFW_MOD_CONTROL) {
-        app->open_scene();
+      if (mods == GLFW_MOD_CONTROL) {
+        switch (key) {
+        case GLFW_KEY_N:
+          app->add_scene();
+          break;
+        case GLFW_KEY_O:
+          app->open_scene();
+          break;
+        }
       }
     }
   });

@@ -20,6 +20,8 @@ typedef unsigned int rRBO;
 // uniform buffer object
 typedef unsigned int rUBO;
 
+typedef unsigned int rUnifomIdx;
+
 typedef unsigned int rTextureAny;
 typedef unsigned int rTexture2D;
 typedef unsigned int rCubeMap;
@@ -115,6 +117,9 @@ public:
   Result<rProgram, no_error> LoadProgram(const char *name, const char *vs,
                                          const char *fs);
   void UnloadProgram(rProgram program);
+
+  Result<Image, int> LoadImage(const char *filepath,
+                                    int desired_channels = 0);
 
   Result<Image, no_error> LoadImageFromMemory(const unsigned char *data,
                                               int length,

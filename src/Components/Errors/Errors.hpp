@@ -10,9 +10,7 @@ template <typename T, typename E> struct Result {
     E error;
   } value;
 
-  Result() {
-    is_ok = false;
-  }
+  Result() { is_ok = false; }
 
   static Result OK(T success) {
     Result res;
@@ -33,9 +31,9 @@ template <typename T, typename E> struct Result {
     value = other.is_ok ? other.value.success : other.value.error;
   }
 
-  T ok_unchecked() const { return value.success; }
+  const T &ok_unchecked() const { return value.success; }
 
-  E err_unchecked() const { return value.error; }
+  const E &err_unchecked() const { return value.error; }
 
   T ok_or(T fallback) const { return is_ok ? value.success : fallback; }
 

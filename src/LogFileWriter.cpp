@@ -2,6 +2,7 @@
 #include <FileUtils.hpp>
 #include <Logging.hpp>
 #include <chrono>
+#include <thread>
 
 #ifdef _WIN32
 #define SEP "\\"
@@ -10,7 +11,8 @@
 #endif
 
 Log::write_fun App::log_file_writer =
-    [](std::chrono::time_point<std::chrono::system_clock> timestamp,
+    [](Log::Logger &logger,
+       std::chrono::time_point<std::chrono::system_clock> timestamp,
        uint32_t user_lang, uint8_t tag, Log::translations_key_t message_idx,
        const char *context, bool is_formatted, std::format_args *args,
        void *data) {
@@ -25,7 +27,7 @@ Log::write_fun App::log_file_writer =
         self->filepath = std::format("{}" SEP "logs" SEP "{}.log",
                                      FileUtils::APP_ROOT.string(), today);
         self->filepath_en = std::format("{}" SEP "logs" SEP "{}.en.log",
-                                     FileUtils::APP_ROOT.string(), today);
+                                        FileUtils::APP_ROOT.string(), today);
         self->file.open(self->filepath, std::ios_base::app);
         self->file_en.open(self->filepath_en, std::ios_base::app);
       }
@@ -46,13 +48,18 @@ Log::write_fun App::log_file_writer =
       else if (tag & Log::SEV_MED)
         severity = "MEDIUM";
 
-      self->file << "[" << timestamp << "][" << context << "][" << log_level << "]["
-           << severity << "] "
-           << LOG_FMT(user_lang, message_idx, Log::, *args, is_formatted)
-           << std::endl;
+      self->file << "[pid: " << logger.get_pid() << "][tid: "
+                 << std::hash<std::thread::id>{}(std::this_thread::get_id())
+                 << "][" << timestamp << "][" << context << "][" << log_level
+                 << "][" << severity << "] "
+                 << LOG_FMT(user_lang, message_idx, Log::, *args, is_formatted)
+                 << std::endl;
 
-      self->file_en << "[" << timestamp << "][" << context << "][" << log_level << "]["
-           << severity << "] "
-           << LOG_FMT(Log::LANG_EN, message_idx, Log::, *args, is_formatted)
-           << std::endl;
+      self->file_en << "[pid: " << logger.get_pid() << "][tid: "
+                    << std::hash<std::thread::id>{}(std::this_thread::get_id())
+                    << "][" << timestamp << "][" << context << "][" << log_level
+                    << "][" << severity << "] "
+                    << LOG_FMT(Log::LANG_EN, message_idx, Log::, *args,
+                               is_formatted)
+                    << std::endl;
     };
