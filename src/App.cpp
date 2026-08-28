@@ -80,6 +80,7 @@ bool App::make_directories(const std::filesystem::path &path) {
 
 void App::init_logger() {
   if (!logger_initialised) {
+    // Log::ConsoleLog_Callback.tag = Log::ACCEPT_ALL;
     Log::Callback LogFile_Callback{.tag = Log::ACCEPT_ALL,
                                    .data = &file_logger_data,
                                    .write = log_file_writer};
@@ -117,6 +118,12 @@ bool App::init() {
     return false;
 
   render.userdata = this;
+
+  render.SetResizeCallback([](Renderer::Render &window, int width, int height) {
+    App *app = (App *)window.userdata;
+    app->draw_self();
+  });
+
   render.SetKeyCallback([](Renderer::Render &window, int key, int scancode,
                            int action, int mods) {
     App *app = (App *)window.userdata;
@@ -134,6 +141,33 @@ bool App::init() {
           break;
         }
       }
+    }
+  });
+
+  render.SetMouseButtonCallback([](Renderer::Render &window, int button,
+                                   int action, int mods) {
+    App *app = (App *)window.userdata;
+    if (!app->is_scene_window_selected() || !app->get_selected_scene()) {
+      app->mousebuttonL = false;
+      app->mousebuttonR = false;
+      return;
+    }
+
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+      app->mousebuttonL = true;
+
+    else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
+      app->mousebuttonL = false;
+
+    else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
+      glfwSetInputMode(window.GetGLFWWindow(), GLFW_CURSOR,
+                       GLFW_CURSOR_DISABLED);
+      app->mousebuttonR = true;
+    }
+
+    else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE) {
+      glfwSetInputMode(window.GetGLFWWindow(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+      app->mousebuttonR = false;
     }
   });
 
@@ -228,200 +262,226 @@ void App::run() {
   render.makeContextCurrent();
   while (!render.WindowShouldClose()) {
     Renderer::Render::PullEvents();
-    if (!render.IsMinimised()) {
-      render.BeginFrame();
-      ImGui::DockSpaceOverViewport();
-      // ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(),
-      //                              ImGuiDockNodeFlags_PassthruCentralNode);
+    draw_self();
+  }
+}
 
-      if (ImGui::BeginMainMenuBar()) {
+void App::draw_self() {
+  if (render.IsMinimised())
+    return;
+  render.BeginFrame();
+  ImGui::DockSpaceOverViewport();
+  // ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(),
+  //                              ImGuiDockNodeFlags_PassthruCentralNode);
 
-        if (ImGui::BeginMenu("Plik")) {
-          ImGui::MenuItem(" " ICON_FA_FILE_ARROW_DOWN
-                          "  (ctrl+S) Zapisz (wszystko)");
-          IconMenuItem(0, "      (ctrl+O) Otwórz dostępną scenę");
-          IconMenuItem(0, "      (ctrl+N) Utwórz nową scenę");
-          IconMenuItem(9, "      (ctrl+I) Importuj scenę");
-          IconMenuItem(10, "      (ctrl+E) Eksportuj scenę");
-          ImGui::EndMenu();
+  if (ImGui::BeginMainMenuBar()) {
+
+    if (ImGui::BeginMenu("Plik")) {
+      ImGui::MenuItem(" " ICON_FA_FILE_ARROW_DOWN
+                      "  (ctrl+S) Zapisz (wszystko)");
+      IconMenuItem(0, "      (ctrl+O) Otwórz dostępną scenę");
+      IconMenuItem(0, "      (ctrl+N) Utwórz nową scenę");
+      IconMenuItem(9, "      (ctrl+I) Importuj scenę");
+      IconMenuItem(10, "      (ctrl+E) Eksportuj scenę");
+      ImGui::EndMenu();
+    }
+
+    if (ImGui::BeginMenu("Edycja")) {
+      IconMenuItem(5, "      (alt+D) Załaduj model");
+      IconMenuItem(6, "      (alt+F) Załaduj teksturę");
+      ImGui::Separator();
+
+      bool use_local_cords = true;
+      ImGui::Checkbox("      Operacje w przestrzeni lokalnej",
+                      &use_local_cords);
+
+      AddIconToDrawlist(2, ImVec2(24, 0));
+
+      ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
+  }
+
+  ImGui::ShowDemoWindow();
+
+#ifndef NDEBUG
+  if (ImGui::Begin("Debug")) {
+    ImGui::Text("LMB: %1b", mousebuttonL);
+    ImGui::Text("RMB: %1b", mousebuttonR);
+    if (selected_scene_idx)
+      ImGui::Text("Selected scene %s\n  %p", selected_scene_idx->c_str(),
+                  selected_scene);
+    else
+      ImGui::Text("Selected scene (no name)\n  %p", selected_scene);
+  }
+  ImGui::End();
+#endif
+
+  if (ImGui::Begin(ICON_FA_CUBES " Scena")) {
+  }
+  ImGui::End();
+
+  if (ImGui::Begin(ICON_FA_WRENCH " Właściwości")) {
+  }
+  ImGui::End();
+
+  if (ImGui::Begin(ICON_FA_DRAW_POLYGON " Modele")) {
+  }
+  ImGui::End();
+
+  if (ImGui::Begin(ICON_FA_IMAGES " Tekstury")) {
+  }
+  ImGui::End();
+
+  if (ImGui::Begin("Scena")) {
+    scene_window_selected = ImGui::IsWindowFocused();
+    if (scenes.size() <= 0) {
+      ImVec2 wsize = ImGui::GetWindowSize();
+      float min_axis = wsize.x < wsize.y ? wsize.x : wsize.y;
+      float img_size = min_axis > 400 ? 200 : min_axis - 200;
+
+      ImGui::SetCursorPos(
+          ImVec2((wsize.x - img_size) / 2, (wsize.y - img_size) / 2));
+
+      ImGui::PushStyleColor(ImGuiCol_Button, ImGuiCol_WindowBg);
+      if (ImGui::ImageButton("##Dodaj scenę", (ImTextureRef)new_scene_tex,
+                             ImVec2(img_size, img_size), ImVec2(0, 1),
+                             ImVec2(1, 0)))
+        add_scene();
+      if (CenteredButton("Brak otwartej sceny."))
+        add_scene();
+      if (CenteredButton("Stwórz scenę."))
+        add_scene();
+      if (CenteredButton("Otwórz scenę."))
+        open_scene();
+      ImGui::PopStyleColor(1);
+    } else {
+      scene_window_selected = ImGui::IsWindowFocused();
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+
+      ImGui::SetCursorPos(ImVec2(0, 25));
+      if (ImGui::BeginTabBar("scene_tab")) {
+        selected_scene_idx = nullptr;
+        for (auto &[name, scene] : scenes) {
+          if (ImGui::BeginTabItem(name.c_str())) {
+            selected_scene_idx = &name;
+            selected_scene = &scene;
+            ImVec2 pos = ImGui::GetCursorScreenPos();
+            ImVec2 sregion = ImGui::GetContentRegionMax();
+
+            sregion = ImVec2(sregion.x + 8, sregion.y - 39);
+
+            ImVec2 imTL = ImVec2(pos.x - 8, pos.y - 4);
+            ImVec2 imBR = ImVec2(pos.x + sregion.x - 8, pos.y + sregion.y - 4);
+
+            Renderer::rect_size sp = render.GetCursorPosition();
+            in_window_cursor_pos = Renderer::rect_size{
+                sp.width - imTL.x, -1 * (sp.height - imBR.y)};
+
+            scene.updateMousePos(in_window_cursor_pos);
+            scene.updateMouseButtonState(mousebuttonL, mousebuttonR);
+            scene.resize({sregion.x, sregion.y});
+            scene.render(render);
+            ImGui::GetWindowDrawList()->AddImage(
+                (ImTextureRef)scene.screen_canvas, imTL, imBR, ImVec2(0, 1),
+                ImVec2(1, 0));
+
+            ImGui::EndTabItem();
+          }
         }
-
-        if (ImGui::BeginMenu("Edycja")) {
-          IconMenuItem(5, "      (alt+D) Załaduj model");
-          IconMenuItem(6, "      (alt+F) Załaduj teksturę");
-          ImGui::Separator();
-
-          bool use_local_cords = true;
-          ImGui::Checkbox("      Operacje w przestrzeni lokalnej",
-                          &use_local_cords);
-
-          AddIconToDrawlist(2, ImVec2(24, 0));
-
-          ImGui::EndMenu();
-        }
-        ImGui::EndMainMenuBar();
+        ImGui::EndTabBar();
       }
 
-      ImGui::ShowDemoWindow();
+      if (!selected_scene_idx)
+        selected_scene = nullptr;
 
-      if (ImGui::Begin(ICON_FA_CUBES " Scena")) {
-      }
-      ImGui::End();
-
-      if (ImGui::Begin(ICON_FA_WRENCH " Właściwości")) {
-      }
-      ImGui::End();
-
-      if (ImGui::Begin(ICON_FA_DRAW_POLYGON " Modele")) {
-      }
-      ImGui::End();
-
-      if (ImGui::Begin(ICON_FA_IMAGES " Tekstury")) {
-      }
-      ImGui::End();
-
-      if (ImGui::Begin("Scena")) {
-        if (scenes.size() <= 0) {
-          ImVec2 wsize = ImGui::GetWindowSize();
-          float min_axis = wsize.x < wsize.y ? wsize.x : wsize.y;
-          float img_size = min_axis > 400 ? 200 : min_axis - 200;
-
-          ImGui::SetCursorPos(
-              ImVec2((wsize.x - img_size) / 2, (wsize.y - img_size) / 2));
-
-          ImGui::PushStyleColor(ImGuiCol_Button, ImGuiCol_WindowBg);
-          if (ImGui::ImageButton("##Dodaj scenę", (ImTextureRef)new_scene_tex,
-                                 ImVec2(img_size, img_size)))
-            add_scene();
-          if (CenteredButton("Brak otwartej sceny."))
-            add_scene();
-          if (CenteredButton("Stwórz scenę."))
-            add_scene();
-          if (CenteredButton("Otwórz scenę."))
-            open_scene();
-          ImGui::PopStyleColor(1);
-        } else {
-          ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-
-          ImGui::SetCursorPos(ImVec2(0, 25));
-          if (ImGui::BeginTabBar("scene_tab")) {
-            for (auto &scene : scenes) {
-              if (ImGui::BeginTabItem(scene.get_name().c_str())) {
-                ImVec2 pos = ImGui::GetCursorScreenPos();
-                ImVec2 sregion = ImGui::GetContentRegionMax();
-
-                sregion = ImVec2(sregion.x + 8, sregion.y - 39);
-
-                ImVec2 imTL = ImVec2(pos.x - 8, pos.y - 4);
-                ImVec2 imBR =
-                    ImVec2(pos.x + sregion.x - 8, pos.y + sregion.y - 4);
-
-                Renderer::rect_size sp = render.GetCursorPosition();
-                in_window_cursor_pos = Renderer::rect_size{
-                    sp.width - imTL.x, -1 * (sp.height - imBR.y)};
-
-                scene.updateMousePos(in_window_cursor_pos);
-                scene.resize({sregion.x, sregion.y});
-                scene.render();
-                ImGui::GetWindowDrawList()->AddImage(
-                    (ImTextureRef)scene.screen_canvas, imTL, imBR, ImVec2(0, 1),
-                    ImVec2(1, 0));
-
-                ImGui::EndTabItem();
-              }
-            }
-            ImGui::EndTabBar();
-          }
-
-          ImGui::PopStyleVar();
-        }
-      }
-      ImGui::End();
-
-      // [modals] -----
-      // //
-      if (current_modal)
-        ImGui::OpenPopup(current_modal);
-
-      ImVec2 center = ImGui::GetMainViewport()->GetCenter();
-      ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
-      do {
-        if (ImGui::BeginPopupModal("Nowa scena", NULL,
-                                   ImGuiWindowFlags_AlwaysAutoResize)) {
-
-          ImGui::InputText("Nazwa sceny", name_buffer, 200);
-          if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-            memset(name_buffer, 0, 200);
-            ImGui::CloseCurrentPopup();
-            current_modal = nullptr;
-          }
-
-          if (ImGui::IsKeyPressed(ImGuiKey_Enter)) {
-            std::filesystem::path path = FileUtils::APP_ROOT / "scenes" /
-                                         std::filesystem::path(name_buffer);
-
-            if (!add_scene(name_buffer)) {
-              ImGui::EndPopup();
-              break;
-            }
-            memset(name_buffer, 0, 200);
-            ImGui::CloseCurrentPopup();
-            current_modal = nullptr;
-          }
-          ImGui::EndPopup();
-        }
-
-        if (ImGui::BeginPopupModal("Wybór sceny", NULL,
-                                   ImGuiWindowFlags_AlwaysAutoResize)) {
-
-          if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
-            ImGui::CloseCurrentPopup();
-            current_modal = nullptr;
-          }
-
-          if (ImGui::BeginCombo("Scena", owned_string.c_str())) {
-            static ImGuiTextFilter filter;
-            if (ImGui::IsWindowAppearing()) {
-              ImGui::SetKeyboardFocusHere();
-              filter.Clear();
-            }
-
-            filter.Draw("Wybierz scenę");
-
-            for (const auto &ent : std::filesystem::directory_iterator(
-                     FileUtils::APP_ROOT / "scenes")) {
-              if (std::filesystem::is_directory(ent.path())) {
-                std::string path_str = ent.path().string();
-                if (filter.PassFilter(path_str.c_str())) {
-                  if (ImGui::Selectable(path_str.c_str(), false)) {
-                    owned_string = path_str;
-                  }
-                }
-              }
-            }
-            ImGui::EndCombo();
-          }
-
-          if (ImGui::Button("Otwórz")) {
-            if (!open_scene(owned_string.substr(
-                    (FileUtils::APP_ROOT / "scenes").string().size() + 1))) {
-              ImGui::EndPopup();
-              break;
-            }
-            owned_string = std::string();
-            ImGui::CloseCurrentPopup();
-            current_modal = nullptr;
-          }
-
-          ImGui::EndPopup();
-        }
-      } while (0);
-      // \\
-      // [modals] -----
-
-      render.EndFrame();
+      ImGui::PopStyleVar();
     }
   }
+  ImGui::End();
+
+  // [modals] -----
+  // //
+  if (current_modal)
+    ImGui::OpenPopup(current_modal);
+
+  ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+  ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+  do {
+    if (ImGui::BeginPopupModal("Nowa scena", NULL,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+
+      ImGui::InputText("Nazwa sceny", name_buffer, 200);
+      if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        memset(name_buffer, 0, 200);
+        ImGui::CloseCurrentPopup();
+        current_modal = nullptr;
+      }
+
+      if (ImGui::IsKeyPressed(ImGuiKey_Enter)) {
+        std::filesystem::path path =
+            FileUtils::APP_ROOT / "scenes" / std::filesystem::path(name_buffer);
+
+        if (!add_scene(name_buffer)) {
+          ImGui::EndPopup();
+          break;
+        }
+        memset(name_buffer, 0, 200);
+        ImGui::CloseCurrentPopup();
+        current_modal = nullptr;
+      }
+      ImGui::EndPopup();
+    }
+
+    if (ImGui::BeginPopupModal("Wybór sceny", NULL,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+
+      if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        ImGui::CloseCurrentPopup();
+        current_modal = nullptr;
+      }
+
+      if (ImGui::BeginCombo("Scena", owned_string.c_str())) {
+        static ImGuiTextFilter filter;
+        if (ImGui::IsWindowAppearing()) {
+          ImGui::SetKeyboardFocusHere();
+          filter.Clear();
+        }
+
+        filter.Draw("Wybierz scenę");
+
+        for (const auto &ent : std::filesystem::directory_iterator(
+                 FileUtils::APP_ROOT / "scenes")) {
+          if (std::filesystem::is_directory(ent.path())) {
+            std::string path_str = ent.path().string();
+            if (filter.PassFilter(path_str.c_str())) {
+              if (ImGui::Selectable(path_str.c_str(), false)) {
+                owned_string = path_str;
+              }
+            }
+          }
+        }
+        ImGui::EndCombo();
+      }
+
+      if (ImGui::Button("Otwórz")) {
+        if (!open_scene(owned_string.substr(
+                (FileUtils::APP_ROOT / "scenes").string().size() + 1))) {
+          ImGui::EndPopup();
+          break;
+        }
+        owned_string = std::string();
+        ImGui::CloseCurrentPopup();
+        current_modal = nullptr;
+      }
+
+      ImGui::EndPopup();
+    }
+  } while (0);
+  // \\
+  // [modals] -----
+
+  render.EndFrame();
 }
 
 bool App::add_scene(const std::string &name) {
@@ -443,8 +503,18 @@ bool App::add_scene(const std::string &name) {
 
   if (!scene.init(render)) {
     std::cerr << "failed to init scene\n";
+    return false;
   }
-  scenes.push_back(std::move(scene));
+
+  if (selected_scene_idx) {
+    std::string cpy = *selected_scene_idx;
+    scenes[name] = std::move(scene);
+    auto iter = scenes.find(cpy);
+    selected_scene_idx = &iter->first;
+    selected_scene = &iter->second;
+  } else {
+    scenes[name] = std::move(scene);
+  }
 
   return true;
 }
@@ -468,8 +538,18 @@ bool App::open_scene(const std::string &name) {
 
   if (!scene.init(render)) {
     std::cerr << "failed to init scene\n";
+    return false;
   }
-  scenes.push_back(std::move(scene));
+
+  if (selected_scene_idx) {
+    std::string cpy = *selected_scene_idx;
+    scenes[name] = std::move(scene);
+    auto iter = scenes.find(cpy);
+    selected_scene_idx = &iter->first;
+    selected_scene = &iter->second;
+  } else {
+    scenes[name] = std::move(scene);
+  }
 
   return true;
 }

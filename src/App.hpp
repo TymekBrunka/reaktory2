@@ -24,6 +24,13 @@ private:
 
   static Log::Logger logger;
   static LogFileWriterData file_logger_data;
+
+public:
+  bool mousebuttonL = false;
+  bool mousebuttonR = false;
+
+private:
+  bool scene_window_selected = false;
   Renderer::rTexture2D icon_tex;
   Renderer::rTexture2D new_scene_tex;
   Renderer::rTexture2D icons;
@@ -32,7 +39,22 @@ private:
   Renderer::Image new_scene_img;
   Renderer::Render render;
 
-  std::vector<Scene> scenes;
+  struct string_hash {
+    using is_transparent = void;
+    [[nodiscard]] inline size_t operator()(const char *txt) const {
+      return std::hash<std::string_view>{}(txt);
+    }
+    [[nodiscard]] inline size_t operator()(std::string_view txt) const {
+      return std::hash<std::string_view>{}(txt);
+    }
+    [[nodiscard]] inline size_t operator()(const std::string &txt) const {
+      return std::hash<std::string>{}(txt);
+    }
+  };
+
+  const std::string *selected_scene_idx = nullptr;
+  Scene *selected_scene = nullptr;
+  std::unordered_map<std::string, Scene, string_hash, std::equal_to<>> scenes;
 
 public:
   App() = default;
@@ -47,12 +69,17 @@ public:
   static bool make_directories(const std::filesystem::path &path);
   static void init_logger();
 
+  inline bool is_scene_window_selected() const { return scene_window_selected; }
+
   inline bool does_have_modal() const { return current_modal; }
+
+  inline Scene *get_selected_scene() const { return selected_scene; }
 
   bool IconMenuItem(int idx, const char *label);
   void AddIconToDrawlist(int idx, ImVec2 offset = ImVec2(0, 0));
 
   bool init();
+  void draw_self();
   void run();
   void shutdown();
 

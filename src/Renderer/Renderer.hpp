@@ -96,6 +96,7 @@ public:
   Render(Render &&other);
   Render &operator=(Render &&other);
 
+  GLFWwindow *GetGLFWWindow() const;
   void SetWindowTitle(const char *title);
   void SetWindowIcon(const Image &icon_);
   // void SetCamera(const Camera *camera = nullptr);

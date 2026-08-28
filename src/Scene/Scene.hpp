@@ -1,10 +1,10 @@
 #pragma once
 #include <Renderer.hpp>
 #include <filesystem>
+#include <glm/mat4x4.hpp>
+#include <glm/vec2.hpp>
 #include <stdatomic.h>
 #include <string>
-#include <glm/vec2.hpp>
-#include <glm/mat4x4.hpp>
 
 class Scene {
   static Renderer::rProgram skybox_program;
@@ -15,12 +15,18 @@ class Scene {
   static Renderer::rFBO tri_fbo;
   static Renderer::rVAO tri_vao;
 
+  static Renderer::rLocation skybox_loc;
+  static Renderer::rLocation skybox_view_loc;
+  static Renderer::rLocation skybox_projection_loc;
+
   bool initialised = false;
+  bool mousebuttonL = false;
+  bool mousebuttonR = false;
   atomic_bool can_rename = true;
   Renderer::rect_size size{640, 480};
+  glm::vec2 last_mpos{0, 0};
   Renderer::rect_size mpos{0, 0};
   // std::string current_folder;
-  Renderer::rLocation skybox_loc;
   Renderer::rTexture2D skybox_texture;
   Renderer::rFBO framebuffer;
   Renderer::rRBO renderbuffer;
@@ -30,13 +36,19 @@ public:
   Renderer::rTexture2D color_canvas;
 
 private:
-  glm::vec2 input{};
-  glm::vec2 orientation{};
-  glm::mat4x4 camera{};
+  glm::vec3 input{};
+  // struct {
+  //   Renderer::rUnifomIdx camera_idx;
+  //   Renderer::rUnifomIdx mpos_idx;
+  // } ubo_locs;
   struct {
-    Renderer::rUnifomIdx camera_idx;
-    Renderer::rUnifomIdx mpos_idx;
-  } ubo_locs;
+    glm::vec2 orientation{};
+    glm::vec3 position;
+    glm::vec3 velocity;
+    glm::vec3 acceleration;
+  } body;
+  glm::mat4x4 projection{};
+  glm::mat4x4 view{};
   std::string name;
   std::filesystem::path current_folder;
 
@@ -60,19 +72,27 @@ public:
   inline bool is_initialised() const { return initialised; }
   static void Cleanup();
 
-
   inline const std::string &get_name() const { return name; }
 
   static bool Init(Renderer::Render &render);
   bool init(Renderer::Render &render);
   void cleanup();
 
-  void render();
+  void render(Renderer::Render &render);
 
   // retuns whether it needs redraw
   bool resize(Renderer::rect_size size);
-  void updateMousePos(const Renderer::rect_size &pos);
-  void updateMouseButtonState(bool left, bool right);
+
+  inline void updateBodyMovement(glm::vec3 input_) {
+    input = input_;
+  }
+
+  inline void updateMousePos(const Renderer::rect_size &pos) { mpos = pos; }
+
+  inline void updateMouseButtonState(bool left, bool right) {
+    mousebuttonL = left;
+    mousebuttonR = right;
+  }
 
   void rename(const std::string &name);
   // void updateSkybox(Renderer::rCubeMap skybox);

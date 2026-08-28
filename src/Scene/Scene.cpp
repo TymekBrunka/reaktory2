@@ -1,3 +1,8 @@
+#define GLFW_INCLUDE_NONE
+#include "GLFW/glfw3.h"
+
+#include "glm/common.hpp"
+#include "glm/trigonometric.hpp"
 #include <Errors/Errors.hpp>
 #include <FileUtils.hpp>
 #include <Logging.hpp>
@@ -10,6 +15,11 @@
 #include <staticassets_scene.h>
 #include <stdatomic.h>
 
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+// #include <glm/ext/matrix_clip_space.hpp>
+#include <glm/ext/matrix_transform.hpp>
+
 Renderer::rProgram Scene::skybox_program = 0;
 Renderer::rFBO Scene::skybox_fbo = 0;
 Renderer::rFBO Scene::skybox_ebo = 0;
@@ -17,6 +27,10 @@ Renderer::rVAO Scene::skybox_vao = 0;
 Renderer::rProgram Scene::tri_program = 0;
 Renderer::rFBO Scene::tri_fbo = 0;
 Renderer::rVAO Scene::tri_vao = 0;
+
+Renderer::rLocation Scene::skybox_loc = 0;
+Renderer::rLocation Scene::skybox_view_loc = 0;
+Renderer::rLocation Scene::skybox_projection_loc = 0;
 
 GLuint skybox_indiecies[] = {0,  1,  2,  0,  2,  3,  4,  5,  6,  4,  6,  7,
                              8,  9,  10, 8,  10, 11, 12, 13, 14, 12, 14, 15,
@@ -121,9 +135,9 @@ struct Vertex {
   Renderer::vec3 col;
 };
 
-static const Vertex vertices[3] = {{{0.0f, 1.0f}, {1.f, 0.f, 0.f}},
-                                   {{-1.0f, -1.0f}, {0.f, 1.f, 0.f}},
-                                   {{1.0f, -1.0f}, {0.f, 0.f, 1.f}}};
+static const Vertex vertices[3] = {{{0.0f, 0.5f}, {1.f, 0.f, 0.f}},
+                                   {{-0.5f, -0.5f}, {0.f, 1.f, 0.f}},
+                                   {{0.5f, -0.5f}, {0.f, 0.f, 1.f}}};
 
 static bool
 write_file_if_not_exists_reported(const std::filesystem::path &filepath,
@@ -248,6 +262,10 @@ bool Scene::resize(Renderer::rect_size size) {
   this->size = size;
   resize_framebuffer(size);
 
+  projection =
+      glm::perspective(glm::radians(90.0f),
+                       (float)size.width / (float)size.height, 0.1f, 1000.0f);
+
   return true;
 }
 
@@ -333,7 +351,8 @@ bool Scene::Init(Renderer::Render &render) {
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(skybox_indiecies),
                skybox_indiecies, GL_STATIC_DRAW);
 
-  const Renderer::rLocation pos_loc = glGetAttribLocation(skybox_program, "pos");
+  const Renderer::rLocation pos_loc =
+      glGetAttribLocation(skybox_program, "pos");
   const Renderer::rLocation uv_loc = glGetAttribLocation(skybox_program, "uv");
 
   glGenVertexArrays(1, &skybox_vao);
@@ -344,6 +363,9 @@ bool Scene::Init(Renderer::Render &render) {
   glEnableVertexAttribArray(uv_loc);
   glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, sizeof(skybox_vert),
                         (void *)offsetof(skybox_vert, uv));
+
+  skybox_projection_loc = glGetUniformLocation(skybox_program, "projection");
+  skybox_view_loc = glGetUniformLocation(skybox_program, "view");
 
   return true;
 }
@@ -385,13 +407,15 @@ bool Scene::init(Renderer::Render &render) {
     Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
              TL(MSG_RENDER_LOAD_IMAGE_ERROR), std::make_format_args(path));
 
-    delete[] res_img_read.ok_unchecked().pixels;
+    free(res_img_read.ok_unchecked().pixels);
 
     glDeleteFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     initialised = false;
     return false;
   }
+
+  free(res_img_read.ok_unchecked().pixels);
 
   skybox_texture = res_txt.ok_unchecked();
   skybox_loc = glGetUniformLocation(skybox_program, "skybox");
@@ -408,9 +432,23 @@ void Scene::cleanup() {
   }
 }
 
-void Scene::updateMousePos(const Renderer::rect_size &pos) { mpos = pos; }
+void Scene::updateCamera() {
+  // float sinx = glm::sin(body.orientation[0]);
+  // float cosx = glm::sin(body.orientation[0]);
+  // float siny = glm::sin(body.orientation[1]);
+  float cosy = glm::cos(body.orientation.y);
 
-void Scene::render() {
+  glm::vec3 forward(glm::sin(body.orientation.x) * cosy,
+                    glm::sin(body.orientation.y),
+                    glm::cos(body.orientation.x) * cosy);
+
+  glm::vec3 right = glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f));
+  glm::vec3 up = glm::cross(right, forward);
+
+  view = glm::lookAt(body.position, body.position + forward, up);
+}
+
+void Scene::render(Renderer::Render &render) {
   glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
   // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
 
@@ -419,6 +457,29 @@ void Scene::render() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   glUseProgram(skybox_program);
+
+  glm::vec2 temp = glm::vec2((float)-mpos.width, (float)mpos.height) * 100.0f;
+  temp.x /= size.width;
+  temp.y /= size.height;
+  if (mousebuttonR) {
+    body.orientation += glm::radians(temp - last_mpos);
+    body.orientation.x = glm::mod(body.orientation.x, glm::radians(360.0f));
+    body.orientation.y =
+        glm::clamp(body.orientation.y, glm::radians(-90.0f) + 0.001f,
+                   glm::radians(90.0f) - 0.001f);
+  }
+  last_mpos = temp;
+
+  updateCamera();
+
+  glUniformMatrix4fv(skybox_view_loc, 1, GL_FALSE, glm::value_ptr(view));
+  glUniformMatrix4fv(skybox_projection_loc, 1, GL_FALSE,
+                     glm::value_ptr(projection));
+
+  // if (mousebuttonL && mousebuttonR)
+  //   body.orientation += glm::vec2((float)mpos.width, (float)mpos.height) *
+  //   glm::radians(render.GetDelta());
+
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, skybox_texture);
   glBindVertexArray(skybox_vao);
@@ -453,4 +514,7 @@ void Scene::Cleanup() {
   glDeleteProgram(skybox_program);
 }
 
-Scene::~Scene() {}
+Scene::~Scene() {
+  if (initialised)
+    cleanup();
+}

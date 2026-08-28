@@ -202,6 +202,8 @@ Render &Render::operator=(Render &&other) {
 
 void Render::makeContextCurrent() { glfwMakeContextCurrent(impl->window); }
 
+GLFWwindow *Render::GetGLFWWindow() const { return impl->window; }
+
 void Render::SetWindowTitle(const char *title) {
   glfwSetWindowTitle(impl->window, title);
 }
@@ -388,6 +390,7 @@ void Render::BeginFrame() {
 }
 
 void Render::EndFrame() {
+  glGetError();
   ImGui::Render();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
   // GLFWwindow *backup_current_context = glfwGetCurrentContext();
