@@ -111,7 +111,7 @@ bool App::init() {
   if (!Renderer::Render::Init())
     return false;
 
-  if (!render.init("Reaktory", {640, 480}))
+  if (!render.init("Reaktory", {960, 540}))
     return false;
 
   if (!Scene::Init(render))
@@ -130,16 +130,54 @@ bool App::init() {
     if (app->does_have_modal())
       return;
 
-    if (action == GLFW_PRESS) {
-      if (mods == GLFW_MOD_CONTROL) {
-        switch (key) {
-        case GLFW_KEY_N:
-          app->add_scene();
-          break;
-        case GLFW_KEY_O:
-          app->open_scene();
-          break;
-        }
+    if (action == GLFW_PRESS && mods == GLFW_MOD_CONTROL) {
+      switch (key) {
+      case GLFW_KEY_N:
+        app->add_scene();
+        break;
+      case GLFW_KEY_O:
+        app->open_scene();
+        break;
+      }
+    } else if (action == GLFW_PRESS && app->get_selected_scene()) {
+      switch (key) {
+      case GLFW_KEY_W:
+        app->movement_input.x += 1;
+        break;
+      case GLFW_KEY_S:
+        app->movement_input.x += -1;
+        break;
+      case GLFW_KEY_A:
+        app->movement_input.y += -1;
+        break;
+      case GLFW_KEY_D:
+        app->movement_input.y += 1;
+        break;
+      case GLFW_KEY_SPACE:
+        app->movement_input.z += 1;
+        break;
+      case GLFW_KEY_LEFT_SHIFT:
+        app->movement_input.z += -1;
+      }
+    } else if (action == GLFW_RELEASE && app->get_selected_scene()) {
+      switch (key) {
+      case GLFW_KEY_W:
+        app->movement_input.x -= 1;
+        break;
+      case GLFW_KEY_S:
+        app->movement_input.x -= -1;
+        break;
+      case GLFW_KEY_A:
+        app->movement_input.y -= -1;
+        break;
+      case GLFW_KEY_D:
+        app->movement_input.y -= 1;
+        break;
+      case GLFW_KEY_SPACE:
+        app->movement_input.z -= 1;
+        break;
+      case GLFW_KEY_LEFT_SHIFT:
+        app->movement_input.z -= -1;
       }
     }
   });
@@ -147,6 +185,13 @@ bool App::init() {
   render.SetMouseButtonCallback([](Renderer::Render &window, int button,
                                    int action, int mods) {
     App *app = (App *)window.userdata;
+
+    if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE) {
+      glfwSetInputMode(window.GetGLFWWindow(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+      app->mousebuttonR = false;
+      return;
+    }
+
     if (!app->is_scene_window_selected() || !app->get_selected_scene()) {
       app->mousebuttonL = false;
       app->mousebuttonR = false;
@@ -163,11 +208,6 @@ bool App::init() {
       glfwSetInputMode(window.GetGLFWWindow(), GLFW_CURSOR,
                        GLFW_CURSOR_DISABLED);
       app->mousebuttonR = true;
-    }
-
-    else if (button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_RELEASE) {
-      glfwSetInputMode(window.GetGLFWWindow(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-      app->mousebuttonR = false;
     }
   });
 
@@ -380,6 +420,7 @@ void App::draw_self() {
 
             scene.updateMousePos(in_window_cursor_pos);
             scene.updateMouseButtonState(mousebuttonL, mousebuttonR);
+            scene.updateBodyMovement(movement_input);
             scene.resize({sregion.x, sregion.y});
             scene.render(render);
             ImGui::GetWindowDrawList()->AddImage(

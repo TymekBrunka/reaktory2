@@ -66,12 +66,12 @@ target_include_directories(pch_core PUBLIC src/precompiled_headers)
 target_link_libraries(pch_core PUBLIC concurrentqueue)
 target_precompile_headers(pch_core PUBLIC src/precompiled_headers/core.hpp)
 
-add_library(allocators STATIC
-  src/Components/Allocators/Arena.cpp
-  src/Components/Allocators/Arena.hpp
-)
-target_include_directories(allocators PUBLIC src/Components/Allocators)
-target_link_libraries(allocators PUBLIC rpmalloc)
+# add_library(allocators STATIC
+#   src/Components/Allocators/Arena.cpp
+#   src/Components/Allocators/Arena.hpp
+# )
+# target_include_directories(allocators PUBLIC src/Components/Allocators)
+# target_link_libraries(allocators PUBLIC mimalloc-static)
 
 add_library(logging STATIC
   src/Components/Logging/Logging.cpp
@@ -84,7 +84,7 @@ add_library(translations STATIC
 )
 
 target_include_directories(translations PUBLIC src/Components/Logging)
-target_link_libraries(translations PUBLIC pch_core yyjson)
+target_link_libraries(translations PUBLIC pch_core yyjson mimalloc-static)
 # target_precompile_headers(translations REUSE_FROM pch_core)
 
 target_include_directories(logging PUBLIC src/Components/Logging)
@@ -124,12 +124,12 @@ target_include_directories(fileutils PUBLIC
 
 add_library(Scene STATIC src/Scene/Scene.hpp src/Scene/Scene.cpp)
 target_include_directories(Scene PUBLIC src/Scene/)
-target_link_libraries(Scene PUBLIC logging renderer allocators fileutils glm::glm PRIVATE staticassets_scene shaders glad imgui)
+target_link_libraries(Scene PUBLIC logging renderer fileutils glm::glm PRIVATE staticassets_scene shaders glad imgui)
 target_precompile_headers(Scene REUSE_FROM logging)
 
 add_library(App STATIC src/App.hpp src/App.cpp)
 target_include_directories(App PUBLIC src)
-target_link_libraries(App PUBLIC Scene icon_img logging renderer imgui allocators fileutils images images_bigger)
+target_link_libraries(App PUBLIC Scene icon_img logging renderer imgui fileutils images images_bigger)
 target_precompile_headers(App REUSE_FROM logging)
 
 add_executable(main src/main.cpp)

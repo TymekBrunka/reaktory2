@@ -1,3 +1,4 @@
+#include "glm/geometric.hpp"
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
 
@@ -448,19 +449,16 @@ void Scene::updateCamera() {
   view = glm::lookAt(body.position, body.position + forward, up);
 }
 
-void Scene::render(Renderer::Render &render) {
-  glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-  // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
+static glm::vec3 vec3clampZ(glm::vec3 vec, float minRange, float max) {
+  float length = vec.length();
+  return length <= max ? (length >= minRange ? vec : glm::vec3(0.0f, 0.0f, 0.0f))
+                       : (vec / length) * max;
+}
 
-  glViewport(0, 0, size.width, size.height);
-  glClearColor(0, 0, 0, 0);
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-  glUseProgram(skybox_program);
-
-  glm::vec2 temp = glm::vec2((float)-mpos.width, (float)mpos.height) * 100.0f;
-  temp.x /= size.width;
-  temp.y /= size.height;
+void Scene::updateCameraAndBody(float delta) {
+  glm::vec2 temp = glm::vec2((float)-mpos.width, (float)mpos.height) * 0.2f;
+  // temp.x /= size.width;
+  // temp.y /= size.height;
   if (mousebuttonR) {
     body.orientation += glm::radians(temp - last_mpos);
     body.orientation.x = glm::mod(body.orientation.x, glm::radians(360.0f));
@@ -470,15 +468,40 @@ void Scene::render(Renderer::Render &render) {
   }
   last_mpos = temp;
 
-  updateCamera();
+  float sinx = glm::sin(body.orientation.x);
+  float cosx = glm::cos(body.orientation.x);
+  float cosy = glm::cos(body.orientation.y);
+
+  glm::vec3 forward(sinx * cosy, glm::sin(body.orientation.y), cosx * cosy);
+  glm::vec3 right = glm::cross(forward, glm::vec3(0.0f, 1.0f, 0.0f));
+  glm::vec3 up = glm::cross(right, forward);
+
+  glm::vec3 movement_right(-cosx, 0.0, sinx);
+  glm::vec3 movement_up = glm::cross(movement_right, forward);
+
+  glm::vec3 move = glm::vec3(forward * input.x + movement_right * input.y +
+                             movement_up * input.z);
+
+  body.acceleration = vec3clampZ(body.velocity * -2.0f, 0.001, 5) + (20.0f * move);
+  body.position += delta * vec3clampZ(body.velocity + (body.acceleration * delta * 0.5f), 0.01, 5);
+  body.velocity = vec3clampZ(body.velocity + body.acceleration * delta, 0.01, 5);
+  view = glm::lookAt(body.position, body.position + forward, up);
+}
+
+void Scene::render(Renderer::Render &render) {
+  glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+  // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
+
+  glViewport(0, 0, size.width, size.height);
+  glClearColor(0, 0, 0, 0);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+  glUseProgram(skybox_program);
+  updateCameraAndBody(render.GetDelta());
 
   glUniformMatrix4fv(skybox_view_loc, 1, GL_FALSE, glm::value_ptr(view));
   glUniformMatrix4fv(skybox_projection_loc, 1, GL_FALSE,
                      glm::value_ptr(projection));
-
-  // if (mousebuttonL && mousebuttonR)
-  //   body.orientation += glm::vec2((float)mpos.width, (float)mpos.height) *
-  //   glm::radians(render.GetDelta());
 
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, skybox_texture);
@@ -489,9 +512,9 @@ void Scene::render(Renderer::Render &render) {
   glClear(GL_DEPTH_BUFFER_BIT);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-  glUseProgram(tri_program);
-  glBindVertexArray(tri_vao);
-  glDrawArrays(GL_TRIANGLES, 0, 3);
+  // glUseProgram(tri_program);
+  // glBindVertexArray(tri_vao);
+  // glDrawArrays(GL_TRIANGLES, 0, 3);
 
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);

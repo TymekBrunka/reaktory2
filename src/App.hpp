@@ -36,6 +36,11 @@ private:
   Renderer::rTexture2D icons;
   Renderer::rect_size in_window_cursor_pos{0, 0};
   const char *current_modal = nullptr;
+
+public:
+  glm::vec3 movement_input{};
+
+private:
   Renderer::Image new_scene_img;
   Renderer::Render render;
 

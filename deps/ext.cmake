@@ -79,13 +79,15 @@ CPMAddPackage(
 get_target_property(zlibincludes zlibstatic INCLUDE_DIRECTORIES)
 set(ZLIB_INCLUDE_DIR ${zlibincludes} CACHE PATH "" FORCE)
 
-message(rpmalloc)
+message(mimalloc)
 CPMAddPackage(
-  NAME rpmalloc
-  VERSION 2.0.0
-  GITHUB_REPOSITORY mjansson/rpmalloc
-  GIT_TAG 2.0.0
-  DOWNLOAD_ONLY
+  NAME mimalloc
+  VERSION 3.5.0
+  GITHUB_REPOSITORY microsoft/mimalloc
+  GIT_TAG v3.5.0
+  OPTIONS
+    "MI_BUILD_SHARED OFF"
+    "MI_BUILD_TESTS OFF"
 )
 
 message(moodycamel_concurentqueue)
@@ -109,9 +111,6 @@ add_library(asio STATIC ${asio_SOURCE_DIR}/src/asio.cpp)
 target_include_directories(asio PUBLIC ${asio_SOURCE_DIR}/include)
 target_compile_definitions(asio PRIVATE -DASIO_SEPARATE_COMPILATION -D_WIN32_WINNT=0x0A00)
 target_precompile_headers(asio PUBLIC ${asio_SOURCE_DIR}/include/asio.hpp)
-
-add_library(rpmalloc ${rpmalloc_SOURCE_DIR}/rpmalloc/rpmalloc.c)
-target_include_directories(rpmalloc PUBLIC ${rpmalloc_SOURCE_DIR}/rpmalloc/)
 
 add_library(yyjson deps/yyjson/yyjson.c)
 target_include_directories(yyjson PUBLIC deps/yyjson/)

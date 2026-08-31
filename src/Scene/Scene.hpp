@@ -43,9 +43,9 @@ private:
   // } ubo_locs;
   struct {
     glm::vec2 orientation{};
-    glm::vec3 position;
-    glm::vec3 velocity;
-    glm::vec3 acceleration;
+    glm::vec3 position{};
+    glm::vec3 velocity{};
+    glm::vec3 acceleration{};
   } body;
   glm::mat4x4 projection{};
   glm::mat4x4 view{};
@@ -56,6 +56,7 @@ private:
   void resize_framebuffer(Renderer::rect_size size);
 
   void updateCamera();
+  void updateCameraAndBody(float delta);
 
   static bool create_folder_structure(const std::string &name,
                                       const std::filesystem::path &path);
@@ -83,7 +84,7 @@ public:
   // retuns whether it needs redraw
   bool resize(Renderer::rect_size size);
 
-  inline void updateBodyMovement(glm::vec3 input_) {
+  inline void updateBodyMovement(const glm::vec3 &input_) {
     input = input_;
   }
 

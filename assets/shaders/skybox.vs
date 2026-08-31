@@ -10,6 +10,6 @@ uniform mat4 view;
 
 void main() {
     //gl_Position = skybox_camera * vec4(pos, 1.0);
-    gl_Position = (projection * view) * vec4(pos, 1.0);
+    gl_Position = (projection * mat4(mat3(view))) * vec4(pos, 1.0);
     out_uv = uv;
 }
