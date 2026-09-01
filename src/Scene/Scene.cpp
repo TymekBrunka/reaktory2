@@ -1,3 +1,4 @@
+#include "Model.hpp"
 #include "glm/geometric.hpp"
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
@@ -422,6 +423,9 @@ bool Scene::init(Renderer::Render &render) {
   skybox_loc = glGetUniformLocation(skybox_program, "skybox");
   glUniform1i(skybox_loc, 0);
   initialised = true;
+
+  // ---------------------- model test
+  Renderer::Model::LoadFromFile("assets/example/models/bunny.obj", true);
   return true;
 }
 

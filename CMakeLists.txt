@@ -113,6 +113,16 @@ target_link_libraries(renderer
 # target_precompile_headers(renderer REUSE_FROM pch_core)
 target_precompile_headers(renderer REUSE_FROM logging)
 
+add_library(renderer_model STATIC
+  src/Renderer/Model.cpp
+  src/Renderer/Model.hpp
+)
+target_include_directories(renderer_model PUBLIC
+  src/Renderer
+  src/Components
+)
+target_link_libraries(renderer_model PUBLIC glad glm::glm PRIVATE logging assimp)
+
 add_library(fileutils STATIC
   src/Components/FileUtils/FileUtils.cpp
   src/Components/FileUtils/FileUtils.hpp
@@ -121,10 +131,11 @@ target_include_directories(fileutils PUBLIC
   src/Components/FileUtils
   src/Components
 )
+target_precompile_headers(renderer_model REUSE_FROM logging)
 
 add_library(Scene STATIC src/Scene/Scene.hpp src/Scene/Scene.cpp)
 target_include_directories(Scene PUBLIC src/Scene/)
-target_link_libraries(Scene PUBLIC logging renderer fileutils glm::glm PRIVATE staticassets_scene shaders glad imgui)
+target_link_libraries(Scene PUBLIC logging renderer renderer_model fileutils glm::glm PRIVATE staticassets_scene shaders glad imgui)
 target_precompile_headers(Scene REUSE_FROM logging)
 
 add_library(App STATIC src/App.hpp src/App.cpp)

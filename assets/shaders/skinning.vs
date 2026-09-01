@@ -1,49 +1,55 @@
 #version 330
 
-#define MAX_BONE_NUM 128
+layout(location = 0) in vec3 pos;
+layout(location = 1) in vec3 norm;
+layout(location = 2) in vec2 tex;
 
-// Input vertex attributes
-in vec3 vertexPosition;
-in vec2 vertexTexCoord;
-in vec4 vertexColor;
-in vec3 vertexNormal;
-in vec4 vertexBoneIds;
-in vec4 vertexBoneWeights;
-
-// Input uniform values
-uniform mat4 mvp;
-uniform mat4 matNormal;
-uniform mat4 boneMatrices[MAX_BONE_NUM];
-
-// Output vertex attributes (to fragment shader)
-out vec2 fragTexCoord;
-out vec4 fragColor;
-out vec3 fragNormal;
-
+layout(location = 3) in ivec4 boneIds1; 
+layout(location = 4) in ivec4 boneIds2; 
+layout(location = 5) in vec4 weights1;
+layout(location = 6) in vec4 weights2;
+	
+uniform mat4 projection;
+uniform mat4 view;
+uniform mat4 model;
+	
+const int MAX_BONES = 100;
+const int MAX_BONE_INFLUENCE = 8;
+// uniform mat4 finalBonesMatrices[MAX_BONES];
+	
+out vec2 TexCoords;
+	
 void main()
 {
-    int boneIndex0 = int(vertexBoneIds.x);
-    int boneIndex1 = int(vertexBoneIds.y);
-    int boneIndex2 = int(vertexBoneIds.z);
-    int boneIndex3 = int(vertexBoneIds.w);
-    
-    vec4 skinnedPosition =
-        vertexBoneWeights.x*(boneMatrices[boneIndex0]*vec4(vertexPosition, 1.0)) +
-        vertexBoneWeights.y*(boneMatrices[boneIndex1]*vec4(vertexPosition, 1.0)) + 
-        vertexBoneWeights.z*(boneMatrices[boneIndex2]*vec4(vertexPosition, 1.0)) + 
-        vertexBoneWeights.w*(boneMatrices[boneIndex3]*vec4(vertexPosition, 1.0));
-
-    vec4 skinnedNormal =
-        vertexBoneWeights.x*(boneMatrices[boneIndex0]*vec4(vertexNormal, 0.0)) +
-        vertexBoneWeights.y*(boneMatrices[boneIndex1]*vec4(vertexNormal, 0.0)) + 
-        vertexBoneWeights.z*(boneMatrices[boneIndex2]*vec4(vertexNormal, 0.0)) + 
-        vertexBoneWeights.w*(boneMatrices[boneIndex3]*vec4(vertexNormal, 0.0));
-    skinnedNormal.w = 0.0;
-
-    fragTexCoord = vertexTexCoord;
-    fragColor = vertexColor;
-
-    fragNormal = normalize(vec3(matNormal*skinnedNormal));
-
-    gl_Position = mvp*skinnedPosition;
+    vec4 totalPosition = vec4(0.0f);
+    for(int i = 0 ; i < 4 ; i++)
+    {
+        if(boneIds1[i] == -1) 
+            continue;
+        if(boneIds1[i] >=MAX_BONES) 
+        {
+            totalPosition = vec4(pos,1.0f);
+            break;
+        }
+        vec4 localPosition = finalBonesMatrices[boneIds1[i]] * vec4(pos,1.0f);
+        totalPosition += localPosition * weights1[i];
+        //vec3 localNormal = mat3(finalBonesMatrices[boneIds[i]]) * norm;
+    }
+    for(int i = 0 ; i < 4 ; i++)
+    {
+        if(boneIds2[i] == -1) 
+            continue;
+        if(boneIds2[i] >=MAX_BONES) 
+        {
+            totalPosition = vec4(pos,1.0f);
+            break;
+        }
+        vec4 localPosition = finalBonesMatrices[boneIds2[i]] * vec4(pos,1.0f);
+        totalPosition += localPosition * weights2[i];
+        //vec3 localNormal = mat3(finalBonesMatrices[boneIds[i]]) * norm;
+    }
+		
+    mat4 viewModel = view * model;
+    gl_Position =  projection * viewModel * totalPosition;
+    TexCoords = tex;
 }

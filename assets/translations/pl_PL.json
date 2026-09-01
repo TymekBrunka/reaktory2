@@ -27,5 +27,7 @@
 
   "MSG_GL_ERROR_SHADER": ["Nie można skompilować {} shader'a: {}."],
   "MSG_GL_ERROR_PROGRAM": ["Nie można podlinkować programu opengl \"{}\" : {}."],
-  "MSG_GL_ERROR_VALIDATION": ["Wystąpił błąd podczas walidacji programu opengl: {}."]
+  "MSG_GL_ERROR_VALIDATION": ["Wystąpił błąd podczas walidacji programu opengl: {}."],
+
+  "MSG_ASSIMP_ERROR": ["Błąd Assimp: {}"]
 }

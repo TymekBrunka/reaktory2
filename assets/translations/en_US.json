@@ -27,5 +27,7 @@
 
   "MSG_GL_ERROR_SHADER": ["Cannot compile {} shader: {}."],
   "MSG_GL_ERROR_PROGRAM": ["Cannot link opengl program \"{}\" : {}."],
-  "MSG_GL_ERROR_VALIDATION": ["Opengl program validation returned error: {}."]
+  "MSG_GL_ERROR_VALIDATION": ["Opengl program validation returned error: {}."],
+
+  "MSG_ASSIMP_ERROR": ["Error Assimp: {}"]
 }
