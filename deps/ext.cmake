@@ -107,13 +107,13 @@ CPMAddPackage(
   DOWNLOAD_ONLY
 )
 
-add_library(asio STATIC ${asio_SOURCE_DIR}/src/asio.cpp)
-target_include_directories(asio PUBLIC ${asio_SOURCE_DIR}/include)
-target_compile_definitions(asio PRIVATE -DASIO_SEPARATE_COMPILATION -D_WIN32_WINNT=0x0A00)
-target_precompile_headers(asio PUBLIC ${asio_SOURCE_DIR}/include/asio.hpp)
-
-add_library(yyjson deps/yyjson/yyjson.c)
-target_include_directories(yyjson PUBLIC deps/yyjson/)
+# add_library(asio STATIC ${asio_SOURCE_DIR}/src/asio.cpp)
+# target_include_directories(asio PUBLIC ${asio_SOURCE_DIR}/include)
+# target_compile_definitions(asio PRIVATE -DASIO_SEPARATE_COMPILATION -D_WIN32_WINNT=0x0A00)
+# target_precompile_headers(asio PUBLIC ${asio_SOURCE_DIR}/include/asio.hpp)
+#
+# add_library(yyjson deps/yyjson/yyjson.c)
+# target_include_directories(yyjson PUBLIC deps/yyjson/)
 
 include(deps/engine.cmake)
 include(deps/excel.cmake)
