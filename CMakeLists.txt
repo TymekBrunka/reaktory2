@@ -116,6 +116,7 @@ target_precompile_headers(renderer REUSE_FROM logging)
 add_library(renderer_model STATIC
   src/Renderer/Model.cpp
   src/Renderer/Model.hpp
+  src/Renderer/AssimpGLMHelpers.hpp
 )
 target_include_directories(renderer_model PUBLIC
   src/Renderer

@@ -8,9 +8,9 @@
 #include <unordered_map>
 namespace Renderer {
 
-struct Material {
-  unsigned int diffuse1;
-};
+// struct Material {
+//   unsigned int diffuse1;
+// };
 
 struct meshVertex {
   glm::vec3 Position;
@@ -25,12 +25,20 @@ struct meshVertex {
 
 // structure for temporary arrays to create opengl objects out of
 struct MeshLoaderTmpCtx {
+  struct Image {
+    int width;
+    int height;
+    int channels;
+    unsigned char *pixels;
+  };
+
   std::vector<meshVertex> verticies;
   std::vector<unsigned int> indices;
-  std::vector<Material> materials;
-  // // std::vector<aiNode *>
-  // std::vector<void *> nodes_refering_to_mesh;
-  std::vector<unsigned int> nodes_refering_to_mesh;
+  // std::vector<Material> materials;
+  std::vector<Image> materials;
+  // std::vector<aiNode *>
+  std::vector<void *> nodes_refering_to_mesh;
+  // std::vector<unsigned int> nodes_refering_to_mesh;
 };
 
 struct BoneInfo {
@@ -41,7 +49,7 @@ struct BoneInfo {
 class MeshInstanced {
   friend class Model;
   MeshLoaderTmpCtx *ctx = nullptr;
-  unsigned int VAO, VBO, EBO;
+  unsigned int VAO, InstanceVBO, VBO, EBO;
 
   MeshInstanced(const MeshLoaderTmpCtx &loader, bool initialise);
 
@@ -56,7 +64,10 @@ public:
 
 class Model {
   bool initialised;
-  unsigned int boneCounter;
+  int boneCounter;
+
+  int *mesh_idx_map = nullptr; // temporary array that maps aiNode.mMeeshes
+                               // indexes to indexes in Model.meshes array
   std::vector<MeshInstanced> meshes;
   std::vector<unsigned int> owned_textures;
 
@@ -76,7 +87,8 @@ class Model {
   std::unordered_map<std::string, BoneInfo, string_hash, std::equal_to<>>
       boneInfo;
 
-  void processNode(void *node, const void *scene);
+  void processNode(void *node_, const void *scene_);
+  MeshInstanced processMesh(void *mesh_, const void *scene_);
 
 public:
   Model() = default;

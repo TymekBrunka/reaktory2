@@ -425,7 +425,7 @@ bool Scene::init(Renderer::Render &render) {
   initialised = true;
 
   // ---------------------- model test
-  Renderer::Model::LoadFromFile("assets/example/models/bunny.obj", true);
+  Renderer::Model::LoadFromFile("assets/example/models/SimpleInstancing.glb", true);
   return true;
 }
 

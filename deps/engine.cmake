@@ -48,20 +48,32 @@ CPMAddPackage(
 target_compile_features(imguizmo PRIVATE cxx_std_11)
 target_link_libraries(imguizmo PUBLIC imgui)
 
+# # for assimp_view
+# if (CMAKE_SYSTEM_NAME MATCHES "Windows")
+#   find_package(DirectX_D3DX9_LIBRARY)
+#   set(DirectX_INCLUDE_DIR src CACHE PATH "" FORCE)
+#   set(DirectX_D3DX9_LIBRARY d3d9;d3dx9;d3dcompiler CACHE STRING "" FORCE)
+# endif()
+
 #loading models
 message(assimp)
 CPMAddPackage(
   NAME assimp
-  VERSION 6.0.4
+  VERSION 6.0.5
   GITHUB_REPOSITORY assimp/assimp
-  GIT_TAG v6.0.4
+  # GIT_TAG v6.0.5
+  GIT_TAG c76f95b89e1d20017a2653b5bec0fec5ff502327
   OPTIONS
     "BUILD_SHARED_LIBS OFF"
     "ASSIMP_BUILD_TESTS OFF"
     "ASSIMP_INSTALL OFF"
-    "ASSIMP_BUILD_DOCS OFF"
+    "ASSIMP_BUILD_DOCS ON"
     "ASSIMP_BUILD_ZLIB OFF"
     "ASSIMP_WARNINGS_AS_ERRORS OFF" #set but unused error causes assimp not to build
+
+    # # to check if models are loading as they should
+    # "ASSIMP_BUILD_ASSIMP_TOOLS ON"
+    # "ASSIMP_BUILD_ASSIMP_VIEW ON"
 
     "ASSIMP_BUILD_M3D_IMPORTER ON"
     # "ZLIB_LIBRARY ${zlib_LIBRARIES}"
