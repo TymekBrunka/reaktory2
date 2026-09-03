@@ -1,4 +1,5 @@
 #pragma once
+#include <Model.hpp>
 #include <Renderer.hpp>
 #include <filesystem>
 #include <glm/mat4x4.hpp>
@@ -15,9 +16,15 @@ class Scene {
   static Renderer::rFBO tri_fbo;
   static Renderer::rVAO tri_vao;
 
+  static Renderer::rProgram skinning_program;
+
   static Renderer::rLocation skybox_loc;
   static Renderer::rLocation skybox_view_loc;
   static Renderer::rLocation skybox_projection_loc;
+
+  static Renderer::Model *preview_model;
+  static Renderer::rLocation model_view_loc;
+  static Renderer::rLocation model_projection_loc;
 
   bool initialised = false;
   bool mousebuttonL = false;

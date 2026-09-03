@@ -30,13 +30,19 @@ Renderer::rProgram Scene::tri_program = 0;
 Renderer::rFBO Scene::tri_fbo = 0;
 Renderer::rVAO Scene::tri_vao = 0;
 
+Renderer::rProgram Scene::skinning_program = 0;
+
 Renderer::rLocation Scene::skybox_loc = 0;
 Renderer::rLocation Scene::skybox_view_loc = 0;
 Renderer::rLocation Scene::skybox_projection_loc = 0;
 
-GLuint skybox_indiecies[] = {0,  1,  2,  0,  2,  3,  4,  5,  6,  4,  6,  7,
-                             8,  9,  10, 8,  10, 11, 12, 13, 14, 12, 14, 15,
-                             16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23};
+Renderer::Model *Scene::preview_model = nullptr;
+Renderer::rLocation Scene::model_view_loc = 0;
+Renderer::rLocation Scene::model_projection_loc = 0;
+
+static GLuint skybox_indiecies[] = {
+    0,  1,  2,  0,  2,  3,  4,  5,  6,  4,  6,  7,  8,  9,  10, 8,  10, 11,
+    12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23};
 
 struct skybox_vert {
   Renderer::vec3 pos;
@@ -266,7 +272,7 @@ bool Scene::resize(Renderer::rect_size size) {
 
   projection =
       glm::perspective(glm::radians(90.0f),
-                       (float)size.width / (float)size.height, 0.1f, 1000.0f);
+                       (float)size.width / (float)size.height, 0.01f, 1000.0f);
 
   return true;
 }
@@ -324,6 +330,22 @@ bool Scene::Init(Renderer::Render &render) {
 
   skybox_program = res_shader.ok_unchecked();
 
+  res_shader = render.LoadProgram("skining", (const char *)skinless_vs_data,
+                                  (const char *)skinning_fs_data);
+
+  if (!res_shader.is_ok) {
+    render.UnloadProgram(tri_program);
+    render.UnloadProgram(skybox_program);
+    tri_program = 0;
+    skybox_program = 0;
+    return false;
+  }
+
+  skinning_program = res_shader.ok_unchecked();
+
+  model_view_loc = glGetUniformLocation(skinning_program, "view");
+  model_projection_loc = glGetUniformLocation(skinning_program, "projection");
+
   glGenBuffers(1, &tri_fbo);
   glBindBuffer(GL_ARRAY_BUFFER, tri_fbo);
   glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
@@ -342,6 +364,9 @@ bool Scene::Init(Renderer::Render &render) {
   glVertexAttribPointer(color_loc, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex),
                         (void *)offsetof(Vertex, col));
   glBindVertexArray(0);
+
+  skybox_projection_loc = glGetUniformLocation(skybox_program, "projection");
+  skybox_view_loc = glGetUniformLocation(skybox_program, "view");
 
   glGenBuffers(1, &skybox_fbo);
   glBindBuffer(GL_ARRAY_BUFFER, skybox_fbo);
@@ -365,9 +390,6 @@ bool Scene::Init(Renderer::Render &render) {
   glEnableVertexAttribArray(uv_loc);
   glVertexAttribPointer(uv_loc, 2, GL_FLOAT, GL_FALSE, sizeof(skybox_vert),
                         (void *)offsetof(skybox_vert, uv));
-
-  skybox_projection_loc = glGetUniformLocation(skybox_program, "projection");
-  skybox_view_loc = glGetUniformLocation(skybox_program, "view");
 
   return true;
 }
@@ -425,7 +447,9 @@ bool Scene::init(Renderer::Render &render) {
   initialised = true;
 
   // ---------------------- model test
-  Renderer::Model::LoadFromFile("assets/example/models/SimpleInstancing.glb", true);
+  preview_model = Renderer::Model::LoadFromFile(
+      // "assets/example/models/RiggedSimple1.glb", true);
+      "assets/example/models/CesiumMan.m3d", true);
   return true;
 }
 
@@ -455,8 +479,9 @@ void Scene::updateCamera() {
 
 static glm::vec3 vec3clampZ(glm::vec3 vec, float minRange, float max) {
   float length = vec.length();
-  return length <= max ? (length >= minRange ? vec : glm::vec3(0.0f, 0.0f, 0.0f))
-                       : (vec / length) * max;
+  return length <= max
+             ? (length >= minRange ? vec : glm::vec3(0.0f, 0.0f, 0.0f))
+             : (vec / length) * max;
 }
 
 void Scene::updateCameraAndBody(float delta) {
@@ -486,9 +511,13 @@ void Scene::updateCameraAndBody(float delta) {
   glm::vec3 move = glm::vec3(forward * input.x + movement_right * input.y +
                              movement_up * input.z);
 
-  body.acceleration = vec3clampZ(body.velocity * -2.0f, 0.001, 5) + (20.0f * move);
-  body.position += delta * vec3clampZ(body.velocity + (body.acceleration * delta * 0.5f), 0.01, 5);
-  body.velocity = vec3clampZ(body.velocity + body.acceleration * delta, 0.01, 5);
+  body.acceleration =
+      vec3clampZ(body.velocity * -2.0f, 0.001, 5) + (20.0f * move);
+  body.position +=
+      delta *
+      vec3clampZ(body.velocity + (body.acceleration * delta * 0.5f), 0.01, 5);
+  body.velocity =
+      vec3clampZ(body.velocity + body.acceleration * delta, 0.01, 5);
   view = glm::lookAt(body.position, body.position + forward, up);
 }
 
@@ -516,6 +545,12 @@ void Scene::render(Renderer::Render &render) {
   glClear(GL_DEPTH_BUFFER_BIT);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
+  glUseProgram(skinning_program);
+  glUniformMatrix4fv(model_view_loc, 1, GL_FALSE, glm::value_ptr(view));
+  glUniformMatrix4fv(model_projection_loc, 1, GL_FALSE,
+                     glm::value_ptr(projection));
+  preview_model->Draw();
+
   // glUseProgram(tri_program);
   // glBindVertexArray(tri_vao);
   // glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -539,6 +574,11 @@ void Scene::Cleanup() {
   glDeleteBuffers(1, &skybox_fbo);
   glDeleteBuffers(1, &skybox_ebo);
   glDeleteProgram(skybox_program);
+
+  if (!skinning_program)
+    return;
+
+  glDeleteProgram(skinning_program);
 }
 
 Scene::~Scene() {

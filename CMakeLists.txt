@@ -16,6 +16,8 @@ bytepack_(
     assets/shaders/simple.fs
     assets/shaders/skybox.vs
     assets/shaders/skybox.fs
+    assets/shaders/skinless.vs
+    assets/shaders/skinning.fs
 )
 
 bytepack_(

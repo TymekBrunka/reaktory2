@@ -50,9 +50,14 @@ target_link_libraries(imguizmo PUBLIC imgui)
 
 # # for assimp_view
 # if (CMAKE_SYSTEM_NAME MATCHES "Windows")
-#   find_package(DirectX_D3DX9_LIBRARY)
+#   find_package(DirectX)
 #   set(DirectX_INCLUDE_DIR src CACHE PATH "" FORCE)
-#   set(DirectX_D3DX9_LIBRARY d3d9;d3dx9;d3dcompiler CACHE STRING "" FORCE)
+#   set(DirectX_D3DX9_LIBRARY
+#     d3d9${CMAKE_STATIC_LIBRARY_SUFFIX};
+#     d3dx9${CMAKE_STATIC_LIBRARY_SUFFIX};
+#     d3dcompiler${CMAKE_STATIC_LIBRARY_SUFFIX}
+#     CACHE STRING "" FORCE)
+#   set(DirectX_LIBRARY ${DirectX_D3DX9_LIBRARY} CACHE STRING "" FORCE)
 # endif()
 
 #loading models
