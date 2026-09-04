@@ -1,4 +1,5 @@
 #include "Model.hpp"
+#include "glm/ext/matrix_float4x4.hpp"
 #include "glm/geometric.hpp"
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
@@ -330,7 +331,7 @@ bool Scene::Init(Renderer::Render &render) {
 
   skybox_program = res_shader.ok_unchecked();
 
-  res_shader = render.LoadProgram("skining", (const char *)skinless_vs_data,
+  res_shader = render.LoadProgram("skinning", (const char *)skinning_vs_data,
                                   (const char *)skinning_fs_data);
 
   if (!res_shader.is_ok) {
@@ -450,6 +451,7 @@ bool Scene::init(Renderer::Render &render) {
   preview_model = Renderer::Model::LoadFromFile(
       // "assets/example/models/RiggedSimple1.glb", true);
       "assets/example/models/CesiumMan.m3d", true);
+  // preview_model->SetAnimation(&preview_model->GetAnimations()[0]);
   return true;
 }
 
@@ -522,6 +524,7 @@ void Scene::updateCameraAndBody(float delta) {
 }
 
 void Scene::render(Renderer::Render &render) {
+  static char uniformNameBuffer[100];
   glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
   // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, framebuffer);
 
@@ -546,9 +549,20 @@ void Scene::render(Renderer::Render &render) {
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
   glUseProgram(skinning_program);
+
   glUniformMatrix4fv(model_view_loc, 1, GL_FALSE, glm::value_ptr(view));
   glUniformMatrix4fv(model_projection_loc, 1, GL_FALSE,
                      glm::value_ptr(projection));
+
+  // preview_model->Advance(render.GetDelta());
+  const glm::mat4 *transforms = preview_model->GetFinalMatrices();
+  for (int i = 0; i < 100; i++) {
+    snprintf(uniformNameBuffer, 100, "finalBonesMatrices[%d]", i);
+    glUniformMatrix4fv(
+        glGetUniformLocation(skinning_program, uniformNameBuffer), 1, GL_FALSE,
+        glm::value_ptr(transforms[i]));
+  }
+
   preview_model->Draw();
 
   // glUseProgram(tri_program);

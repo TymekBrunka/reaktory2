@@ -6,6 +6,28 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+  if (CMAKE_C_COMPILER_ID MATCHES "MSVC") # not sure if this project will build on msvc but regardless, ill set this flags for it just in case
+
+    if(NOT CMAKE_C_FLAGS_RELEASE)
+      set(CMAKE_C_FLAGS_RELEASE "/O2 /DNDEBUG")
+    endif()
+    if(NOT CMAKE_CXX_FLAGS_RELEASE)
+      set(CMAKE_CXX_FLAGS_RELEASE "/O2 /DNDEBUG")
+    endif()
+
+  else()
+
+    if(NOT CMAKE_C_FLAGS_RELEASE)
+      set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG")
+    endif()
+    if(NOT CMAKE_CXX_FLAGS_RELEASE)
+      set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
+    endif()
+
+  endif()
+endif()
+
 include(deps/ext.cmake)
 add_subdirectory(src/BuildTools)
 
@@ -16,7 +38,8 @@ bytepack_(
     assets/shaders/simple.fs
     assets/shaders/skybox.vs
     assets/shaders/skybox.fs
-    assets/shaders/skinless.vs
+    # assets/shaders/skinless.vs
+    assets/shaders/skinning.vs
     assets/shaders/skinning.fs
 )
 

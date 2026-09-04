@@ -91,9 +91,7 @@ public:
   // retuns whether it needs redraw
   bool resize(Renderer::rect_size size);
 
-  inline void updateBodyMovement(const glm::vec3 &input_) {
-    input = input_;
-  }
+  inline void updateBodyMovement(const glm::vec3 &input_) { input = input_; }
 
   inline void updateMousePos(const Renderer::rect_size &pos) { mpos = pos; }
 

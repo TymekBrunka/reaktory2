@@ -1,4 +1,5 @@
 #pragma once
+#include <glm/gtc/quaternion.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
@@ -60,12 +61,91 @@ public:
   Mesh &operator=(Mesh &&other);
 };
 
+struct KeyPosition {
+  glm::vec3 position;
+  float timeStamp;
+};
+
+struct KeyRotation {
+  glm::quat orientation;
+  float timeStamp;
+};
+
+struct KeyScale {
+  glm::vec3 scale;
+  float timeStamp;
+};
+
+class AnimationBoneChannel {
+  friend class Model;
+
+private:
+  std::vector<KeyPosition> Positions;
+  std::vector<KeyRotation> Rotations;
+  std::vector<KeyScale> Scales;
+
+  glm::mat4 localTransform;
+  std::string name;
+
+  AnimationBoneChannel(const std::string &name, void *channel_);
+
+  void UpdateTo(float animationTime);
+  int GetPositionIndex(float animationTime);
+  int GetRotationIndex(float animationTime);
+  int GetScaleIndex(float animationTime);
+
+  /* Gets normalized value for Lerp & Slerp*/
+  float GetScaleFactor(float lastTimeStamp, float nextTimeStamp,
+                       float animationTime);
+
+public:
+  ~AnimationBoneChannel() = default;
+};
+
+struct Animation {
+  friend class Model;
+
+private:
+  float Duration;
+  int TicksPerSecond;
+  std::string name;
+  std::vector<AnimationBoneChannel> channels;
+
+public:
+  inline float GetDuration() const { return Duration; }
+  inline int GetTPS() const { return TicksPerSecond; }
+};
+
+// matrices calculated for animations are calculated from root node to leafs,
+// which requires storing node hierarchy
+struct modelNode {
+  int idx = 0;
+  int channel_binding = -1;
+  BoneInfo *bone_idx_binding = nullptr;
+  int childCount = 0;
+  int childStartIdx =
+      -1; // those nodes will be stored in continous array but when loading, it
+          // will be changing its size which would invalidate pointers, so index
+          // has to be used instead
+  glm::mat4 transformation;
+  std::string name;
+};
+
 class Model {
   bool initialised;
-  int boneCounter;
+  float animationTime = 0;
+  int boneCounter = 0;
+  Animation *current_animation = nullptr;
+
+  std::vector<modelNode>
+      nodes; // normally, those 2 fields should be stored in animation class but
+             // since im not loading animations outside the model, i can safetly
+             // put it here and optimise some other things
 
   std::vector<Mesh> meshes;
+  std::vector<Animation> animations;
   std::vector<unsigned int> owned_textures;
+  glm::mat4 finalMatrices[100];
 
   struct string_hash {
     using is_transparent = void;
@@ -83,15 +163,33 @@ class Model {
   std::unordered_map<std::string, BoneInfo, string_hash, std::equal_to<>>
       boneInfoMap;
 
-  void processNode(void *node_, const void *scene_, bool initialise);
+  void PrintNodeTreeImpl(const modelNode *node, int depth) const;
+
+  void processNode(void *node_, const void *scene_, int nodeIdx,
+                   bool initialise);
   Mesh processMesh(void *mesh_, const void *scene_, bool initialise);
-  void ExtractBoneWeightForVertices(std::vector<meshVertex> &vertices, void *mesh_, const void *scene_);
+  void ExtractBoneWeightForVertices(std::vector<meshVertex> &vertices,
+                                    void *mesh_, const void *scene_);
+
+  void loadAnimation(void *animation_);
+
+  void calculateBoneTransform(modelNode *node, glm::mat4 parentTransform);
 
 public:
   Model() = default;
   ~Model() = default;
 
   static Model *LoadFromFile(const char *filepath, bool initialise = true);
+  inline const std::vector<Animation> &GetAnimations() const {
+    return animations;
+  }
+
+  inline const glm::mat4 *GetFinalMatrices() const { return finalMatrices; }
+
+  void SetAnimation(const Animation *animation);
+  void Advance(float delta);
+
+  void PrintNodeTree() const;
   void Draw();
 };
 
