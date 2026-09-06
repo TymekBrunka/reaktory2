@@ -193,7 +193,7 @@ void Model::processNode(void *node_, const void *scene_, int nodeIdx,
   int childStartIdx = self.childStartIdx; // make copy before it's too late
   // fill child node 'array' before recuring (so they stay next to each other)
   for (unsigned int i = 0; i < node->mNumChildren; i++) {
-    nodes.push_back(modelNode{.idx = nodes.size()});
+    nodes.push_back(modelNode{.idx = (int)nodes.size()});
   }
 
   // process all the node's meshes (if any)
@@ -306,7 +306,7 @@ AnimationBoneChannel::AnimationBoneChannel(const std::string &name,
     Positions.push_back(KeyPosition{
         .position =
             AssimpGLMHelpers::GetGLMVec(channel->mPositionKeys[i].mValue),
-        .timeStamp = channel->mPositionKeys[i].mTime,
+        .timeStamp = (float)channel->mPositionKeys[i].mTime,
     });
   }
 
@@ -314,14 +314,14 @@ AnimationBoneChannel::AnimationBoneChannel(const std::string &name,
     Rotations.push_back(KeyRotation{
         .orientation =
             AssimpGLMHelpers::GetGLMQuat(channel->mRotationKeys[i].mValue),
-        .timeStamp = channel->mRotationKeys[i].mTime,
+        .timeStamp = (float)channel->mRotationKeys[i].mTime,
     });
   }
 
   for (int i = 0; i < channel->mNumScalingKeys; ++i) {
     Scales.push_back(KeyScale{
         .scale = AssimpGLMHelpers::GetGLMVec(channel->mScalingKeys[i].mValue),
-        .timeStamp = channel->mScalingKeys[i].mTime,
+        .timeStamp = (float)channel->mScalingKeys[i].mTime,
     });
   }
 }

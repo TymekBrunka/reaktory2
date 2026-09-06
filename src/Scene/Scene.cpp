@@ -451,7 +451,7 @@ bool Scene::init(Renderer::Render &render) {
   preview_model = Renderer::Model::LoadFromFile(
       // "assets/example/models/RiggedSimple1.glb", true);
       "assets/example/models/CesiumMan.m3d", true);
-  // preview_model->SetAnimation(&preview_model->GetAnimations()[0]);
+  preview_model->SetAnimation(&preview_model->GetAnimations()[0]);
   return true;
 }
 
@@ -554,7 +554,7 @@ void Scene::render(Renderer::Render &render) {
   glUniformMatrix4fv(model_projection_loc, 1, GL_FALSE,
                      glm::value_ptr(projection));
 
-  // preview_model->Advance(render.GetDelta());
+  preview_model->Advance(render.GetDelta());
   const glm::mat4 *transforms = preview_model->GetFinalMatrices();
   for (int i = 0; i < 100; i++) {
     snprintf(uniformNameBuffer, 100, "finalBonesMatrices[%d]", i);

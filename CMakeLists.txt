@@ -6,6 +6,11 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if (SANS)
+  set(CMAKE_CXX_FLAGS -fsanitize=address,undefined,memory)
+  set(CMAKE_C_FLAGS -fsanitize=address,undefined,memory)
+endif()
+
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
   if (CMAKE_C_COMPILER_ID MATCHES "MSVC") # not sure if this project will build on msvc but regardless, ill set this flags for it just in case
 

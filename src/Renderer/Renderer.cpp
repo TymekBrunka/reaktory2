@@ -127,7 +127,7 @@ bool Render::init(const char *title, rect_size window_size) {
   glfwSetCursorPosCallback(
       impl->window, [](GLFWwindow *window, double xpos, double ypos) {
         Render &render = *(Render *)glfwGetWindowUserPointer(window);
-        render.impl->cursor_position = rect_size{xpos, ypos};
+        render.impl->cursor_position = rect_size{(int)xpos, (int)ypos};
         if (render.impl->mouse_move_callback) {
           render.impl->mouse_move_callback(render, xpos, ypos);
         }

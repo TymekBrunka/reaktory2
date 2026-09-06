@@ -29,7 +29,7 @@ ReadFile(const std::filesystem::path &filepath,
     return std::allocator_traits<Allocator>::allocate((Allocator &)aloc, n);
   };
 
-  alloc_fun frre = [](void *aloc, void *buff, size_t n) {
+  free_fun frre = [](void *aloc, void *buff, size_t n) {
     return std::allocator_traits<Allocator>::free((Allocator &)aloc, buff, n);
   };
 

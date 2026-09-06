@@ -1,5 +1,6 @@
 build/
 build_release/
+build_sans/
 Session.vim
 .cache/
 imgui.ini

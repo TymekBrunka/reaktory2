@@ -26,6 +26,8 @@ set(cmpath ${CMAKE_MODULE_PATH})
 list(PREPEND cmpath "${CMAKE_CURRENT_SOURCE_DIR}/deps/cmake-off/")
 set(CMAKE_MODULE_PATH ${cmpath} CACHE ARRAY "" FORCE)
 
+find_package(Threads REQUIRED)
+
 message(zstd)
 CPMAddPackage(
   NAME zstd

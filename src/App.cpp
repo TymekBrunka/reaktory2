@@ -416,12 +416,12 @@ void App::draw_self() {
 
             Renderer::rect_size sp = render.GetCursorPosition();
             in_window_cursor_pos = Renderer::rect_size{
-                sp.width - imTL.x, -1 * (sp.height - imBR.y)};
+                (int)(sp.width - imTL.x), (int)(-1 * (sp.height - imBR.y))};
 
             scene.updateMousePos(in_window_cursor_pos);
             scene.updateMouseButtonState(mousebuttonL, mousebuttonR);
             scene.updateBodyMovement(movement_input);
-            scene.resize({sregion.x, sregion.y});
+            scene.resize({(int)sregion.x, (int)sregion.y});
             scene.render(render);
             ImGui::GetWindowDrawList()->AddImage(
                 (ImTextureRef)scene.screen_canvas, imTL, imBR, ImVec2(0, 1),
