@@ -14,11 +14,11 @@ namespace Renderer {
 // };
 
 struct meshVertex {
-  glm::vec3 Position;
-  glm::vec3 Normal;
-  glm::vec2 TexCoords;
-  glm::vec3 Tangent;
-  glm::vec3 Bitangent;
+  glm::vec3 Position{};
+  glm::vec3 Normal{};
+  glm::vec2 TexCoords{};
+  glm::vec3 Tangent{};
+  glm::vec3 Bitangent{};
 
   int BoneIdxs[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
   float Weights[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
@@ -27,26 +27,26 @@ struct meshVertex {
 // structure for temporary arrays to create opengl objects out of
 struct MeshLoaderTmpCtx {
   struct Image {
-    int width;
-    int height;
-    int channels;
-    unsigned char *pixels;
+    int width = 0;
+    int height = 0;
+    int channels = 4;
+    unsigned char *pixels = nullptr;
   };
 
-  Image material;
-  std::vector<meshVertex> vertices;
-  std::vector<unsigned int> indices;
+  Image material{};
+  std::vector<meshVertex> vertices{};
+  std::vector<unsigned int> indices{};
 };
 
 struct BoneInfo {
-  int idx;
-  glm::mat4x4 offset;
+  int idx = 0;
+  glm::mat4x4 offset{};
 };
 
 class Mesh {
   friend class Model;
-  unsigned int numIndices;
-  unsigned int VAO, VBO, EBO;
+  unsigned int numIndices = 0;
+  unsigned int VAO = 0, VBO = 0, EBO = 0;
   MeshLoaderTmpCtx *ctx = nullptr;
 
   void init();
@@ -62,30 +62,30 @@ public:
 };
 
 struct KeyPosition {
-  glm::vec3 position;
-  float timeStamp;
+  glm::vec3 position{};
+  float timeStamp = 0.0f;
 };
 
 struct KeyRotation {
-  glm::quat orientation;
-  float timeStamp;
+  glm::quat orientation{};
+  float timeStamp = 0.0f;
 };
 
 struct KeyScale {
-  glm::vec3 scale;
-  float timeStamp;
+  glm::vec3 scale{};
+  float timeStamp = 0.0f;
 };
 
 class AnimationBoneChannel {
   friend class Model;
 
 private:
-  std::vector<KeyPosition> Positions;
-  std::vector<KeyRotation> Rotations;
-  std::vector<KeyScale> Scales;
+  std::vector<KeyPosition> Positions{};
+  std::vector<KeyRotation> Rotations{};
+  std::vector<KeyScale> Scales{};
 
-  glm::mat4 localTransform;
-  std::string name;
+  glm::mat4 localTransform{};
+  std::string name{};
 
   AnimationBoneChannel(const std::string &name, void *channel_);
 
@@ -106,10 +106,10 @@ struct Animation {
   friend class Model;
 
 private:
-  float Duration;
-  int TicksPerSecond;
-  std::string name;
-  std::vector<AnimationBoneChannel> channels;
+  float Duration = 0.0f;
+  int TicksPerSecond = 0;
+  std::string name{};
+  std::vector<AnimationBoneChannel> channels{};
 
 public:
   inline float GetDuration() const { return Duration; }
@@ -127,12 +127,12 @@ struct modelNode {
       -1; // those nodes will be stored in continous array but when loading, it
           // will be changing its size which would invalidate pointers, so index
           // has to be used instead
-  glm::mat4 transformation;
-  std::string name;
+  glm::mat4 transformation{};
+  std::string name{};
 };
 
 class Model {
-  bool initialised;
+  bool initialised = false;
   float animationTime = 0;
   int boneCounter = 0;
   Animation *current_animation = nullptr;
@@ -142,10 +142,10 @@ class Model {
              // since im not loading animations outside the model, i can safetly
              // put it here and optimise some other things
 
-  std::vector<Mesh> meshes;
-  std::vector<Animation> animations;
-  std::vector<unsigned int> owned_textures;
-  glm::mat4 finalMatrices[100];
+  std::vector<Mesh> meshes{};
+  std::vector<Animation> animations{};
+  std::vector<unsigned int> owned_textures{};
+  glm::mat4 finalMatrices[100]{};
 
   struct string_hash {
     using is_transparent = void;
@@ -161,7 +161,7 @@ class Model {
   };
 
   std::unordered_map<std::string, BoneInfo, string_hash, std::equal_to<>>
-      boneInfoMap;
+      boneInfoMap{};
 
   void PrintNodeTreeImpl(const modelNode *node, int depth) const;
 

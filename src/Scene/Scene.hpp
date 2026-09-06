@@ -34,13 +34,13 @@ class Scene {
   glm::vec2 last_mpos{0, 0};
   Renderer::rect_size mpos{0, 0};
   // std::string current_folder;
-  Renderer::rTexture2D skybox_texture;
-  Renderer::rFBO framebuffer;
-  Renderer::rRBO renderbuffer;
+  Renderer::rTexture2D skybox_texture = 0;
+  Renderer::rFBO framebuffer = 0;
+  Renderer::rRBO renderbuffer = 0;
 
 public:
-  Renderer::rTexture2D screen_canvas;
-  Renderer::rTexture2D color_canvas;
+  Renderer::rTexture2D screen_canvas = 0;
+  Renderer::rTexture2D color_canvas = 0;
 
 private:
   glm::vec3 input{};
@@ -57,7 +57,7 @@ private:
   glm::mat4x4 projection{};
   glm::mat4x4 view{};
   std::string name;
-  std::filesystem::path current_folder;
+  std::filesystem::path current_folder{};
 
   bool create_framebuffer();
   void resize_framebuffer(Renderer::rect_size size);

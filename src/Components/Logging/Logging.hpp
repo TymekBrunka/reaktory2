@@ -55,7 +55,7 @@ struct Callback {
 class Logger {
 private:
   uint32_t user_lang = 0;
-  int32_t pid;
+  int32_t pid = 0;
   std::vector<Callback> callbacks;
 
 public:

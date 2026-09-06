@@ -39,8 +39,8 @@ typedef float mat4[16];
 typedef int rLocation;
 
 struct rect_size {
-  int width;
-  int height;
+  int width = 0;
+  int height = 0;
 };
 
 struct Image {
