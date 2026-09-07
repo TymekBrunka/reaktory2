@@ -22,6 +22,7 @@ class Scene {
   static Renderer::rLocation skybox_view_loc;
   static Renderer::rLocation skybox_projection_loc;
 
+  static Renderer::Model *preview_model;
   static Renderer::rLocation model_view_loc;
   static Renderer::rLocation model_projection_loc;
 

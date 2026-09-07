@@ -63,6 +63,7 @@ imgpack_(
   FLIP y
   SOURCES
     assets/images/icons.png
+    assets/images/keybind_icons.png
     assets/images/placeholder.png
 )
 

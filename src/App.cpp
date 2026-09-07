@@ -238,6 +238,13 @@ bool App::init() {
                          .mipmap_levels = 0,
                          .pixels = (unsigned char *)icons_png_pixels};
 
+  Renderer::Image keybind_icons{.width = keybind_icons_png_width,
+                                .height = keybind_icons_png_height,
+                                .channels = keybind_icons_png_channels,
+                                .mipmap_levels = 0,
+                                .pixels =
+                                    (unsigned char *)keybind_icons_png_pixels};
+
   new_scene_img =
       render.LoadImageFromMemory(scene_new_png_data, scene_new_png_size)
           .ok_unchecked();
@@ -245,6 +252,7 @@ bool App::init() {
 
   icon_tex = render.LoadTexture(icon).ok_unchecked();
   icons = render.LoadTexture(icons_, true).ok_unchecked();
+  keybinds_tex = render.LoadTexture(keybind_icons, true).ok_unchecked();
 
   render.SetWindowIcon(icon);
 
@@ -256,6 +264,7 @@ void App::shutdown() {
   render.UnloadTexture(new_scene_tex);
   render.UnloadTexture(icon_tex);
   render.UnloadTexture(icons);
+  render.UnloadTexture(keybinds_tex);
 
   render.cleanup();
   Renderer::Render::Cleanup();

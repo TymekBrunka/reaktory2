@@ -32,6 +32,7 @@ public:
 private:
   bool scene_window_selected = false;
   Renderer::rTexture2D icon_tex;
+  Renderer::rTexture2D keybinds_tex;
   Renderer::rTexture2D new_scene_tex;
   Renderer::rTexture2D icons;
   Renderer::rect_size in_window_cursor_pos{0, 0};
@@ -58,6 +59,7 @@ private:
   };
 
   const std::string *selected_scene_idx = nullptr;
+  Scene *scene_to_be_selected = nullptr;
   Scene *selected_scene = nullptr;
   std::unordered_map<std::string, Scene, string_hash, std::equal_to<>> scenes;
 
@@ -83,8 +85,8 @@ public:
 
   inline Scene *get_selected_scene() const { return selected_scene; }
 
-  bool IconMenuItem(int idx, const char *label);
-  void AddIconToDrawlist(int idx, ImVec2 offset = ImVec2(0, 0));
+  bool IconMenuItem(int idx, const char *label, Renderer::rTexture2D tex = 0);
+  void AddIconToDrawlist(int idx, ImVec2 offset = ImVec2(0, 0), Renderer::rTexture2D tex = 0);
 
   bool init();
   void draw_self();

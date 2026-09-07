@@ -1,4 +1,6 @@
+#include "Renderer.hpp"
 #include "imgui.h"
+#include "imgui_internal.h"
 #include <App.hpp>
 #include <FontsAwesome/IconsFontAwesome6.h>
 
@@ -21,19 +23,20 @@ imrect2 icon_cords(int idx) {
   return rect;
 }
 
-void App::AddIconToDrawlist(int idx, ImVec2 offset) {
+void App::AddIconToDrawlist(int idx, ImVec2 offset, Renderer::rTexture2D tex) {
   ImVec2 pos = ImGui::GetItemRectMin();
   ImDrawList *drawlist = ImGui::GetWindowDrawList();
 
   imrect2 ic = icon_cords(idx);
-  drawlist->AddImage(
-      (ImTextureRef)icons, ImVec2(pos.x + 1 + offset.x, pos.y + 1 + offset.y),
-      ImVec2(pos.x + 21 + offset.x, pos.y + 21 + offset.y), ic.s, ic.e);
+  drawlist->AddImage((ImTextureRef)(tex ? tex : icons),
+                     ImVec2(pos.x + 1 + offset.x, pos.y + 1 + offset.y),
+                     ImVec2(pos.x + 21 + offset.x, pos.y + 21 + offset.y), ic.s,
+                     ic.e);
 }
 
-bool App::IconMenuItem(int idx, const char *label) {
+bool App::IconMenuItem(int idx, const char *label, Renderer::rTexture2D tex) {
   bool ret = ImGui::MenuItem(label);
-  AddIconToDrawlist(idx);
+  AddIconToDrawlist(idx, ImVec2(0, 0), tex);
   return ret;
 }
 
@@ -51,8 +54,10 @@ void App::draw_gui() {
     if (ImGui::BeginMenu("Plik")) {
       ImGui::MenuItem(" " ICON_FA_FILE_ARROW_DOWN
                       "  (ctrl+S) Zapisz (wszystko)");
-      IconMenuItem(0, "      (ctrl+O) Otwórz dostępną scenę");
-      IconMenuItem(0, "      (ctrl+N) Utwórz nową scenę");
+      if (IconMenuItem(0, "      (ctrl+O) Otwórz dostępną scenę"))
+        open_scene();
+      if (IconMenuItem(0, "      (ctrl+N) Utwórz nową scenę"))
+        add_scene();
       IconMenuItem(9, "      (ctrl+I) Importuj scenę");
       IconMenuItem(10, "      (ctrl+E) Eksportuj scenę");
       ImGui::EndMenu();
@@ -64,7 +69,7 @@ void App::draw_gui() {
       ImGui::Separator();
 
       bool use_local_cords = true;
-      ImGui::Checkbox("      Operacje w przestrzeni lokalnej",
+      ImGui::Checkbox("      Osi względne do objektu",
                       &use_local_cords);
 
       AddIconToDrawlist(2, ImVec2(24, 0));
@@ -88,29 +93,6 @@ void App::draw_gui() {
   }
   ImGui::End();
 #endif
-
-  if (ImGui::Begin(ICON_FA_CUBES " Scena")) {
-    ImGui::Text("Sceny (%d)", scenes.size());
-    for (auto &[name, scene] : scenes) {
-      if (ImGui::Selectable(name.c_str(), &scene == selected_scene)) {
-        selected_scene_idx = &name;
-        selected_scene = &scene;
-      }
-    }
-  }
-  ImGui::End();
-
-  if (ImGui::Begin(ICON_FA_WRENCH " Właściwości")) {
-  }
-  ImGui::End();
-
-  if (ImGui::Begin(ICON_FA_DRAW_POLYGON " Modele")) {
-  }
-  ImGui::End();
-
-  if (ImGui::Begin(ICON_FA_IMAGES " Tekstury")) {
-  }
-  ImGui::End();
 
   if (ImGui::Begin("Scena")) {
     scene_window_selected = ImGui::IsWindowFocused();
@@ -142,7 +124,11 @@ void App::draw_gui() {
       if (ImGui::BeginTabBar("scene_tab")) {
         selected_scene_idx = nullptr;
         for (auto &[name, scene] : scenes) {
-          if (ImGui::BeginTabItem(name.c_str())) {
+          if (ImGui::BeginTabItem(name.c_str(), NULL,
+                                  &scene == scene_to_be_selected
+                                      ? ImGuiTabItemFlags_SetSelected
+                                      : ImGuiTabItemFlags_None)) {
+
             selected_scene_idx = &name;
             selected_scene = &scene;
             ImVec2 pos = ImGui::GetCursorScreenPos();
@@ -162,21 +148,77 @@ void App::draw_gui() {
             scene.updateBodyMovement(movement_input);
             scene.resize({(int)sregion.x, (int)sregion.y});
             scene.render(render);
-            ImGui::GetWindowDrawList()->AddImage(
-                (ImTextureRef)scene.screen_canvas, imTL, imBR, ImVec2(0, 1),
-                ImVec2(1, 0));
+            ImDrawList *drawlist = ImGui::GetWindowDrawList();
+            drawlist->AddImage((ImTextureRef)scene.screen_canvas, imTL, imBR,
+                               ImVec2(0, 1), ImVec2(1, 0));
 
             ImGui::EndTabItem();
+
+            ImVec2 kbwnd_size(150, 160);
+            struct {
+              int icon;
+              const char *label;
+            } keybinds_prev[] = {
+                {0, "       zaznacz"},       {1, "       obrót kamerą"},
+                {2, "       przód"},         {3, "       tył"},
+                {4, "       lewo"},          {5, "       prawo"},
+                {6, "       (spacja) góra"}, {7, "       (shift) dół"},
+            };
+
+            for (int i = 0;
+                 i < sizeof(keybinds_prev) / sizeof(keybinds_prev[0]); i++) {
+              ImVec2 offset =
+                  ImVec2(pos.x + sregion.x - kbwnd_size.x,
+                         pos.y + sregion.y - kbwnd_size.y + (18 * i));
+              drawlist->AddText(offset, ImColor(255, 255, 255),
+                                keybinds_prev[i].label);
+
+              imrect2 ic = icon_cords(keybinds_prev[i].icon);
+              drawlist->AddImage((ImTextureRef)keybinds_tex,
+                                 ImVec2(1 + offset.x, 1 + offset.y),
+                                 ImVec2(21 + offset.x, 21 + offset.y), ic.s,
+                                 ic.e);
+            }
           }
         }
         ImGui::EndTabBar();
       }
 
-      if (!selected_scene_idx)
-        selected_scene = nullptr;
-
       ImGui::PopStyleVar();
     }
+  }
+  ImGui::End();
+
+  scene_to_be_selected = nullptr;
+  if (ImGui::Begin(ICON_FA_CUBES " Scena")) {
+    ImGui::Text(ICON_FA_CUBES " Sceny (%d)", scenes.size());
+    ImVec2 wsize = ImGui::GetWindowSize();
+    ImGui::BeginChild("scena_child", ImVec2(wsize.x - 16, 70));
+    for (auto &[name, scene] : scenes) {
+      if (ImGui::Selectable(name.c_str(), &scene == selected_scene)) {
+        selected_scene_idx = &name;
+        selected_scene = &scene;
+        scene_to_be_selected = &scene;
+      }
+    }
+    ImGui::EndChild();
+
+    ImGui::Text(ICON_FA_CUBE " Objekty (0)");
+  }
+  ImGui::End();
+
+  if (!selected_scene_idx)
+    selected_scene = nullptr;
+
+  if (ImGui::Begin(ICON_FA_WRENCH " Właściwości")) {
+  }
+  ImGui::End();
+
+  if (ImGui::Begin(ICON_FA_DRAW_POLYGON " Modele")) {
+  }
+  ImGui::End();
+
+  if (ImGui::Begin(ICON_FA_IMAGES " Tekstury")) {
   }
   ImGui::End();
 }
