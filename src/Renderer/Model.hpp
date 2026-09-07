@@ -40,7 +40,7 @@ struct MeshLoaderTmpCtx {
 
 struct BoneInfo {
   int idx = 0;
-  glm::mat4x4 offset{};
+  glm::mat4 offset{1.0f};
 };
 
 class Mesh {
@@ -84,7 +84,7 @@ private:
   std::vector<KeyRotation> Rotations{};
   std::vector<KeyScale> Scales{};
 
-  glm::mat4 localTransform{};
+  glm::mat4 localTransform{1.0f};
   std::string name{};
 
   AnimationBoneChannel(const std::string &name, void *channel_);
@@ -100,6 +100,10 @@ private:
 
 public:
   ~AnimationBoneChannel() = default;
+  // AnimationBoneChannel(const AnimationBoneChannel &other) = default;
+  // AnimationBoneChannel &operator=(const AnimationBoneChannel &other) = default;
+  AnimationBoneChannel(AnimationBoneChannel &&other);
+  AnimationBoneChannel &operator=(AnimationBoneChannel &&other);
 };
 
 struct Animation {

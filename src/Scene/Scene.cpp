@@ -449,7 +449,6 @@ bool Scene::init(Renderer::Render &render) {
 
   // ---------------------- model test
   preview_model = Renderer::Model::LoadFromFile(
-      // "assets/example/models/RiggedSimple1.glb", true);
       "assets/example/models/CesiumMan.m3d", true);
   preview_model->SetAnimation(&preview_model->GetAnimations()[0]);
   return true;

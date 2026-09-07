@@ -21,6 +21,7 @@ out vec2 TexCoords;
 	
 void main()
 {
+    bool skinned = false;
     vec4 totalPosition = vec4(0.0f);
     for(int i = 0 ; i < 4 ; i++)
     {
@@ -31,6 +32,7 @@ void main()
             totalPosition = vec4(pos,1.0f);
             break;
         }
+        skinned = true;
         vec4 localPosition = finalBonesMatrices[boneIds1[i]] * vec4(pos,1.0f);
         totalPosition += localPosition * weights1[i];
         //vec3 localNormal = mat3(finalBonesMatrices[boneIds[i]]) * norm;
@@ -44,6 +46,7 @@ void main()
             totalPosition = vec4(pos,1.0f);
             break;
         }
+        skinned = true;
         vec4 localPosition = finalBonesMatrices[boneIds2[i]] * vec4(pos,1.0f);
         totalPosition += localPosition * weights2[i];
         //vec3 localNormal = mat3(finalBonesMatrices[boneIds[i]]) * norm;
@@ -51,6 +54,6 @@ void main()
 		
     //mat4 viewModel = view * model;
     mat4 viewModel = view;
-    gl_Position =  projection * viewModel * totalPosition;
+    gl_Position =  projection * viewModel * (skinned ? totalPosition : vec4(pos,1.0f));
     TexCoords = tex;
 }

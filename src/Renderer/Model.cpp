@@ -12,6 +12,9 @@
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/io.hpp>
+
 #include <cmath>
 #include <iostream>
 namespace Renderer {
@@ -54,6 +57,26 @@ Mesh &Mesh::operator=(Mesh &&other) {
     other.VBO = 0;
     other.EBO = 0;
     other.ctx = nullptr;
+  }
+  return *this;
+}
+
+AnimationBoneChannel::AnimationBoneChannel(AnimationBoneChannel &&other) {
+  Positions = std::move(other.Positions);
+  Rotations = std::move(other.Rotations);
+  Scales = std::move(other.Scales);
+  localTransform = other.localTransform;
+  name = std::move(other.name);
+}
+
+AnimationBoneChannel &
+AnimationBoneChannel::operator=(AnimationBoneChannel &&other) {
+  if (this != &other) {
+    Positions = std::move(other.Positions);
+    Rotations = std::move(other.Rotations);
+    Scales = std::move(other.Scales);
+    localTransform = other.localTransform;
+    name = std::move(other.name);
   }
   return *this;
 }
@@ -203,6 +226,11 @@ void Model::processNode(void *node_, const void *scene_, int nodeIdx,
     meshes.push_back(processMesh(scene->mMeshes[mesh_idx], scene, initialise));
   }
 
+  std::cerr << "bone info map:\n";
+  for (const auto &[name, boneinfo] : boneInfoMap) {
+    std::cerr << "(" << boneinfo.idx << ") " << name << "\n";
+  }
+
   // process each of aiNode's children
   for (unsigned int i = 0; i < node->mNumChildren; i++) {
     processNode(node->mChildren[i], scene, childStartIdx + i, initialise);
@@ -246,7 +274,7 @@ Mesh Model::processMesh(void *mesh_, const void *scene_, bool initialise) {
 
   std::cerr << "mesh bone:index map:\n";
   for (const auto &[name, data] : boneInfoMap) {
-    std::cerr << "  " << data.idx << " - " << name << "\n";
+    std::cerr << "(" << data.idx << ") " << name << "\n";
   }
 
   if (initialise)
@@ -288,10 +316,11 @@ void Model::ExtractBoneWeightForVertices(std::vector<meshVertex> &vertices,
     int numWeights = mesh->mBones[i]->mNumWeights;
 
     for (int w = 0; w < numWeights; w++) {
-      if (weights[w].mVertexId >= vertices.size())
+      int vertexId = weights[w].mVertexId;
+      if (vertexId >= vertices.size())
         continue;
 
-      SetVertexBoneData(vertices[w], boneIdx, weights[w].mWeight);
+      SetVertexBoneData(vertices[vertexId], boneIdx, weights[w].mWeight);
     }
   }
 }
@@ -331,8 +360,7 @@ int AnimationBoneChannel::GetPositionIndex(float animationTime) {
     if (animationTime < Positions[index + 1].timeStamp)
       return index;
   }
-  // assert(0);
-  return 0;
+  return Positions.size() - 1;
 }
 
 int AnimationBoneChannel::GetRotationIndex(float animationTime) {
@@ -340,8 +368,7 @@ int AnimationBoneChannel::GetRotationIndex(float animationTime) {
     if (animationTime < Rotations[index + 1].timeStamp)
       return index;
   }
-  // assert(0);
-  return 0;
+  return Rotations.size() - 1;
 }
 
 int AnimationBoneChannel::GetScaleIndex(float animationTime) {
@@ -349,8 +376,7 @@ int AnimationBoneChannel::GetScaleIndex(float animationTime) {
     if (animationTime < Scales[index + 1].timeStamp)
       return index;
   }
-  // assert(0);
-  return 0;
+  return Scales.size() - 1;
 }
 
 float AnimationBoneChannel::GetScaleFactor(float lastTimeStamp,
@@ -368,13 +394,19 @@ void AnimationBoneChannel::UpdateTo(float animationTime) {
     translation = glm::translate(glm::mat4(1.0f), Positions[0].position);
   else {
     int p0Index = GetPositionIndex(animationTime);
-    int p1Index = p0Index + 1;
-    float scaleFactor =
-        GetScaleFactor(Positions[p0Index].timeStamp,
-                       Positions[p1Index].timeStamp, animationTime);
-    glm::vec3 finalPosition = glm::mix(
-        Positions[p0Index].position, Positions[p1Index].position, scaleFactor);
-    translation = glm::translate(glm::mat4(1.0f), finalPosition);
+    if (p0Index == Positions.size() - 1) { // last keyframe
+      translation = glm::translate(glm::mat4(1.0f),
+                                   Positions[Positions.size() - 1].position);
+    } else {
+      int p1Index = p0Index + 1;
+      float scaleFactor =
+          GetScaleFactor(Positions[p0Index].timeStamp,
+                         Positions[p1Index].timeStamp, animationTime);
+      glm::vec3 finalPosition =
+          glm::mix(Positions[p0Index].position, Positions[p1Index].position,
+                   scaleFactor);
+      translation = glm::translate(glm::mat4(1.0f), finalPosition);
+    }
   }
 
   glm::mat4 rotation{};
@@ -382,15 +414,20 @@ void AnimationBoneChannel::UpdateTo(float animationTime) {
     rotation = glm::mat4(glm::normalize(Rotations[0].orientation));
   } else {
     int p0Index = GetRotationIndex(animationTime);
-    int p1Index = p0Index + 1;
-    float scaleFactor =
-        GetScaleFactor(Rotations[p0Index].timeStamp,
-                       Rotations[p1Index].timeStamp, animationTime);
-    glm::quat finalRotation =
-        glm::slerp(Rotations[p0Index].orientation,
-                   Rotations[p1Index].orientation, scaleFactor);
-    finalRotation = glm::normalize(finalRotation);
-    rotation = glm::mat4(finalRotation);
+    if (p0Index == Rotations.size() - 1) { // last keyframe
+      rotation = glm::mat4(
+          glm::normalize(Rotations[Rotations.size() - 1].orientation));
+    } else {
+      int p1Index = p0Index + 1;
+      float scaleFactor =
+          GetScaleFactor(Rotations[p0Index].timeStamp,
+                         Rotations[p1Index].timeStamp, animationTime);
+      glm::quat finalRotation =
+          glm::slerp(Rotations[p0Index].orientation,
+                     Rotations[p1Index].orientation, scaleFactor);
+      finalRotation = glm::normalize(finalRotation);
+      rotation = glm::mat4(finalRotation);
+    }
   }
 
   glm::mat4 scale{};
@@ -398,12 +435,16 @@ void AnimationBoneChannel::UpdateTo(float animationTime) {
     scale = glm::scale(glm::mat4(1.0f), Scales[0].scale);
   else {
     int p0Index = GetScaleIndex(animationTime);
-    int p1Index = p0Index + 1;
-    float scaleFactor = GetScaleFactor(
-        Scales[p0Index].timeStamp, Scales[p1Index].timeStamp, animationTime);
-    glm::vec3 finalScale =
-        glm::mix(Scales[p0Index].scale, Scales[p1Index].scale, scaleFactor);
-    scale = glm::scale(glm::mat4(1.0f), finalScale);
+    if (p0Index == Scales.size() - 1) { // last keyframe
+      scale = glm::scale(glm::mat4(1.0f), Scales[Scales.size() - 1].scale);
+    } else {
+      int p1Index = p0Index + 1;
+      float scaleFactor = GetScaleFactor(
+          Scales[p0Index].timeStamp, Scales[p1Index].timeStamp, animationTime);
+      glm::vec3 finalScale =
+          glm::mix(Scales[p0Index].scale, Scales[p1Index].scale, scaleFactor);
+      scale = glm::scale(glm::mat4(1.0f), finalScale);
+    }
   }
 
   localTransform = translation * rotation * scale;
@@ -415,6 +456,7 @@ void Model::loadAnimation(void *animation_) {
 
   Animation animaton;
   animaton.name = animation->mName.data;
+  animaton.Duration = animation->mDuration;
   animaton.TicksPerSecond = animation->mTicksPerSecond;
   for (int i = 0; i < animation->mNumChannels; i++) {
     animaton.channels.push_back(std::move(AnimationBoneChannel(
