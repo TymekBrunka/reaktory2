@@ -61,6 +61,9 @@ private:
   Scene *selected_scene = nullptr;
   std::unordered_map<std::string, Scene, string_hash, std::equal_to<>> scenes;
 
+  void draw_gui();
+  void draw_popup();
+
 public:
   App() = default;
   ~App() = default;
