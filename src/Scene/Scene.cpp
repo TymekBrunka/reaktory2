@@ -1,4 +1,5 @@
 #include "Model.hpp"
+#include "ModelManager.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/geometric.hpp"
 #define GLFW_INCLUDE_NONE
@@ -37,9 +38,9 @@ Renderer::rLocation Scene::skybox_loc = 0;
 Renderer::rLocation Scene::skybox_view_loc = 0;
 Renderer::rLocation Scene::skybox_projection_loc = 0;
 
-Renderer::Model *Scene::preview_model = nullptr;
 Renderer::rLocation Scene::model_view_loc = 0;
 Renderer::rLocation Scene::model_projection_loc = 0;
+Renderer::rLocation Scene::model_model_loc = 0;
 
 static GLuint skybox_indiecies[] = {
     0,  1,  2,  0,  2,  3,  4,  5,  6,  4,  6,  7,  8,  9,  10, 8,  10, 11,
@@ -89,10 +90,10 @@ static skybox_vert skybox_verticies[] = {
 };
 
 Scene::Scene(Scene &&other) {
-  bool b = atomic_load_explicit(&other.can_rename, memory_order_seq_cst);
-  atomic_store_explicit(&can_rename, b, memory_order_seq_cst);
+  bool b = atomic_load_explicit(&other.is_busy, memory_order_seq_cst);
+  atomic_store_explicit(&is_busy, b, memory_order_seq_cst);
 
-  name = other.name;
+  name = std::move(other.name);
   size = other.size;
   mpos = other.mpos;
   skybox_texture = other.skybox_texture;
@@ -102,7 +103,7 @@ Scene::Scene(Scene &&other) {
   screen_canvas = other.screen_canvas;
   color_canvas = other.color_canvas;
   initialised = other.initialised;
-  other.name = std::string();
+  modelManager = std::move(other.modelManager);
   other.size = {640, 480};
   other.skybox_texture = 0;
   other.framebuffer = 0;
@@ -114,10 +115,10 @@ Scene::Scene(Scene &&other) {
 
 Scene &Scene::operator=(Scene &&other) {
   if (this != &other) {
-    bool b = atomic_load_explicit(&other.can_rename, memory_order_seq_cst);
-    atomic_store_explicit(&can_rename, b, memory_order_seq_cst);
+    bool b = atomic_load_explicit(&other.is_busy, memory_order_seq_cst);
+    atomic_store_explicit(&is_busy, b, memory_order_seq_cst);
 
-    name = other.name;
+    name = std::move(other.name);
     size = other.size;
     mpos = other.mpos;
     skybox_texture = other.skybox_texture;
@@ -127,7 +128,7 @@ Scene &Scene::operator=(Scene &&other) {
     screen_canvas = other.screen_canvas;
     color_canvas = other.color_canvas;
     initialised = other.initialised;
-    other.name = std::string();
+    modelManager = std::move(other.modelManager);
     other.size = {640, 480};
     other.skybox_texture = 0;
     other.framebuffer = 0;
@@ -214,6 +215,8 @@ Scene::Scene(const std::string &name) {
     Log::log(Log::DEFAULT, 0, "Scene", TL(MSG_SCENE_OPEN_SUCCESS),
              std::make_format_args(name));
   }
+
+  modelManager = std::move(ModelManager{current_folder / "models"});
 }
 
 bool Scene::create_framebuffer() {
@@ -346,6 +349,7 @@ bool Scene::Init(Renderer::Render &render) {
 
   model_view_loc = glGetUniformLocation(skinning_program, "view");
   model_projection_loc = glGetUniformLocation(skinning_program, "projection");
+  model_model_loc = glGetUniformLocation(skinning_program, "model");
 
   glGenBuffers(1, &tri_fbo);
   glBindBuffer(GL_ARRAY_BUFFER, tri_fbo);
@@ -402,10 +406,14 @@ bool Scene::init(Renderer::Render &render) {
   std::filesystem::path filepath =
       FileUtils::APP_ROOT / "scenes" / name / "skybox.png";
   Errors::Result<Renderer::Image, int> res_img_read =
-      render.LoadImage(filepath.string().c_str());
+      render.LoadImage(filepath);
 
   if (!res_img_read.is_ok) {
     std::string path = filepath.string();
+
+    if (res_img_read.value.error == -2)
+      Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+               TL(MSG_GENERIC_FILE_NOT_FOUND), std::make_format_args(path));
 
     if (res_img_read.value.error == -1)
       Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
@@ -448,9 +456,9 @@ bool Scene::init(Renderer::Render &render) {
   initialised = true;
 
   // ---------------------- model test
-  preview_model = Renderer::Model::LoadFromFile(
-      "assets/example/models/CesiumMan.m3d", true);
-  preview_model->SetAnimation(&preview_model->GetAnimations()[0]);
+  modelManager.Import("assets/example/models/CesiumMan.m3d");
+  modelManager["CesiumMan.m3d"]->SetAnimation(
+      &modelManager["CesiumMan.m3d"]->GetAnimations()[0]);
   return true;
 }
 
@@ -553,8 +561,17 @@ void Scene::render(Renderer::Render &render) {
   glUniformMatrix4fv(model_projection_loc, 1, GL_FALSE,
                      glm::value_ptr(projection));
 
-  preview_model->Advance(render.GetDelta());
-  const glm::mat4 *transforms = preview_model->GetFinalMatrices();
+  // glm::mat4 model = glm::rotate(
+  //     glm::mat4(1.0f), glm::radians((float)preview_model.GetAnimationTime()),
+  //     glm::normalize(glm::vec3(1.0f, 1.0f, 1.0f)));
+
+  glm::mat4 model = glm::mat4(1.0f);
+
+  glUniformMatrix4fv(model_model_loc, 1, GL_FALSE, glm::value_ptr(model));
+
+  modelManager["CesiumMan.m3d"]->Advance(render.GetDelta());
+  const glm::mat4 *transforms =
+      modelManager["CesiumMan.m3d"]->GetFinalMatrices();
   for (int i = 0; i < 100; i++) {
     snprintf(uniformNameBuffer, 100, "finalBonesMatrices[%d]", i);
     glUniformMatrix4fv(
@@ -562,7 +579,7 @@ void Scene::render(Renderer::Render &render) {
         glm::value_ptr(transforms[i]));
   }
 
-  preview_model->Draw();
+  modelManager["CesiumMan.m3d"]->Draw();
 
   // glUseProgram(tri_program);
   // glBindVertexArray(tri_vao);
@@ -579,6 +596,7 @@ void Scene::Cleanup() {
   glDeleteVertexArrays(1, &tri_vao);
   glDeleteBuffers(1, &tri_fbo);
   glDeleteProgram(tri_program);
+  tri_program = 0;
 
   if (!skybox_program)
     return;
@@ -587,11 +605,13 @@ void Scene::Cleanup() {
   glDeleteBuffers(1, &skybox_fbo);
   glDeleteBuffers(1, &skybox_ebo);
   glDeleteProgram(skybox_program);
+  skybox_program = 0;
 
   if (!skinning_program)
     return;
 
   glDeleteProgram(skinning_program);
+  skinning_program = 0;
 }
 
 Scene::~Scene() {

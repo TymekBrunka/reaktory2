@@ -39,7 +39,20 @@ private:
   const char *current_modal = nullptr;
 
 public:
+  struct {
+    bool front = false;
+    bool back = false;
+    bool left = false;
+    bool right = false;
+    bool up = false;
+    bool down = false;
+  } input;
   glm::vec3 movement_input{};
+
+  inline void set_movement_vec() {
+    movement_input = glm::vec3(input.front - input.back,
+                               input.right - input.left, input.up - input.down);
+  }
 
 private:
   Renderer::Image new_scene_img;
@@ -86,7 +99,8 @@ public:
   inline Scene *get_selected_scene() const { return selected_scene; }
 
   bool IconMenuItem(int idx, const char *label, Renderer::rTexture2D tex = 0);
-  void AddIconToDrawlist(int idx, ImVec2 offset = ImVec2(0, 0), Renderer::rTexture2D tex = 0);
+  void AddIconToDrawlist(int idx, ImVec2 offset = ImVec2(0, 0),
+                         Renderer::rTexture2D tex = 0);
 
   bool init();
   void draw_self();

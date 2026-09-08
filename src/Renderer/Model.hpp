@@ -1,4 +1,6 @@
 #pragma once
+#include "Renderer.hpp"
+#include <cstddef>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
@@ -47,7 +49,9 @@ class Mesh {
   friend class Model;
   unsigned int numIndices = 0;
   unsigned int VAO = 0, VBO = 0, EBO = 0;
+  rTexture2D material;
   MeshLoaderTmpCtx *ctx = nullptr;
+  std::string name;
 
   void init();
   void Draw();
@@ -101,7 +105,8 @@ private:
 public:
   ~AnimationBoneChannel() = default;
   // AnimationBoneChannel(const AnimationBoneChannel &other) = default;
-  // AnimationBoneChannel &operator=(const AnimationBoneChannel &other) = default;
+  // AnimationBoneChannel &operator=(const AnimationBoneChannel &other) =
+  // default;
   AnimationBoneChannel(AnimationBoneChannel &&other);
   AnimationBoneChannel &operator=(AnimationBoneChannel &&other);
 };
@@ -118,6 +123,7 @@ private:
 public:
   inline float GetDuration() const { return Duration; }
   inline int GetTPS() const { return TicksPerSecond; }
+  inline const std::string &GetName() const { return name; }
 };
 
 // matrices calculated for animations are calculated from root node to leafs,
@@ -139,7 +145,9 @@ class Model {
   bool initialised = false;
   float animationTime = 0;
   int boneCounter = 0;
-  Animation *current_animation = nullptr;
+  Animation *current_animation =
+      nullptr; // reset to null upon std::move() bc i won't be moving it while
+               // it's animated anytime soon
 
   std::vector<modelNode>
       nodes; // normally, those 2 fields should be stored in animation class but
@@ -149,7 +157,6 @@ class Model {
   std::vector<Mesh> meshes{};
   std::vector<Animation> animations{};
   std::vector<unsigned int> owned_textures{};
-  glm::mat4 finalMatrices[100]{};
 
   struct string_hash {
     using is_transparent = void;
@@ -167,6 +174,8 @@ class Model {
   std::unordered_map<std::string, BoneInfo, string_hash, std::equal_to<>>
       boneInfoMap{};
 
+  glm::mat4 finalMatrices[100]{};
+
   void PrintNodeTreeImpl(const modelNode *node, int depth) const;
 
   void processNode(void *node_, const void *scene_, int nodeIdx,
@@ -179,16 +188,47 @@ class Model {
 
   void calculateBoneTransform(modelNode *node, glm::mat4 parentTransform);
 
+  static bool LoadModel(const void *scene_, Model &model,
+                        bool initialise = true);
+
 public:
   Model() = default;
   ~Model() = default;
+  Model(const Model &other) = delete;
+  Model &operator=(const Model &other) = delete;
+  Model(Model &&other);
+  Model &operator=(Model &&other);
 
-  static Model *LoadFromFile(const char *filepath, bool initialise = true);
+  static Model LoadFromFile(const char *filepath, bool initialise = true);
+  static Model LoadFromMemory(const void *data, size_t length,
+                              bool initialise = true, const char *hint = "");
+
+  void init();
+
   inline const std::vector<Animation> &GetAnimations() const {
     return animations;
   }
 
+  inline float &GetAnimationTime() { return animationTime; }
+
   inline const glm::mat4 *GetFinalMatrices() const { return finalMatrices; }
+
+  inline int FindMesh(const char *name) {
+    for (int i = 0; i < meshes.size(); i++) {
+      if (meshes[i].name == name) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
+  inline bool SetMeshMaterial(int idx, rTexture2D material) {
+    if (idx < 0 || idx > meshes.size())
+      return false;
+
+    meshes[idx].material = material;
+    return true;
+  }
 
   void SetAnimation(const Animation *animation);
   void Advance(float delta);

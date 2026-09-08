@@ -12,25 +12,31 @@ using no_error = Errors::no_error;
 extern std::filesystem::path HOME_DIR;
 extern std::filesystem::path APP_ROOT;
 
-typedef unsigned char *(*alloc_fun)(void *alloc, size_t n);
-typedef unsigned char *(*free_fun)(void *alloc, void *buff, size_t n);
+typedef char *(*alloc_fun)(void *alloc, size_t n);
+typedef void (*free_fun)(void *alloc, void *buff, size_t n);
 
-Result<unsigned char *, int> ReadFilex(const std::filesystem::path &filepath,
-                                       alloc_fun alloc = nullptr,
-                                       free_fun frre = nullptr,
-                                       void *allocator = nullptr);
+struct ReadResult {
+  char *data;
+  size_t length;
+};
 
-template <class Allocator = std::allocator<unsigned char>>
-Result<unsigned char *, int>
+Result<ReadResult, int> ReadFilex(const std::filesystem::path &filepath,
+                                  alloc_fun alloc = nullptr,
+                                  free_fun frre = nullptr,
+                                  void *allocator = nullptr);
+
+template <class Allocator = std::allocator<char>>
+Result<ReadResult, int>
 ReadFile(const std::filesystem::path &filepath,
-         const Allocator &alloc = std::allocator<unsigned char>()) {
+         const Allocator &alloc = std::allocator<char>()) {
 
   alloc_fun allo = [](void *aloc, size_t n) {
     return std::allocator_traits<Allocator>::allocate((Allocator &)aloc, n);
   };
 
   free_fun frre = [](void *aloc, void *buff, size_t n) {
-    return std::allocator_traits<Allocator>::free((Allocator &)aloc, buff, n);
+    return std::allocator_traits<Allocator>::deallocate((Allocator &)aloc,
+                                                        (char *)buff, n);
   };
 
   return ReadFilex(filepath, allo, frre, (void *)&alloc);

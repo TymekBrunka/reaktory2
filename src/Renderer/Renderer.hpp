@@ -2,6 +2,7 @@
 #define GLFW_INCLUDE_NONE
 #include <Errors/Errors.hpp>
 #include <GLFW/glfw3.h>
+#include <filesystem>
 namespace Renderer {
 
 template <typename T, typename E> using Result = Errors::Result<T, E>;
@@ -119,8 +120,8 @@ public:
                                          const char *fs);
   void UnloadProgram(rProgram program);
 
-  Result<Image, int> LoadImage(const char *filepath,
-                                    int desired_channels = 0);
+  Result<Image, int> LoadImage(std::filesystem::path filepath,
+                               int desired_channels = 0);
 
   Result<Image, no_error> LoadImageFromMemory(const unsigned char *data,
                                               int length,

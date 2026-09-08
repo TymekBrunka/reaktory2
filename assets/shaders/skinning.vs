@@ -11,7 +11,7 @@ layout(location = 6) in vec4 weights2;
 	
 uniform mat4 projection;
 uniform mat4 view;
-//uniform mat4 model;
+uniform mat4 model;
 	
 const int MAX_BONES = 100;
 const int MAX_BONE_INFLUENCE = 8;
@@ -52,8 +52,8 @@ void main()
         //vec3 localNormal = mat3(finalBonesMatrices[boneIds[i]]) * norm;
     }
 		
-    //mat4 viewModel = view * model;
-    mat4 viewModel = view;
+    mat4 viewModel = view * model;
+    //mat4 viewModel = view;
     gl_Position =  projection * viewModel * (skinned ? totalPosition : vec4(pos,1.0f));
     TexCoords = tex;
 }

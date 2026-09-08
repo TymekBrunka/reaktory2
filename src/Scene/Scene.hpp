@@ -7,6 +7,8 @@
 #include <stdatomic.h>
 #include <string>
 
+#include <ModelManager.hpp>
+
 class Scene {
   static Renderer::rProgram skybox_program;
   static Renderer::rFBO skybox_fbo;
@@ -22,14 +24,14 @@ class Scene {
   static Renderer::rLocation skybox_view_loc;
   static Renderer::rLocation skybox_projection_loc;
 
-  static Renderer::Model *preview_model;
   static Renderer::rLocation model_view_loc;
   static Renderer::rLocation model_projection_loc;
+  static Renderer::rLocation model_model_loc;
 
   bool initialised = false;
   bool mousebuttonL = false;
   bool mousebuttonR = false;
-  atomic_bool can_rename = true;
+  atomic_bool is_busy = true;
   Renderer::rect_size size{640, 480};
   glm::vec2 last_mpos{0, 0};
   Renderer::rect_size mpos{0, 0};
@@ -69,6 +71,8 @@ private:
                                       const std::filesystem::path &path);
 
 public:
+  ModelManager modelManager{};
+
   Scene() = default;
   Scene(const std::string &name);
   Scene(const Scene &other) = delete;

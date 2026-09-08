@@ -1,4 +1,5 @@
 #include <Renderer.hpp>
+#include <fstream>
 #include <glad/gl.h>
 #include <stdexcept>
 
@@ -286,22 +287,25 @@ Result<Image, no_error> Render::LoadImageFromMemory(const unsigned char *data,
   return Result<Image, no_error>::OK(image);
 }
 
-Result<Image, int> Render::LoadImage(const char *filepath,
+Result<Image, int> Render::LoadImage(std::filesystem::path filepath,
                                      int desired_channels) {
-  FILE *file = fopen(filepath, "rb");
-  if (!file)
+
+  if (!std::filesystem::exists(filepath))
+    return Result<Image, int>::ERR(-2);
+
+  std::ifstream file(filepath, std::ios_base::in | std::ios_base::binary);
+  if (!file.is_open())
     return Result<Image, int>::ERR(-1);
 
-  if (fseek(file, 0, SEEK_END))
-    return Result<Image, int>::ERR(1);
-
-  size_t fsize = ftell(file);
-  fseek(file, 0, SEEK_SET);
+  file.seekg(0, std::ios_base::end);
+  size_t fsize = file.tellg();
+  file.seekg(0, std::ios_base::beg);
   unsigned char *out = new unsigned char[fsize];
+  file.read((char *)out, fsize);
 
-  if (fread(out, fsize, 1, file) < fsize) {
-    // delete[] out;
-    // return Result<Image, int>::ERR(1);
+  if (file.gcount() < fsize) {
+    delete[] out;
+    return Result<Image, int>::ERR(1);
   }
 
   Result<Image, no_error> res_img =

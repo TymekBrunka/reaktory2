@@ -37,11 +37,14 @@ Mesh::Mesh(Mesh &&other) {
   VAO = other.VAO;
   VBO = other.VBO;
   EBO = other.EBO;
+  material = other.material;
+  name = std::move(other.name);
   numIndices = other.numIndices;
   ctx = other.ctx;
   other.VAO = 0;
   other.VBO = 0;
   other.EBO = 0;
+  other.material = 0;
   other.ctx = nullptr;
 }
 
@@ -52,10 +55,13 @@ Mesh &Mesh::operator=(Mesh &&other) {
     VBO = other.VBO;
     EBO = other.EBO;
     ctx = other.ctx;
+    material = other.material;
+    name = std::move(other.name);
     numIndices = other.numIndices;
     other.VAO = 0;
     other.VBO = 0;
     other.EBO = 0;
+    other.material = 0;
     other.ctx = nullptr;
   }
   return *this;
@@ -77,6 +83,49 @@ AnimationBoneChannel::operator=(AnimationBoneChannel &&other) {
     Scales = std::move(other.Scales);
     localTransform = other.localTransform;
     name = std::move(other.name);
+  }
+  return *this;
+}
+
+Model::Model(Model &&other) {
+  initialised = other.initialised;
+  animationTime = other.animationTime;
+  boneCounter = other.boneCounter;
+  current_animation = nullptr;
+  nodes = std::move(other.nodes);
+  meshes = std::move(other.meshes);
+  animations = std::move(other.animations);
+  owned_textures = std::move(other.owned_textures);
+  boneInfoMap = std::move(other.boneInfoMap);
+  memcpy(finalMatrices, other.finalMatrices, MAX_BONES * sizeof(glm::mat4));
+
+  other.initialised = false;
+  other.animationTime = 0;
+  other.boneCounter = 0;
+  for (int i = 0; i < MAX_BONES; i++) {
+    other.finalMatrices[i] = glm::mat4(1.0f);
+  }
+}
+
+Model &Model::operator=(Model &&other) {
+  if (this != &other) {
+    initialised = other.initialised;
+    animationTime = other.animationTime;
+    boneCounter = other.boneCounter;
+    current_animation = nullptr;
+    nodes = std::move(other.nodes);
+    meshes = std::move(other.meshes);
+    animations = std::move(other.animations);
+    owned_textures = std::move(other.owned_textures);
+    boneInfoMap = std::move(other.boneInfoMap);
+    memcpy(finalMatrices, other.finalMatrices, MAX_BONES * sizeof(glm::mat4));
+
+    other.initialised = false;
+    other.animationTime = 0;
+    other.boneCounter = 0;
+    for (int i = 0; i < MAX_BONES; i++) {
+      other.finalMatrices[i] = glm::mat4(1.0f);
+    }
   }
   return *this;
 }
@@ -163,8 +212,8 @@ void Model::PrintNodeTreeImpl(const modelNode *node, int depth) const {
   }
 }
 
-Model *Model::LoadFromFile(const char *filepath, bool initialise) {
-  Model *model = new Model{};
+Model Model::LoadFromFile(const char *filepath, bool initialise) {
+  Model model{};
 
   Assimp::Importer import;
   const aiScene *scene =
@@ -175,28 +224,67 @@ Model *Model::LoadFromFile(const char *filepath, bool initialise) {
     const char *err = import.GetErrorString();
     Log::log(Log::ERROR | Log::SEV_MED, 0, "Assimp", TL(MSG_ASSIMP_ERROR),
              std::make_format_args(err));
-    return nullptr;
+    return {};
   }
+
+  if (!LoadModel(scene, model, initialise)) {
+    return {};
+  }
+
+  return model;
+}
+
+Model Model::LoadFromMemory(const void *data, size_t length, bool initialise,
+                            const char *hint) {
+  Model model{};
+
+  Assimp::Importer import;
+  const aiScene *scene = import.ReadFileFromMemory(
+      data, length, aiProcess_Triangulate | aiProcess_FlipUVs, hint);
+
+  if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
+      !scene->mRootNode) {
+    const char *err = import.GetErrorString();
+    Log::log(Log::ERROR | Log::SEV_MED, 0, "Assimp", TL(MSG_ASSIMP_ERROR),
+             std::make_format_args(err));
+    return {};
+  }
+
+  if (!LoadModel(scene, model, initialise)) {
+    return {};
+  }
+
+  return model;
+}
+
+bool Model::LoadModel(const void *scene_, Model &model, bool initialise) {
+  auto scene = (aiScene *)scene_;
 
   // this would go to animation class but im only loading animations from
   // within
   // single model, so its best to save space per animation and save node
   // hiererchy here
 
-  model->nodes.push_back(modelNode{.idx = 0});
-  model->processNode(scene->mRootNode, scene, 0, initialise);
+  model.nodes.push_back(modelNode{.idx = 0});
+  model.processNode(scene->mRootNode, scene, 0, initialise);
 
-  model->PrintNodeTree();
+  model.PrintNodeTree();
 
   for (unsigned int i = 0; i < scene->mNumAnimations; i++) {
-    model->loadAnimation(scene->mAnimations[i]);
+    model.loadAnimation(scene->mAnimations[i]);
   }
 
   for (int i = 0; i < MAX_BONES; i++)
-    model->finalMatrices[i] = glm::mat4(1.0f);
+    model.finalMatrices[i] = glm::mat4(1.0f);
 
-  model->initialised = initialise;
-  return model;
+  model.initialised = initialise;
+
+  return true;
+}
+
+void Model::init() {
+  for (auto &mesh : meshes)
+    mesh.init();
 }
 
 void Model::processNode(void *node_, const void *scene_, int nodeIdx,
@@ -244,6 +332,7 @@ Mesh Model::processMesh(void *mesh_, const void *scene_, bool initialise) {
   std::cerr << "loading mesh named " << mesh->mName.data << "\n";
 
   Mesh Mesh{};
+  Mesh.name = mesh->mName.data;
   Mesh.ctx = new MeshLoaderTmpCtx{};
 
   std::cerr << "mesh consists of " << mesh->mNumVertices << " vertices\n";

@@ -69,8 +69,7 @@ void App::draw_gui() {
       ImGui::Separator();
 
       bool use_local_cords = true;
-      ImGui::Checkbox("      Osi względne do objektu",
-                      &use_local_cords);
+      ImGui::Checkbox("      Osi względne do objektu", &use_local_cords);
 
       AddIconToDrawlist(2, ImVec2(24, 0));
 
@@ -154,7 +153,7 @@ void App::draw_gui() {
 
             ImGui::EndTabItem();
 
-            ImVec2 kbwnd_size(150, 160);
+            ImVec2 kbwnd_size(120, 160);
             struct {
               int icon;
               const char *label;
@@ -215,6 +214,16 @@ void App::draw_gui() {
   ImGui::End();
 
   if (ImGui::Begin(ICON_FA_DRAW_POLYGON " Modele")) {
+    if (selected_scene) {
+      ImGui::Text(ICON_FA_DRAW_POLYGON " Modele (%d)",
+                  selected_scene->modelManager.GetModelsMap().size());
+
+      for (const auto &[name, model] :
+           selected_scene->modelManager.GetModelsMap()) {
+
+        ImGui::Selectable(name.c_str(), false);
+      }
+    }
   }
   ImGui::End();
 

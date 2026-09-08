@@ -153,7 +153,7 @@ target_include_directories(renderer_model PUBLIC
   src/Renderer
   src/Components
 )
-target_link_libraries(renderer_model PUBLIC glad glm::glm PRIVATE logging assimp)
+target_link_libraries(renderer_model PUBLIC glad glm::glm PRIVATE logging assimp glfw)
 
 add_library(fileutils STATIC
   src/Components/FileUtils/FileUtils.cpp
@@ -165,9 +165,17 @@ target_include_directories(fileutils PUBLIC
 )
 target_precompile_headers(renderer_model REUSE_FROM logging)
 
+add_library(Scene_asset_managers STATIC
+  src/Scene/ModelManager.hpp
+  src/Scene/ModelManager.cpp
+)
+target_include_directories(Scene_asset_managers PUBLIC src/Scene/)
+target_link_libraries(Scene_asset_managers PUBLIC logging renderer renderer_model fileutils)
+target_precompile_headers(Scene_asset_managers REUSE_FROM logging)
+
 add_library(Scene STATIC src/Scene/Scene.hpp src/Scene/Scene.cpp)
 target_include_directories(Scene PUBLIC src/Scene/)
-target_link_libraries(Scene PUBLIC logging renderer renderer_model fileutils glm::glm PRIVATE staticassets_scene shaders glad imgui)
+target_link_libraries(Scene PUBLIC logging renderer renderer_model fileutils glm::glm Scene_asset_managers PRIVATE staticassets_scene shaders glad imgui)
 target_precompile_headers(Scene REUSE_FROM logging)
 
 add_library(App STATIC src/App.hpp src/App.cpp)

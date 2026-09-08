@@ -145,43 +145,45 @@ bool App::init() {
     } else if (action == GLFW_PRESS && app->get_selected_scene()) {
       switch (key) {
       case GLFW_KEY_W:
-        app->movement_input.x += 1;
+        app->input.front = true;
         break;
       case GLFW_KEY_S:
-        app->movement_input.x += -1;
+        app->input.back = true;
         break;
       case GLFW_KEY_A:
-        app->movement_input.y += -1;
+        app->input.left = true;
         break;
       case GLFW_KEY_D:
-        app->movement_input.y += 1;
+        app->input.right = true;
         break;
       case GLFW_KEY_SPACE:
-        app->movement_input.z += 1;
+        app->input.up = true;
         break;
       case GLFW_KEY_LEFT_SHIFT:
-        app->movement_input.z += -1;
+        app->input.down = true;
       }
+      app->set_movement_vec();
     } else if (action == GLFW_RELEASE && app->get_selected_scene()) {
       switch (key) {
       case GLFW_KEY_W:
-        app->movement_input.x -= 1;
+        app->input.front = false;
         break;
       case GLFW_KEY_S:
-        app->movement_input.x -= -1;
+        app->input.back = false;
         break;
       case GLFW_KEY_A:
-        app->movement_input.y -= -1;
+        app->input.left = false;
         break;
       case GLFW_KEY_D:
-        app->movement_input.y -= 1;
+        app->input.right = false;
         break;
       case GLFW_KEY_SPACE:
-        app->movement_input.z -= 1;
+        app->input.up = false;
         break;
       case GLFW_KEY_LEFT_SHIFT:
-        app->movement_input.z -= -1;
+        app->input.down = false;
       }
+      app->set_movement_vec();
     }
   });
 
