@@ -7,7 +7,7 @@
 #include <stdatomic.h>
 #include <string>
 
-#include <ModelManager.hpp>
+#include <ResourceManager.hpp>
 
 class Scene {
   static Renderer::rProgram skybox_program;
@@ -71,7 +71,7 @@ private:
                                       const std::filesystem::path &path);
 
 public:
-  ModelManager modelManager{};
+  ResourceManager resMan{};
 
   Scene() = default;
   Scene(const std::string &name);

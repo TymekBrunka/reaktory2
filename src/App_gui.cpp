@@ -1,6 +1,7 @@
 #include "Renderer.hpp"
 #include "imgui.h"
 #include "imgui_internal.h"
+#include "pfd/pfd.hpp"
 #include <App.hpp>
 #include <FontsAwesome/IconsFontAwesome6.h>
 
@@ -215,14 +216,30 @@ void App::draw_gui() {
 
   if (ImGui::Begin(ICON_FA_DRAW_POLYGON " Modele")) {
     if (selected_scene) {
-      ImGui::Text(ICON_FA_DRAW_POLYGON " Modele (%d)",
-                  selected_scene->modelManager.GetModelsMap().size());
 
+      ImGui::Text(ICON_FA_DRAW_POLYGON " Modele (%d)",
+                  selected_scene->resMan.GetModelsMap().size());
+      ImGui::SameLine();
+
+      if (ImGui::Button(" + ")) {
+        std::vector<std::string> models_to_load = ipfd::open_file(
+            "Wybór modeli", "",
+            {"Plik modelu (obj/gltf/glb/m3d/fbx)",
+             "*.obj;*.gltf;*.glb;*.m3d;*.fbx", "Wszystkie pliki", "*"},
+            ipfd::opt::multiselect);
+
+        for (const auto &model : models_to_load) {
+          selected_scene->resMan.ImportModel(model);
+        }
+      }
+
+      ImGui::BeginChild("modele_child");
       for (const auto &[name, model] :
-           selected_scene->modelManager.GetModelsMap()) {
+           selected_scene->resMan.GetModelsMap()) {
 
         ImGui::Selectable(name.c_str(), false);
       }
+      ImGui::EndChild();
     }
   }
   ImGui::End();

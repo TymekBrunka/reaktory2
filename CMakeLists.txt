@@ -89,6 +89,14 @@ imgpack_(
     assets/images/placeholder2.png
 )
 
+add_library(pfd OBJECT
+  src/Components/pfd/pfd.cpp
+  src/Components/pfd/pfd.hpp
+  deps/portable-file-dialogs.h
+)
+
+target_include_directories(pfd PUBLIC src/Components/pfd PRIVATE deps)
+
 add_library(pch_core STATIC
   src/precompiled_headers/core.hpp
   src/precompiled_headers/core.cpp
@@ -165,22 +173,22 @@ target_include_directories(fileutils PUBLIC
 )
 target_precompile_headers(renderer_model REUSE_FROM logging)
 
-add_library(Scene_asset_managers STATIC
-  src/Scene/ModelManager.hpp
-  src/Scene/ModelManager.cpp
+add_library(Scene_resource_manager STATIC
+  src/Scene/ResourceManager.hpp
+  src/Scene/ResourceManager.cpp
 )
-target_include_directories(Scene_asset_managers PUBLIC src/Scene/)
-target_link_libraries(Scene_asset_managers PUBLIC logging renderer renderer_model fileutils)
-target_precompile_headers(Scene_asset_managers REUSE_FROM logging)
+target_include_directories(Scene_resource_manager PUBLIC src/Scene/)
+target_link_libraries(Scene_resource_manager PUBLIC logging renderer renderer_model fileutils)
+target_precompile_headers(Scene_resource_manager REUSE_FROM logging)
 
 add_library(Scene STATIC src/Scene/Scene.hpp src/Scene/Scene.cpp)
 target_include_directories(Scene PUBLIC src/Scene/)
-target_link_libraries(Scene PUBLIC logging renderer renderer_model fileutils glm::glm Scene_asset_managers PRIVATE staticassets_scene shaders glad imgui)
+target_link_libraries(Scene PUBLIC logging renderer renderer_model fileutils glm::glm Scene_resource_manager PRIVATE staticassets_scene shaders glad imgui)
 target_precompile_headers(Scene REUSE_FROM logging)
 
 add_library(App STATIC src/App.hpp src/App.cpp)
 target_include_directories(App PUBLIC src)
-target_link_libraries(App PUBLIC Scene icon_img logging renderer imgui fileutils images images_bigger)
+target_link_libraries(App PUBLIC Scene icon_img logging renderer imgui fileutils images images_bigger PRIVATE pfd)
 target_precompile_headers(App REUSE_FROM logging)
 
 add_executable(main src/main.cpp)

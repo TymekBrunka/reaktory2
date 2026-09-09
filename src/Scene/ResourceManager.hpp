@@ -8,7 +8,7 @@
 #include <string_view>
 #include <unordered_map>
 
-class ModelManager {
+class ResourceManager {
 private:
   std::filesystem::path folder{};
 
@@ -29,36 +29,36 @@ private:
       models;
 
 public:
-  ModelManager() = default;
-  ModelManager(const std::filesystem::path &folder_);
-  ~ModelManager() = default;
-  ModelManager(const ModelManager &other) = delete;
-  ModelManager &operator=(const ModelManager &other) = delete;
-  ModelManager(ModelManager &&other) = default;
-  ModelManager &operator=(ModelManager &&other) = default;
+  ResourceManager() = default;
+  ResourceManager(const std::filesystem::path &folder_) : folder(folder_) {};
+  ~ResourceManager() = default;
+  ResourceManager(const ResourceManager &other) = delete;
+  ResourceManager &operator=(const ResourceManager &other) = delete;
+  ResourceManager(ResourceManager &&other) = default;
+  ResourceManager &operator=(ResourceManager &&other) = default;
 
   inline const decltype(models)& GetModelsMap() const { return models; }
 
-  inline Renderer::Model *operator[](const char *txt) {
+  inline Renderer::Model *GetModel(const char *txt) {
     auto iter = models.find(txt);
     return iter != models.end() ? &(*iter).second : nullptr;
   }
 
-  inline Renderer::Model *operator[](std::string_view txt) {
+  inline Renderer::Model *GetModel(std::string_view txt) {
     auto iter = models.find(txt);
     return iter != models.end() ? &(*iter).second : nullptr;
   }
 
-  inline Renderer::Model *operator[](const std::string &txt) {
+  inline Renderer::Model *GetModel(const std::string &txt) {
     auto iter = models.find(txt);
     return iter != models.end() ? &(*iter).second : nullptr;
   }
 
   Errors::Result<Renderer::Model *, int>
-  Import(const std::filesystem::path &filepath);
+  ImportModel(const std::filesystem::path &filepath, bool allow_reload = false);
 
   Errors::Result<Renderer::Model *, int>
-  Import(const std::filesystem::path &filepath, Renderer::Model *model);
+  ImportModel(const std::filesystem::path &filepath, Renderer::Model *model, bool allow_reload = false);
 
-  Errors::Result<Renderer::Model *, int> Load(const char *name);
+  Errors::Result<Renderer::Model *, int> LoadModel(const char *name);
 };

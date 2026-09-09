@@ -16,12 +16,15 @@
 #include <glm/gtx/io.hpp>
 
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
 namespace Renderer {
 
 #define MAX_BONES 100
 
 Mesh::~Mesh() {
+  if (ctx && ctx->material.pixels)
+    free(ctx->material.pixels);
   if (ctx)
     delete[] ctx;
   if (VAO)
@@ -181,7 +184,10 @@ void Mesh::init() {
   glBindVertexArray(0);
 
   numIndices = ctx->indices.size();
-  delete ctx;
+  if (ctx && ctx->material.pixels)
+    free(ctx->material.pixels);
+  // delete[] ctx;
+  delete ctx; // TODO: find out why does delete[]ing ctx segfault at ~vector()
   ctx = nullptr;
 }
 
@@ -360,11 +366,6 @@ Mesh Model::processMesh(void *mesh_, const void *scene_, bool initialise) {
   }
 
   ExtractBoneWeightForVertices(Mesh.ctx->vertices, mesh_, scene_);
-
-  std::cerr << "mesh bone:index map:\n";
-  for (const auto &[name, data] : boneInfoMap) {
-    std::cerr << "(" << data.idx << ") " << name << "\n";
-  }
 
   if (initialise)
     Mesh.init();

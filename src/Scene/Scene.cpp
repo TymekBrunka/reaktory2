@@ -1,5 +1,5 @@
 #include "Model.hpp"
-#include "ModelManager.hpp"
+#include "ResourceManager.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/geometric.hpp"
 #define GLFW_INCLUDE_NONE
@@ -103,7 +103,7 @@ Scene::Scene(Scene &&other) {
   screen_canvas = other.screen_canvas;
   color_canvas = other.color_canvas;
   initialised = other.initialised;
-  modelManager = std::move(other.modelManager);
+  resMan = std::move(other.resMan);
   other.size = {640, 480};
   other.skybox_texture = 0;
   other.framebuffer = 0;
@@ -128,7 +128,7 @@ Scene &Scene::operator=(Scene &&other) {
     screen_canvas = other.screen_canvas;
     color_canvas = other.color_canvas;
     initialised = other.initialised;
-    modelManager = std::move(other.modelManager);
+    resMan = std::move(other.resMan);
     other.size = {640, 480};
     other.skybox_texture = 0;
     other.framebuffer = 0;
@@ -202,21 +202,16 @@ bool Scene::create_folder_structure(const std::string &name,
 Scene::Scene(const std::string &name) {
   this->name = name;
   current_folder = FileUtils::APP_ROOT / "scenes" / std::filesystem::path(name);
-  if (!std::filesystem::exists(current_folder)) {
-    if (!create_folder_structure(name, current_folder)) {
-      Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
-               TL(MSG_SCENE_CREATE_ERROR), std::make_format_args(name));
-      throw std::runtime_error("");
-    }
-
-    Log::log(Log::DEFAULT, 0, "Scene", TL(MSG_SCENE_CREATE_SUCCESS),
+  if (!create_folder_structure(name, current_folder)) {
+    Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene", TL(MSG_SCENE_CREATE_ERROR),
              std::make_format_args(name));
-  } else {
-    Log::log(Log::DEFAULT, 0, "Scene", TL(MSG_SCENE_OPEN_SUCCESS),
-             std::make_format_args(name));
+    throw std::runtime_error("");
   }
 
-  modelManager = std::move(ModelManager{current_folder / "models"});
+  Log::log(Log::DEFAULT, 0, "Scene", TL(MSG_SCENE_OPEN_SUCCESS),
+           std::make_format_args(name));
+
+  resMan = std::move(ResourceManager{current_folder / "models"});
 }
 
 bool Scene::create_framebuffer() {
@@ -456,9 +451,9 @@ bool Scene::init(Renderer::Render &render) {
   initialised = true;
 
   // ---------------------- model test
-  modelManager.Import("assets/example/models/CesiumMan.m3d");
-  modelManager["CesiumMan.m3d"]->SetAnimation(
-      &modelManager["CesiumMan.m3d"]->GetAnimations()[0]);
+  resMan.ImportModel("assets/example/models/CesiumMan.m3d");
+  resMan.GetModel("CesiumMan.m3d")
+      ->SetAnimation(&resMan.GetModel("CesiumMan.m3d")->GetAnimations()[0]);
   return true;
 }
 
@@ -569,9 +564,9 @@ void Scene::render(Renderer::Render &render) {
 
   glUniformMatrix4fv(model_model_loc, 1, GL_FALSE, glm::value_ptr(model));
 
-  modelManager["CesiumMan.m3d"]->Advance(render.GetDelta());
+  resMan.GetModel("CesiumMan.m3d")->Advance(render.GetDelta());
   const glm::mat4 *transforms =
-      modelManager["CesiumMan.m3d"]->GetFinalMatrices();
+      resMan.GetModel("CesiumMan.m3d")->GetFinalMatrices();
   for (int i = 0; i < 100; i++) {
     snprintf(uniformNameBuffer, 100, "finalBonesMatrices[%d]", i);
     glUniformMatrix4fv(
@@ -579,7 +574,7 @@ void Scene::render(Renderer::Render &render) {
         glm::value_ptr(transforms[i]));
   }
 
-  modelManager["CesiumMan.m3d"]->Draw();
+  resMan.GetModel("CesiumMan.m3d")->Draw();
 
   // glUseProgram(tri_program);
   // glBindVertexArray(tri_vao);
