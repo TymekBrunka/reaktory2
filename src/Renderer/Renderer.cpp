@@ -1,3 +1,4 @@
+#include "FileUtils/FileUtils.hpp"
 #include <Renderer.hpp>
 #include <fstream>
 #include <glad/gl.h>
@@ -272,9 +273,9 @@ Result<rProgram, no_error> Render::LoadProgram(const char *name, const char *vs,
 
 void Render::UnloadProgram(rProgram program) { glDeleteProgram(program); }
 
-Result<Image, no_error> Render::LoadImageFromMemory(const unsigned char *data,
-                                                    int length,
-                                                    int desired_channels) {
+Result<Image, no_error> Render::sLoadImageFromMemory(const unsigned char *data,
+                                                     int length,
+                                                     int desired_channels) {
 
   Image image;
   image.pixels =
@@ -287,32 +288,24 @@ Result<Image, no_error> Render::LoadImageFromMemory(const unsigned char *data,
   return Result<Image, no_error>::OK(image);
 }
 
-Result<Image, int> Render::LoadImage(std::filesystem::path filepath,
-                                     int desired_channels) {
+Result<Image, int> Render::sLoadImage(const FileUtils::Fs &fs,
+                                      const FileUtils::path &filepath,
+                                      int desired_channels) {
 
-  if (!std::filesystem::exists(filepath))
+  if (!fs.FileExists(filepath))
     return Result<Image, int>::ERR(-2);
 
-  std::ifstream file(filepath, std::ios_base::in | std::ios_base::binary);
-  if (!file.is_open())
-    return Result<Image, int>::ERR(-1);
-
-  file.seekg(0, std::ios_base::end);
-  size_t fsize = file.tellg();
-  file.seekg(0, std::ios_base::beg);
-  unsigned char *out = new unsigned char[fsize];
-  file.read((char *)out, fsize);
-
-  if (file.gcount() < fsize) {
-    delete[] out;
-    return Result<Image, int>::ERR(1);
+  Result<FileUtils::ReadResult, int> res_fs = fs.ReadFile(filepath);
+  if (!res_fs.is_ok) {
+    return Result<Image, int>::ERR(res_fs.value.error);
   }
 
   Result<Image, no_error> res_img =
-      LoadImageFromMemory(out, fsize, desired_channels);
+      sLoadImageFromMemory((unsigned char *)res_fs.ok_unchecked().data,
+                           res_fs.ok_unchecked().length, desired_channels);
 
   if (!res_img.is_ok) {
-    delete[] out;
+    delete[] res_fs.value.success.data;
     return Result<Image, int>::ERR(2);
   }
 

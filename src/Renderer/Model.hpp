@@ -1,4 +1,5 @@
 #pragma once
+#include "FileUtils.hpp"
 #include "Renderer.hpp"
 #include <cstddef>
 #include <glm/gtc/quaternion.hpp>
@@ -11,9 +12,14 @@
 #include <unordered_map>
 namespace Renderer {
 
-// struct Material {
-//   unsigned int diffuse1;
-// };
+template <typename T, typename E> using Result = Errors::Result<T, E>;
+using no_error = Errors::no_error;
+
+struct Material {
+  unsigned int diffuse1 = 0;
+  unsigned int program = 0;
+  float color_diffuse[4] = {1, 1, 1, 1};
+};
 
 struct meshVertex {
   glm::vec3 Position{};
@@ -26,6 +32,14 @@ struct meshVertex {
   float Weights[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
 };
 
+// structure for temporary material data to create opengl objects out of
+struct MaterialTmpCtx {
+  float color_diffuse[4] = {1, 1, 1, 1};
+  Image diffuse1{};
+  std::string vs;
+  std::string fs;
+};
+
 // structure for temporary arrays to create opengl objects out of
 struct MeshLoaderTmpCtx {
   struct Image {
@@ -35,7 +49,7 @@ struct MeshLoaderTmpCtx {
     unsigned char *pixels = nullptr;
   };
 
-  Image material{};
+  MaterialTmpCtx material;
   std::vector<meshVertex> vertices{};
   std::vector<unsigned int> indices{};
 };
@@ -49,7 +63,7 @@ class Mesh {
   friend class Model;
   unsigned int numIndices = 0;
   unsigned int VAO = 0, VBO = 0, EBO = 0;
-  rTexture2D material;
+  Material material;
   MeshLoaderTmpCtx *ctx = nullptr;
   std::string name;
 
@@ -188,8 +202,8 @@ class Model {
 
   void calculateBoneTransform(modelNode *node, glm::mat4 parentTransform);
 
-  static bool LoadModel(const void *scene_, Model &model,
-                        bool initialise = true);
+  static bool LoadModel(const FileUtils::Fs &fs, const void *scene_,
+                        Model &model, bool initialise = true);
 
 public:
   Model() = default;
@@ -199,9 +213,12 @@ public:
   Model(Model &&other);
   Model &operator=(Model &&other);
 
-  static Model LoadFromFile(const char *filepath, bool initialise = true);
-  static Model LoadFromMemory(const void *data, size_t length,
-                              bool initialise = true, const char *hint = "");
+  static Model LoadFromFile(const FileUtils::Fs &fs,
+                            const FileUtils::path &filepath,
+                            bool initialise = true);
+  // static Model LoadFromMemory(const FileUtils::Fs &fs, const void *data,
+  //                             size_t length, bool initialise = true,
+  //                             const char *hint = "");
 
   void init();
 
@@ -222,7 +239,7 @@ public:
     return -1;
   }
 
-  inline bool SetMeshMaterial(int idx, rTexture2D material) {
+  inline bool SetMeshMaterial(int idx, const Material &material) {
     if (idx < 0 || idx > meshes.size())
       return false;
 

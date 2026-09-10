@@ -401,26 +401,33 @@ bool Scene::init(Renderer::Render &render) {
   std::filesystem::path filepath =
       FileUtils::APP_ROOT / "scenes" / name / "skybox.png";
   Errors::Result<Renderer::Image, int> res_img_read =
-      render.LoadImage(filepath);
+      render.LoadImage(FileUtils::RealFs{}, filepath);
 
   if (!res_img_read.is_ok) {
     std::string path = filepath.string();
-
-    if (res_img_read.value.error == -2)
+    switch (res_img_read.value.error) {
+    case -2:
       Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
                TL(MSG_GENERIC_FILE_NOT_FOUND), std::make_format_args(path));
+      break;
 
-    if (res_img_read.value.error == -1)
+    case -1:
       Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
                TL(MSG_GENERIC_OPEN_ERROR), std::make_format_args(path));
+      break;
 
-    else if (res_img_read.value.error == 1)
+    case 1:
       Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
                TL(MSG_GENERIC_READ_ERROR), std::make_format_args(path));
+      break;
 
-    else if (res_img_read.value.error == 2)
+    case 2:
       Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
                TL(MSG_RENDER_LOAD_IMAGE_ERROR), std::make_format_args(path));
+      break;
+    default:
+      break;
+    }
 
     glDeleteFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -451,7 +458,8 @@ bool Scene::init(Renderer::Render &render) {
   initialised = true;
 
   // ---------------------- model test
-  resMan.ImportModel("assets/example/models/CesiumMan.m3d");
+  resMan.ImportModel(FileUtils::RealFs{},
+                     "assets/example/models/CesiumMan.m3d");
   resMan.GetModel("CesiumMan.m3d")
       ->SetAnimation(&resMan.GetModel("CesiumMan.m3d")->GetAnimations()[0]);
   return true;

@@ -133,6 +133,15 @@ target_precompile_headers(logging PUBLIC src/Components/Logging/Logging.hpp)
 
 target_precompile_headers(translations REUSE_FROM logging)
 
+add_library(fileutils STATIC
+  src/Components/FileUtils/FileUtils.cpp
+  src/Components/FileUtils/FileUtils.hpp
+)
+target_include_directories(fileutils PUBLIC
+  src/Components/FileUtils
+  src/Components
+)
+
 add_library(renderer STATIC
   src/Renderer/Renderer.cpp
   src/Renderer/Renderer_impl.cpp
@@ -147,7 +156,7 @@ target_link_libraries(renderer
   PRIVATE
   placeholder_icon_img glad imgui
   PUBLIC
-  glfw logging
+  glfw logging fileutils
 )
 # target_precompile_headers(renderer REUSE_FROM pch_core)
 target_precompile_headers(renderer REUSE_FROM logging)
@@ -161,16 +170,7 @@ target_include_directories(renderer_model PUBLIC
   src/Renderer
   src/Components
 )
-target_link_libraries(renderer_model PUBLIC glad glm::glm PRIVATE logging assimp glfw)
-
-add_library(fileutils STATIC
-  src/Components/FileUtils/FileUtils.cpp
-  src/Components/FileUtils/FileUtils.hpp
-)
-target_include_directories(fileutils PUBLIC
-  src/Components/FileUtils
-  src/Components
-)
+target_link_libraries(renderer_model PUBLIC glad glm::glm fileutils PRIVATE logging assimp glfw)
 target_precompile_headers(renderer_model REUSE_FROM logging)
 
 add_library(Scene_resource_manager STATIC

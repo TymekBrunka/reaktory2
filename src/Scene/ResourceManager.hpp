@@ -55,10 +55,10 @@ public:
   }
 
   Errors::Result<Renderer::Model *, int>
-  ImportModel(const std::filesystem::path &filepath, bool allow_reload = false);
+  ImportModel(const FileUtils::Fs &fs, const std::filesystem::path &filepath, bool allow_reload = false);
 
   Errors::Result<Renderer::Model *, int>
-  ImportModel(const std::filesystem::path &filepath, Renderer::Model *model, bool allow_reload = false);
+  ImportModel(const FileUtils::Fs &fs, const std::filesystem::path &filepath, Renderer::Model *model, bool allow_reload = false);
 
   Errors::Result<Renderer::Model *, int> LoadModel(const char *name);
 };

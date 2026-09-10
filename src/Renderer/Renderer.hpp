@@ -1,6 +1,7 @@
 #pragma once
 #define GLFW_INCLUDE_NONE
 #include <Errors/Errors.hpp>
+#include <FileUtils.hpp>
 #include <GLFW/glfw3.h>
 #include <filesystem>
 namespace Renderer {
@@ -120,12 +121,28 @@ public:
                                          const char *fs);
   void UnloadProgram(rProgram program);
 
-  Result<Image, int> LoadImage(std::filesystem::path filepath,
-                               int desired_channels = 0);
+  static Result<Image, int> sLoadImage(const FileUtils::Fs &fs,
+                                       const FileUtils::path &filepath,
+                                       int desired_channels = 0);
 
-  Result<Image, no_error> LoadImageFromMemory(const unsigned char *data,
-                                              int length,
-                                              int desired_channels = 0);
+  static Result<Image, no_error> sLoadImageFromMemory(const unsigned char *data,
+                                                      int length,
+                                                      int desired_channels = 0);
+
+  inline Result<Image, int> LoadImage(const FileUtils::Fs &fs,
+                                      const FileUtils::path &filepath,
+                                      int desired_channels = 0) {
+
+    return sLoadImage(fs, filepath, desired_channels);
+  }
+
+  inline Result<Image, no_error> LoadImageFromMemory(const unsigned char *data,
+                                                     int length,
+                                                     int desired_channels = 0) {
+
+    return sLoadImageFromMemory(data, length, desired_channels);
+  }
+
   Result<rTexture2D, no_error>
   LoadTexture(const Image &image, bool pixelated = false, bool repeat = false);
   void BindTexture(rTexture2D id, int slot);

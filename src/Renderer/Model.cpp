@@ -1,3 +1,5 @@
+#include "Errors/Errors.hpp"
+#include "FileUtils.hpp"
 #include "assimp/anim.h"
 #include "assimp/mesh.h"
 #include <AssimpGLMHelpers.hpp>
@@ -23,8 +25,8 @@ namespace Renderer {
 #define MAX_BONES 100
 
 Mesh::~Mesh() {
-  if (ctx && ctx->material.pixels)
-    free(ctx->material.pixels);
+  if (ctx && ctx->material.diffuse1.pixels)
+    free(ctx->material.diffuse1.pixels);
   if (ctx)
     delete[] ctx;
   if (VAO)
@@ -47,7 +49,7 @@ Mesh::Mesh(Mesh &&other) {
   other.VAO = 0;
   other.VBO = 0;
   other.EBO = 0;
-  other.material = 0;
+  other.material = Material{};
   other.ctx = nullptr;
 }
 
@@ -64,7 +66,7 @@ Mesh &Mesh::operator=(Mesh &&other) {
     other.VAO = 0;
     other.VBO = 0;
     other.EBO = 0;
-    other.material = 0;
+    other.material = Material{};
     other.ctx = nullptr;
   }
   return *this;
@@ -184,10 +186,9 @@ void Mesh::init() {
   glBindVertexArray(0);
 
   numIndices = ctx->indices.size();
-  if (ctx && ctx->material.pixels)
-    free(ctx->material.pixels);
-  // delete[] ctx;
-  delete ctx; // TODO: find out why does delete[]ing ctx segfault at ~vector()
+  if (ctx && ctx->material.diffuse1.pixels)
+    free(ctx->material.diffuse1.pixels);
+  delete ctx;
   ctx = nullptr;
 }
 
@@ -218,35 +219,37 @@ void Model::PrintNodeTreeImpl(const modelNode *node, int depth) const {
   }
 }
 
-Model Model::LoadFromFile(const char *filepath, bool initialise) {
-  Model model{};
+Model Model::LoadFromFile(const FileUtils::Fs &fs,
+                          const FileUtils::path &filepath, bool initialise) {
+  Result<FileUtils::ReadResult, int> res_fs = fs.ReadFile(filepath);
+  if (!res_fs.is_ok) {
+    std::string path = filepath.to_string();
+    switch (res_fs.value.error) {
+    case -2:
+      Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+               TL(MSG_GENERIC_FILE_NOT_FOUND), std::make_format_args(path));
+      break;
 
-  Assimp::Importer import;
-  const aiScene *scene =
-      import.ReadFile(filepath, aiProcess_Triangulate | aiProcess_FlipUVs);
+    case -1:
+      Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+               TL(MSG_GENERIC_OPEN_ERROR), std::make_format_args(path));
+      break;
 
-  if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
-      !scene->mRootNode) {
-    const char *err = import.GetErrorString();
-    Log::log(Log::ERROR | Log::SEV_MED, 0, "Assimp", TL(MSG_ASSIMP_ERROR),
-             std::make_format_args(err));
+    case 1:
+      Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+               TL(MSG_GENERIC_READ_ERROR), std::make_format_args(path));
+      break;
+    default:
+      break;
+    }
     return {};
   }
 
-  if (!LoadModel(scene, model, initialise)) {
-    return {};
-  }
-
-  return model;
-}
-
-Model Model::LoadFromMemory(const void *data, size_t length, bool initialise,
-                            const char *hint) {
   Model model{};
-
   Assimp::Importer import;
   const aiScene *scene = import.ReadFileFromMemory(
-      data, length, aiProcess_Triangulate | aiProcess_FlipUVs, hint);
+      res_fs.ok_unchecked().data, res_fs.ok_unchecked().length,
+      aiProcess_Triangulate | aiProcess_FlipUVs);
 
   if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
       !scene->mRootNode) {
@@ -256,14 +259,39 @@ Model Model::LoadFromMemory(const void *data, size_t length, bool initialise,
     return {};
   }
 
-  if (!LoadModel(scene, model, initialise)) {
+  if (!LoadModel(fs, scene, model, initialise)) {
     return {};
   }
 
   return model;
 }
 
-bool Model::LoadModel(const void *scene_, Model &model, bool initialise) {
+// Model Model::LoadFromMemory(const FileUtils::Fs &fs, const void *data, size_t
+// length, bool initialise,
+//                             const char *hint) {
+//   Model model{};
+//
+//   Assimp::Importer import;
+//   const aiScene *scene = import.ReadFileFromMemory(
+//       data, length, aiProcess_Triangulate | aiProcess_FlipUVs, hint);
+//
+//   if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
+//       !scene->mRootNode) {
+//     const char *err = import.GetErrorString();
+//     Log::log(Log::ERROR | Log::SEV_MED, 0, "Assimp", TL(MSG_ASSIMP_ERROR),
+//              std::make_format_args(err));
+//     return {};
+//   }
+//
+//   if (!LoadModel(fs, scene, model, initialise)) {
+//     return {};
+//   }
+//
+//   return model;
+// }
+
+bool Model::LoadModel(const FileUtils::Fs &fs, const void *scene_, Model &model,
+                      bool initialise) {
   auto scene = (aiScene *)scene_;
 
   // this would go to animation class but im only loading animations from

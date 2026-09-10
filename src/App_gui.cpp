@@ -1,3 +1,4 @@
+#include "FileUtils.hpp"
 #include "Renderer.hpp"
 #include "imgui.h"
 #include "imgui_internal.h"
@@ -229,7 +230,7 @@ void App::draw_gui() {
             ipfd::opt::multiselect);
 
         for (const auto &model : models_to_load) {
-          selected_scene->resMan.ImportModel(model);
+          selected_scene->resMan.ImportModel(FileUtils::RealFs{std::filesystem::path{}}, model);
         }
       }
 

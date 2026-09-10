@@ -63,12 +63,31 @@ public:
   path(const std::string &path_) : Path(path_) {};
   ~path() = default;
 
-  inline std::filesystem::path operator/(const std::filesystem::path &path_) {
-    return std::get<std::filesystem::path>(Path) / path_;
+  inline operator std::filesystem::path() const {
+    if (const std::filesystem::path *paf =
+            std::get_if<std::filesystem::path>(&Path)) {
+      return *paf;
+    } else {
+      return std::get<std::string>(Path);
+    }
   }
 
-  inline std::filesystem::path &operator/=(const std::filesystem::path &path_) {
-    return std::get<std::filesystem::path>(Path) /= path_;
+  inline operator std::filesystem::path &() const {
+    return *const_cast<std::filesystem::path *>(
+        &std::get<std::filesystem::path>(Path));
+  }
+
+  inline operator std::string &() const {
+    return *const_cast<std::string *>(&std::get<std::string>(Path));
+  }
+
+  inline std::string to_string() const {
+    if (const std::filesystem::path *path_ =
+            std::get_if<std::filesystem::path>(&Path)) {
+      return path_->string();
+    } else {
+      return std::get<std::string>(Path);
+    }
   }
 
   inline path operator/(const path &path_) {
@@ -83,6 +102,8 @@ public:
       return path((*paf) / (*paf_));
     else if (spaf && spaf_)
       return path(*spaf + "/" + *spaf_);
+    else if (paf && spaf_)
+      return path(*paf / *spaf);
   }
 
   inline path &operator/=(const path &path_) {
@@ -97,6 +118,8 @@ public:
       *((std::filesystem::path *)paf) /= *paf_;
     else if (spaf && spaf_)
       *((std::string *)spaf) += "/" + *spaf_;
+    else if (paf && spaf_)
+      *((std::filesystem::path *)paf) /= *spaf_;
 
     return *this;
   }
@@ -104,15 +127,14 @@ public:
 
 class Fs {
 public:
-  virtual Result<ReadResult, int> ReadFilex(const path &filepath,
-                                            alloc_fun alloc = nullptr,
-                                            free_fun frre = nullptr,
-                                            void *allocator = nullptr) = 0;
+  virtual Result<ReadResult, int>
+  ReadFilex(const path &filepath, alloc_fun alloc = nullptr,
+            free_fun frre = nullptr, void *allocator = nullptr) const = 0;
 
   template <class Allocator = std::allocator<char>>
   Result<ReadResult, int>
   ReadFile(const path &filepath,
-           const Allocator &alloc = std::allocator<char>()) {
+           const Allocator &alloc = std::allocator<char>()) const {
 
     alloc_fun allo = [](void *aloc, size_t n) {
       return std::allocator_traits<Allocator>::allocate((Allocator &)aloc, n);
@@ -126,10 +148,30 @@ public:
     return ReadFilex(filepath, allo, frre, (void *)&alloc);
   }
 
-  virtual bool FileExists(const path &filepath) = 0;
+  virtual bool FileExists(const path &filepath) const = 0;
 };
 
-class RealFs : Fs {
+class RealFs : public Fs {
+private:
+  std::filesystem::path root;
+
+public:
+  RealFs() = default;
+  RealFs(const std::filesystem::path &path) : root(path) {};
+  RealFs(std::filesystem::path &&path) : root(path) {};
+  ~RealFs() = default;
+
+  inline Result<ReadResult, int>
+  ReadFilex(const path &filepath, alloc_fun alloc = nullptr,
+            free_fun frre = nullptr, void *allocator = nullptr) const override {
+
+    return FileUtils::ReadFilex(root / filepath, alloc, frre, allocator);
+  };
+
+  inline bool FileExists(const path &filepath) const override {
+    return std::filesystem::exists(root / filepath) &&
+           std::filesystem::is_regular_file(root / filepath);
+  };
 };
 
 } // namespace FileUtils
