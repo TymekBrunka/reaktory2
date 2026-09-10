@@ -1,7 +1,9 @@
 #include "Errors/Errors.hpp"
 #include "FileUtils.hpp"
 #include "assimp/anim.h"
+#include "assimp/material.h"
 #include "assimp/mesh.h"
+#include "glm/ext/vector_float4.hpp"
 #include <AssimpGLMHelpers.hpp>
 #include <Logging.hpp>
 #include <Model.hpp>
@@ -24,9 +26,9 @@ namespace Renderer {
 
 #define MAX_BONES 100
 
+unsigned int Mesh::defaultProgram = -1;
+
 Mesh::~Mesh() {
-  if (ctx && ctx->material.diffuse1.pixels)
-    free(ctx->material.diffuse1.pixels);
   if (ctx)
     delete[] ctx;
   if (VAO)
@@ -42,14 +44,12 @@ Mesh::Mesh(Mesh &&other) {
   VAO = other.VAO;
   VBO = other.VBO;
   EBO = other.EBO;
-  material = other.material;
   name = std::move(other.name);
   numIndices = other.numIndices;
   ctx = other.ctx;
   other.VAO = 0;
   other.VBO = 0;
   other.EBO = 0;
-  other.material = Material{};
   other.ctx = nullptr;
 }
 
@@ -60,13 +60,11 @@ Mesh &Mesh::operator=(Mesh &&other) {
     VBO = other.VBO;
     EBO = other.EBO;
     ctx = other.ctx;
-    material = other.material;
     name = std::move(other.name);
     numIndices = other.numIndices;
     other.VAO = 0;
     other.VBO = 0;
     other.EBO = 0;
-    other.material = Material{};
     other.ctx = nullptr;
   }
   return *this;
@@ -92,16 +90,25 @@ AnimationBoneChannel::operator=(AnimationBoneChannel &&other) {
   return *this;
 }
 
+Model::~Model() {
+  if (texture_data)
+    delete texture_data;
+}
+
 Model::Model(Model &&other) {
   initialised = other.initialised;
   animationTime = other.animationTime;
   boneCounter = other.boneCounter;
+  texture_data = other.texture_data;
   current_animation = nullptr;
+  other.current_animation = nullptr;
+  other.texture_data = nullptr;
   nodes = std::move(other.nodes);
   meshes = std::move(other.meshes);
   animations = std::move(other.animations);
-  owned_textures = std::move(other.owned_textures);
+  texture_data = std::move(other.texture_data);
   boneInfoMap = std::move(other.boneInfoMap);
+  materials = std::move(other.materials);
   memcpy(finalMatrices, other.finalMatrices, MAX_BONES * sizeof(glm::mat4));
 
   other.initialised = false;
@@ -117,12 +124,16 @@ Model &Model::operator=(Model &&other) {
     initialised = other.initialised;
     animationTime = other.animationTime;
     boneCounter = other.boneCounter;
+    texture_data = other.texture_data;
     current_animation = nullptr;
+    other.current_animation = nullptr;
+    other.texture_data = nullptr;
     nodes = std::move(other.nodes);
     meshes = std::move(other.meshes);
     animations = std::move(other.animations);
-    owned_textures = std::move(other.owned_textures);
+    texture_data = std::move(other.texture_data);
     boneInfoMap = std::move(other.boneInfoMap);
+    materials = std::move(other.materials);
     memcpy(finalMatrices, other.finalMatrices, MAX_BONES * sizeof(glm::mat4));
 
     other.initialised = false;
@@ -186,8 +197,6 @@ void Mesh::init() {
   glBindVertexArray(0);
 
   numIndices = ctx->indices.size();
-  if (ctx && ctx->material.diffuse1.pixels)
-    free(ctx->material.diffuse1.pixels);
   delete ctx;
   ctx = nullptr;
 }
@@ -394,6 +403,15 @@ Mesh Model::processMesh(void *mesh_, const void *scene_, bool initialise) {
   }
 
   ExtractBoneWeightForVertices(Mesh.ctx->vertices, mesh_, scene_);
+
+  if (mesh->mMaterialIndex >= 0) {
+    std::cerr << "mesh has material\n";
+
+    aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
+    aiColor3D cold{};
+    material->Get(AI_MATKEY_COLOR_DIFFUSE, cold);
+    mesh.ctx->material.color_diffuse = glm::vec4(cold.r, cold.g, cold.b, 1.0f);
+  }
 
   if (initialise)
     Mesh.init();

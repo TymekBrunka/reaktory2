@@ -16,8 +16,8 @@ template <typename T, typename E> using Result = Errors::Result<T, E>;
 using no_error = Errors::no_error;
 
 struct Material {
-  unsigned int diffuse1 = 0;
-  unsigned int program = 0;
+  unsigned int diffuse1 = -1;
+  unsigned int program = -1;
   float color_diffuse[4] = {1, 1, 1, 1};
 };
 
@@ -32,26 +32,16 @@ struct meshVertex {
   float Weights[8] = {-1, -1, -1, -1, -1, -1, -1, -1};
 };
 
-// structure for temporary material data to create opengl objects out of
-struct MaterialTmpCtx {
-  float color_diffuse[4] = {1, 1, 1, 1};
-  Image diffuse1{};
-  std::string vs;
-  std::string fs;
-};
-
 // structure for temporary arrays to create opengl objects out of
 struct MeshLoaderTmpCtx {
-  struct Image {
-    int width = 0;
-    int height = 0;
-    int channels = 4;
-    unsigned char *pixels = nullptr;
+  struct MaterialTmpCtx {
+    glm::vec4 color_diffuse{};
+    std::string diffuse1;
   };
 
-  MaterialTmpCtx material;
   std::vector<meshVertex> vertices{};
   std::vector<unsigned int> indices{};
+  MaterialTmpCtx material;
 };
 
 struct BoneInfo {
@@ -61,9 +51,10 @@ struct BoneInfo {
 
 class Mesh {
   friend class Model;
+  static unsigned int defaultProgram;
   unsigned int numIndices = 0;
   unsigned int VAO = 0, VBO = 0, EBO = 0;
-  Material material;
+  // Material material;
   MeshLoaderTmpCtx *ctx = nullptr;
   std::string name;
 
@@ -159,18 +150,6 @@ class Model {
   bool initialised = false;
   float animationTime = 0;
   int boneCounter = 0;
-  Animation *current_animation =
-      nullptr; // reset to null upon std::move() bc i won't be moving it while
-               // it's animated anytime soon
-
-  std::vector<modelNode>
-      nodes; // normally, those 2 fields should be stored in animation class but
-             // since im not loading animations outside the model, i can safetly
-             // put it here and optimise some other things
-
-  std::vector<Mesh> meshes{};
-  std::vector<Animation> animations{};
-  std::vector<unsigned int> owned_textures{};
 
   struct string_hash {
     using is_transparent = void;
@@ -184,6 +163,29 @@ class Model {
       return std::hash<std::string>{}(txt);
     }
   };
+
+  struct Image {
+    int width = 0;
+    int height = 0;
+    int channels = 4;
+    unsigned char *pixels = nullptr;
+  };
+
+  std::unordered_map<std::string, Image, string_hash, std::equal_to<>>
+      *texture_data = nullptr;
+
+  Animation *current_animation =
+      nullptr; // reset to null upon std::move() bc i won't be moving it while
+               // it's animated anytime soon
+
+  std::vector<modelNode>
+      nodes; // normally, those 2 fields should be stored in animation class but
+             // since im not loading animations outside the model, i can safetly
+             // put it here and optimise some other things
+
+  std::vector<Mesh> meshes{};
+  std::vector<Animation> animations{};
+  std::vector<Material> materials{};
 
   std::unordered_map<std::string, BoneInfo, string_hash, std::equal_to<>>
       boneInfoMap{};
@@ -207,7 +209,7 @@ class Model {
 
 public:
   Model() = default;
-  ~Model() = default;
+  ~Model();
   Model(const Model &other) = delete;
   Model &operator=(const Model &other) = delete;
   Model(Model &&other);
@@ -229,6 +231,7 @@ public:
   inline float &GetAnimationTime() { return animationTime; }
 
   inline const glm::mat4 *GetFinalMatrices() const { return finalMatrices; }
+  inline std::vector<Material> &GetMaterials() { return materials; }
 
   inline int FindMesh(const char *name) {
     for (int i = 0; i < meshes.size(); i++) {
@@ -237,14 +240,6 @@ public:
       }
     }
     return -1;
-  }
-
-  inline bool SetMeshMaterial(int idx, const Material &material) {
-    if (idx < 0 || idx > meshes.size())
-      return false;
-
-    meshes[idx].material = material;
-    return true;
   }
 
   void SetAnimation(const Animation *animation);
