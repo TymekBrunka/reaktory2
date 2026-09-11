@@ -354,8 +354,10 @@ Result<rTexture2D, no_error> Render::sLoadTexture(const Image &image,
     break;
   }
 
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
   glTexImage2D(GL_TEXTURE_2D, 0, color_format, image.width, image.height, 0,
                color_format, GL_UNSIGNED_BYTE, image.pixels);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 
   if (image.mipmap_levels > 0)
     glGenerateMipmap(GL_TEXTURE_2D);
