@@ -215,37 +215,49 @@ void App::draw_gui() {
   }
   ImGui::End();
 
-  if (ImGui::Begin(ICON_FA_DRAW_POLYGON " Modele")) {
-    if (selected_scene) {
+  if (ImGui::Begin(ICON_FA_DRAW_POLYGON " Modele") && selected_scene) {
 
-      ImGui::Text(ICON_FA_DRAW_POLYGON " Modele (%d)",
-                  selected_scene->resMan.GetModelsMap().size());
-      ImGui::SameLine();
+    ImGui::Text(ICON_FA_DRAW_POLYGON " Modele (%d)",
+                selected_scene->resMan.GetModelsMap().size());
+    ImGui::SameLine();
 
-      if (ImGui::Button(" + ")) {
-        std::vector<std::string> models_to_load = ipfd::open_file(
-            "Wybór modeli", "",
-            {"Plik modelu (obj/gltf/glb/m3d/fbx)",
-             "*.obj;*.gltf;*.glb;*.m3d;*.fbx", "Wszystkie pliki", "*"},
-            ipfd::opt::multiselect);
+    if (ImGui::Button(" + ")) {
+      std::vector<std::string> models_to_load = ipfd::open_file(
+          "Wybór modeli", "",
+          {"Plik modelu (obj/gltf/glb/m3d/fbx)",
+           "*.obj;*.gltf;*.glb;*.m3d;*.fbx", "Wszystkie pliki", "*"},
+          ipfd::opt::multiselect);
 
-        for (const auto &model : models_to_load) {
-          selected_scene->resMan.ImportModel(FileUtils::RealFs{std::filesystem::path{}}, model);
-        }
+      for (const auto &model : models_to_load) {
+        selected_scene->resMan.ImportModel(
+            FileUtils::RealFs{std::filesystem::path{}}, model);
       }
-
-      ImGui::BeginChild("modele_child");
-      for (const auto &[name, model] :
-           selected_scene->resMan.GetModelsMap()) {
-
-        ImGui::Selectable(name.c_str(), false);
-      }
-      ImGui::EndChild();
     }
+
+    ImGui::BeginChild("modele_child");
+    for (const auto &[name, model] : selected_scene->resMan.GetModelsMap()) {
+
+      ImGui::Selectable(name.c_str(), false);
+    }
+    ImGui::EndChild();
   }
   ImGui::End();
 
-  if (ImGui::Begin(ICON_FA_IMAGES " Tekstury")) {
+  if (ImGui::Begin(ICON_FA_IMAGES " Tekstury") && selected_scene) {
+
+    ImGui::Text(ICON_FA_IMAGE " Tekstury (%d)",
+                selected_scene->resMan.GetTexturesMap().size());
+    // ImGui::SameLine();
+
+    ImGui::BeginChild("textury_child");
+    for (const auto &[name, texture] :
+         selected_scene->resMan.GetTexturesMap()) {
+
+      ImGui::Selectable(name.c_str(), false);
+      ImGui::Image((ImTextureRef)texture, ImVec2(50, 50), ImVec2(0, 1),
+                   ImVec2(1, 0));
+    }
+    ImGui::EndChild();
   }
   ImGui::End();
 }

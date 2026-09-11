@@ -3,6 +3,7 @@
 #include <fstream>
 #include <glad/gl.h>
 #include <stdexcept>
+#include <iostream>
 
 #include <GLFW/glfw3.h>
 #include <Renderer_internal.hpp>
@@ -312,8 +313,8 @@ Result<Image, int> Render::sLoadImage(const FileUtils::Fs &fs,
   return Result<Image, int>::OK(res_img.value.success);
 }
 
-Result<rTexture2D, no_error> Render::LoadTexture(const Image &image,
-                                                 bool pixelated, bool repeat) {
+Result<rTexture2D, no_error> Render::sLoadTexture(const Image &image,
+                                                  bool pixelated, bool repeat) {
 
   if (image.channels <= 0 || image.channels > 4)
     return Result<rTexture2D, no_error>::ERR(false);
@@ -354,15 +355,17 @@ Result<rTexture2D, no_error> Render::LoadTexture(const Image &image,
   }
 
   glTexImage2D(GL_TEXTURE_2D, 0, color_format, image.width, image.height, 0,
-               GL_RGBA, GL_UNSIGNED_BYTE, image.pixels);
+               color_format, GL_UNSIGNED_BYTE, image.pixels);
 
   if (image.mipmap_levels > 0)
     glGenerateMipmap(GL_TEXTURE_2D);
 
-  if (glGetError() == GL_NO_ERROR)
-    return Result<rTexture2D, no_error>::OK(texture);
-  else
-    return Result<rTexture2D, no_error>::ERR(false);
+  // if (glGetError() == GL_NO_ERROR)
+  //   return Result<rTexture2D, no_error>::OK(texture);
+  // else
+  //   return Result<rTexture2D, no_error>::ERR(false);
+
+  return Result<rTexture2D, no_error>::OK(texture);
 }
 
 void Render::BindTexture(rTexture2D id, int slot) {

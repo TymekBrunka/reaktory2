@@ -129,6 +129,9 @@ public:
                                                       int length,
                                                       int desired_channels = 0);
 
+  static Result<rTexture2D, no_error>
+  sLoadTexture(const Image &image, bool pixelated = false, bool repeat = false);
+
   inline Result<Image, int> LoadImage(const FileUtils::Fs &fs,
                                       const FileUtils::path &filepath,
                                       int desired_channels = 0) {
@@ -143,8 +146,11 @@ public:
     return sLoadImageFromMemory(data, length, desired_channels);
   }
 
-  Result<rTexture2D, no_error>
-  LoadTexture(const Image &image, bool pixelated = false, bool repeat = false);
+  inline Result<rTexture2D, no_error>
+  LoadTexture(const Image &image, bool pixelated = false, bool repeat = false) {
+    return sLoadTexture(image, pixelated, repeat);
+  }
+
   void BindTexture(rTexture2D id, int slot);
   void UnloadTexture(rTexture2D id);
 

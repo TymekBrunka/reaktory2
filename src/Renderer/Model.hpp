@@ -16,9 +16,8 @@ template <typename T, typename E> using Result = Errors::Result<T, E>;
 using no_error = Errors::no_error;
 
 struct Material {
-  unsigned int diffuse1 = -1;
-  unsigned int program = -1;
-  float color_diffuse[4] = {1, 1, 1, 1};
+  int diffuse1 = -1;
+  glm::vec4 color_diffuse{};
 };
 
 struct meshVertex {
@@ -51,7 +50,8 @@ struct BoneInfo {
 
 class Mesh {
   friend class Model;
-  static unsigned int defaultProgram;
+
+private:
   unsigned int numIndices = 0;
   unsigned int VAO = 0, VBO = 0, EBO = 0;
   // Material material;
@@ -59,7 +59,7 @@ class Mesh {
   std::string name;
 
   void init();
-  void Draw();
+  void Draw(const Material &material);
 
 public:
   Mesh() = default;
@@ -164,14 +164,12 @@ class Model {
     }
   };
 
-  struct Image {
-    int width = 0;
-    int height = 0;
-    int channels = 4;
-    unsigned char *pixels = nullptr;
+  struct img_with_id {
+    Image image{};
+    unsigned int id = -1;
   };
 
-  std::unordered_map<std::string, Image, string_hash, std::equal_to<>>
+  std::unordered_map<std::string, img_with_id, string_hash, std::equal_to<>>
       *texture_data = nullptr;
 
   Animation *current_animation =
@@ -194,9 +192,13 @@ class Model {
 
   void PrintNodeTreeImpl(const modelNode *node, int depth) const;
 
-  void processNode(void *node_, const void *scene_, int nodeIdx,
+  void processNode(const FileUtils::Fs &fs, const FileUtils::path &path,
+                   void *node_, const void *scene_, int nodeIdx,
                    bool initialise);
-  Mesh processMesh(void *mesh_, const void *scene_, bool initialise);
+
+  Mesh processMesh(const FileUtils::Fs &fs, const FileUtils::path &path,
+                   void *mesh_, const void *scene_, bool initialise);
+
   void ExtractBoneWeightForVertices(std::vector<meshVertex> &vertices,
                                     void *mesh_, const void *scene_);
 
@@ -204,16 +206,31 @@ class Model {
 
   void calculateBoneTransform(modelNode *node, glm::mat4 parentTransform);
 
-  static bool LoadModel(const FileUtils::Fs &fs, const void *scene_,
-                        Model &model, bool initialise = true);
+  static bool LoadModel(const FileUtils::Fs &fs, const FileUtils::path &path,
+                        const void *scene_, Model &model,
+                        bool initialise = true);
 
 public:
+  static unsigned int defaultProgram;
   Model() = default;
   ~Model();
   Model(const Model &other) = delete;
   Model &operator=(const Model &other) = delete;
   Model(Model &&other);
   Model &operator=(Model &&other);
+
+
+  inline int GetNumMeshes() { return meshes.size(); }
+  inline const MeshLoaderTmpCtx::MaterialTmpCtx *
+  GetTmpMaterialData(int n) const {
+    if (!meshes[n].ctx)
+      return nullptr;
+    return &meshes[n].ctx->material;
+  }
+
+  inline static void setDefaultProgram(unsigned int program) {
+    defaultProgram = program;
+  }
 
   static Model LoadFromFile(const FileUtils::Fs &fs,
                             const FileUtils::path &filepath,

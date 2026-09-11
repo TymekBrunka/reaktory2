@@ -9,9 +9,7 @@
 #include <unordered_map>
 
 class ResourceManager {
-private:
-  std::filesystem::path folder{};
-
+public:
   struct string_hash {
     using is_transparent = void;
     [[nodiscard]] inline size_t operator()(const char *txt) const {
@@ -25,8 +23,15 @@ private:
     }
   };
 
+private:
+  std::filesystem::path folder{};
+
   std::unordered_map<std::string, Renderer::Model, string_hash, std::equal_to<>>
       models;
+
+  std::unordered_map<std::string, Renderer::rTexture2D, string_hash,
+                     std::equal_to<>>
+      textures;
 
 public:
   ResourceManager() = default;
@@ -37,7 +42,8 @@ public:
   ResourceManager(ResourceManager &&other) = default;
   ResourceManager &operator=(ResourceManager &&other) = default;
 
-  inline const decltype(models)& GetModelsMap() const { return models; }
+  inline const decltype(models) &GetModelsMap() const { return models; }
+  inline const decltype(textures) &GetTexturesMap() const { return textures; }
 
   inline Renderer::Model *GetModel(const char *txt) {
     auto iter = models.find(txt);
@@ -55,10 +61,12 @@ public:
   }
 
   Errors::Result<Renderer::Model *, int>
-  ImportModel(const FileUtils::Fs &fs, const std::filesystem::path &filepath, bool allow_reload = false);
+  ImportModel(const FileUtils::Fs &fs, const std::filesystem::path &filepath,
+              bool allow_reload = false);
 
   Errors::Result<Renderer::Model *, int>
-  ImportModel(const FileUtils::Fs &fs, const std::filesystem::path &filepath, Renderer::Model *model, bool allow_reload = false);
+  ImportModel(const FileUtils::Fs &fs, const std::filesystem::path &filepath,
+              Renderer::Model *model, bool allow_reload = false);
 
   Errors::Result<Renderer::Model *, int> LoadModel(const char *name);
 };

@@ -1,9 +1,12 @@
 #include "Errors/Errors.hpp"
 #include "FileUtils.hpp"
+#include "Renderer.hpp"
 #include "assimp/anim.h"
 #include "assimp/material.h"
 #include "assimp/mesh.h"
+#include "assimp/types.h"
 #include "glm/ext/vector_float4.hpp"
+#include "glm/gtc/type_ptr.hpp"
 #include <AssimpGLMHelpers.hpp>
 #include <Logging.hpp>
 #include <Model.hpp>
@@ -26,7 +29,7 @@ namespace Renderer {
 
 #define MAX_BONES 100
 
-unsigned int Mesh::defaultProgram = -1;
+unsigned int Model::defaultProgram = -1;
 
 Mesh::~Mesh() {
   if (ctx)
@@ -106,7 +109,6 @@ Model::Model(Model &&other) {
   nodes = std::move(other.nodes);
   meshes = std::move(other.meshes);
   animations = std::move(other.animations);
-  texture_data = std::move(other.texture_data);
   boneInfoMap = std::move(other.boneInfoMap);
   materials = std::move(other.materials);
   memcpy(finalMatrices, other.finalMatrices, MAX_BONES * sizeof(glm::mat4));
@@ -131,7 +133,6 @@ Model &Model::operator=(Model &&other) {
     nodes = std::move(other.nodes);
     meshes = std::move(other.meshes);
     animations = std::move(other.animations);
-    texture_data = std::move(other.texture_data);
     boneInfoMap = std::move(other.boneInfoMap);
     materials = std::move(other.materials);
     memcpy(finalMatrices, other.finalMatrices, MAX_BONES * sizeof(glm::mat4));
@@ -147,6 +148,9 @@ Model &Model::operator=(Model &&other) {
 }
 
 void Mesh::init() {
+  if (VAO || VBO || EBO)
+    return;
+
   glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &VBO);
   glGenBuffers(1, &EBO);
@@ -201,17 +205,34 @@ void Mesh::init() {
   ctx = nullptr;
 }
 
-void Mesh::Draw() {
+void Mesh::Draw(const Material &material) {
+  // if (material.diffuse1) {
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, material.diffuse1 != -1 ? material.diffuse1 : 0);
+  // }
+
+  unsigned int program = Model::defaultProgram;
+  glUniform1i(glGetUniformLocation(program, "diffuse1"), 0);
+  glUniform4fv(glGetUniformLocation(program, "diffuse_color"), 1,
+               glm::value_ptr(material.color_diffuse));
+
+  glUseProgram(program);
   glBindVertexArray(VAO);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
   glDrawElements(GL_TRIANGLES, numIndices, GL_UNSIGNED_INT, 0);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
   glBindVertexArray(0);
+  glUseProgram(0);
+  // glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 void Model::Draw() {
-  for (auto &mesh : meshes)
-    mesh.Draw();
+  Material *mat = &materials[0];
+  for (auto &mesh : meshes) {
+    mesh.Draw(*mat);
+    mat++;
+  }
 }
 
 void Model::PrintNodeTree() const {
@@ -230,35 +251,34 @@ void Model::PrintNodeTreeImpl(const modelNode *node, int depth) const {
 
 Model Model::LoadFromFile(const FileUtils::Fs &fs,
                           const FileUtils::path &filepath, bool initialise) {
-  Result<FileUtils::ReadResult, int> res_fs = fs.ReadFile(filepath);
-  if (!res_fs.is_ok) {
-    std::string path = filepath.to_string();
-    switch (res_fs.value.error) {
-    case -2:
-      Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
-               TL(MSG_GENERIC_FILE_NOT_FOUND), std::make_format_args(path));
-      break;
-
-    case -1:
-      Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
-               TL(MSG_GENERIC_OPEN_ERROR), std::make_format_args(path));
-      break;
-
-    case 1:
-      Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
-               TL(MSG_GENERIC_READ_ERROR), std::make_format_args(path));
-      break;
-    default:
-      break;
-    }
-    return {};
-  }
+  // Result<FileUtils::ReadResult, int> res_fs = fs.ReadFile(filepath);
+  // if (!res_fs.is_ok) {
+  //   std::string path = filepath.to_string();
+  //   switch (res_fs.value.error) {
+  //   case -2:
+  //     Log::log(Log::ERROR | Log::SEV_MED, 0, "Model loader",
+  //              TL(MSG_GENERIC_FILE_NOT_FOUND), std::make_format_args(path));
+  //     break;
+  //
+  //   case -1:
+  //     Log::log(Log::ERROR | Log::SEV_MED, 0, "Model loader",
+  //              TL(MSG_GENERIC_OPEN_ERROR), std::make_format_args(path));
+  //     break;
+  //
+  //   case 1:
+  //     Log::log(Log::ERROR | Log::SEV_MED, 0, "Model loader",
+  //              TL(MSG_GENERIC_READ_ERROR), std::make_format_args(path));
+  //     break;
+  //   default:
+  //     break;
+  //   }
+  //   return {};
+  // }
 
   Model model{};
   Assimp::Importer import;
-  const aiScene *scene = import.ReadFileFromMemory(
-      res_fs.ok_unchecked().data, res_fs.ok_unchecked().length,
-      aiProcess_Triangulate | aiProcess_FlipUVs);
+  const aiScene *scene = import.ReadFile(
+      filepath.to_string(), aiProcess_Triangulate);
 
   if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
       !scene->mRootNode) {
@@ -268,7 +288,7 @@ Model Model::LoadFromFile(const FileUtils::Fs &fs,
     return {};
   }
 
-  if (!LoadModel(fs, scene, model, initialise)) {
+  if (!LoadModel(fs, filepath, scene, model, initialise)) {
     return {};
   }
 
@@ -299,8 +319,8 @@ Model Model::LoadFromFile(const FileUtils::Fs &fs,
 //   return model;
 // }
 
-bool Model::LoadModel(const FileUtils::Fs &fs, const void *scene_, Model &model,
-                      bool initialise) {
+bool Model::LoadModel(const FileUtils::Fs &fs, const FileUtils::path &path,
+                      const void *scene_, Model &model, bool initialise) {
   auto scene = (aiScene *)scene_;
 
   // this would go to animation class but im only loading animations from
@@ -308,8 +328,16 @@ bool Model::LoadModel(const FileUtils::Fs &fs, const void *scene_, Model &model,
   // single model, so its best to save space per animation and save node
   // hiererchy here
 
+  model.texture_data =
+      new std::unordered_map<std::string, Model::img_with_id,
+                             Model::string_hash, std::equal_to<>>{};
   model.nodes.push_back(modelNode{.idx = 0});
-  model.processNode(scene->mRootNode, scene, 0, initialise);
+  model.processNode(fs, path, scene->mRootNode, scene, 0, initialise);
+
+  std::cerr << "bone info map:\n";
+  for (const auto &[name, boneinfo] : model.boneInfoMap) {
+    std::cerr << "(" << boneinfo.idx << ") " << name << "\n";
+  }
 
   model.PrintNodeTree();
 
@@ -320,17 +348,44 @@ bool Model::LoadModel(const FileUtils::Fs &fs, const void *scene_, Model &model,
   for (int i = 0; i < MAX_BONES; i++)
     model.finalMatrices[i] = glm::mat4(1.0f);
 
-  model.initialised = initialise;
+  if (initialise)
+    model.init();
 
   return true;
 }
 
 void Model::init() {
-  for (auto &mesh : meshes)
+  for (const auto &[path, data] : *texture_data) {
+    std::cerr << "txt: " << path << "\n";
+  }
+  for (auto &mesh : meshes) {
+    int diffuse1_id = -1;
+    if (!mesh.ctx->material.diffuse1.empty()) {
+      Model::img_with_id &img =
+          (*texture_data->find(mesh.ctx->material.diffuse1)).second;
+      if (img.id == -1) {
+        Result<rTexture2D, no_error> res_img = Render::sLoadTexture(img.image);
+        if (res_img.is_ok) {
+          img.id = res_img.ok_unchecked();
+          diffuse1_id = res_img.ok_unchecked();
+        }
+      }
+    }
+    materials.push_back(Material{
+        .diffuse1 = diffuse1_id,
+        .color_diffuse = mesh.ctx->material.color_diffuse,
+    });
+    std::cerr << "material: " << diffuse1_id << ", "
+              << mesh.ctx->material.color_diffuse.x << "\n";
     mesh.init();
+  }
+  delete texture_data;
+  texture_data = nullptr;
+  initialised = true;
 }
 
-void Model::processNode(void *node_, const void *scene_, int nodeIdx,
+void Model::processNode(const FileUtils::Fs &fs, const FileUtils::path &path,
+                        void *node_, const void *scene_, int nodeIdx,
                         bool initialise) {
   auto node = (aiNode *)node_;
   auto scene = (const aiScene *)scene_;
@@ -354,21 +409,19 @@ void Model::processNode(void *node_, const void *scene_, int nodeIdx,
   for (unsigned int i = 0; i < node->mNumMeshes; i++) {
     int mesh_idx = node->mMeshes[i];
     std::cerr << "load mesh id#" << mesh_idx << "\n";
-    meshes.push_back(processMesh(scene->mMeshes[mesh_idx], scene, initialise));
-  }
-
-  std::cerr << "bone info map:\n";
-  for (const auto &[name, boneinfo] : boneInfoMap) {
-    std::cerr << "(" << boneinfo.idx << ") " << name << "\n";
+    meshes.push_back(
+        processMesh(fs, path, scene->mMeshes[mesh_idx], scene, initialise));
   }
 
   // process each of aiNode's children
   for (unsigned int i = 0; i < node->mNumChildren; i++) {
-    processNode(node->mChildren[i], scene, childStartIdx + i, initialise);
+    processNode(fs, path, node->mChildren[i], scene, childStartIdx + i,
+                initialise);
   }
 }
 
-Mesh Model::processMesh(void *mesh_, const void *scene_, bool initialise) {
+Mesh Model::processMesh(const FileUtils::Fs &fs, const FileUtils::path &path,
+                        void *mesh_, const void *scene_, bool initialise) {
   auto mesh = (aiMesh *)mesh_;
   auto scene = (const aiScene *)scene_;
 
@@ -405,16 +458,62 @@ Mesh Model::processMesh(void *mesh_, const void *scene_, bool initialise) {
   ExtractBoneWeightForVertices(Mesh.ctx->vertices, mesh_, scene_);
 
   if (mesh->mMaterialIndex >= 0) {
-    std::cerr << "mesh has material\n";
+    std::cerr << "mesh has material with id#" << mesh->mMaterialIndex << "\n";
 
     aiMaterial *material = scene->mMaterials[mesh->mMaterialIndex];
     aiColor3D cold{};
     material->Get(AI_MATKEY_COLOR_DIFFUSE, cold);
-    mesh.ctx->material.color_diffuse = glm::vec4(cold.r, cold.g, cold.b, 1.0f);
+    Mesh.ctx->material.color_diffuse = glm::vec4(cold.r, cold.g, cold.b, 1.0f);
+
+    if (material->GetTextureCount(aiTextureType_DIFFUSE)) {
+      aiString path_{};
+      material->GetTexture(aiTextureType_DIFFUSE, 0, &path_);
+      std::cerr << "the image path for texture is " << path_.data << "\n";
+
+      if (texture_data->find(path_.data) == texture_data->end()) {
+        Result<Renderer::Image, int> res_fs =
+            Render::sLoadImage(fs, path.folder() / path_.data);
+
+        if (!res_fs.is_ok) {
+          std::string s_path = (path.folder() / path_.data).to_string();
+          switch (res_fs.value.error) {
+          case -2:
+            Log::log(Log::ERROR | Log::SEV_MED, 0, "Model loader",
+                     TL(MSG_GENERIC_FILE_NOT_FOUND),
+                     std::make_format_args(s_path));
+            break;
+
+          case -1:
+            Log::log(Log::ERROR | Log::SEV_MED, 0, "Model loader",
+                     TL(MSG_GENERIC_OPEN_ERROR), std::make_format_args(s_path));
+            break;
+
+          case 1:
+            Log::log(Log::ERROR | Log::SEV_MED, 0, "Model loader",
+                     TL(MSG_GENERIC_READ_ERROR), std::make_format_args(s_path));
+            break;
+          case 2:
+            Log::log(Log::ERROR | Log::SEV_MED, 0, "Model loader",
+                     TL(MSG_RENDER_LOAD_IMAGE_ERROR),
+                     std::make_format_args(s_path));
+            break;
+          default:
+            break;
+          }
+        } else {
+          std::cerr << "Loaded required texture\n";
+          (*texture_data)[path_.data] =
+              Model::img_with_id{.image = res_fs.ok_unchecked()};
+          Mesh.ctx->material.diffuse1 = path_.data;
+        }
+      } else {
+        Mesh.ctx->material.diffuse1 = path_.data;
+      }
+    }
   }
 
-  if (initialise)
-    Mesh.init();
+  // if (initialise)
+  //   Mesh.init();
 
   return Mesh;
 }

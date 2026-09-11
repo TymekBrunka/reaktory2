@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <utility>
 #include <variant>
 namespace FileUtils {
 
@@ -61,6 +62,7 @@ public:
   path() = default;
   path(const std::filesystem::path &path_) : Path(path_) {};
   path(const std::string &path_) : Path(path_) {};
+  path(const char *path_) : Path(std::string(path_)) {};
   ~path() = default;
 
   inline operator std::filesystem::path() const {
@@ -103,7 +105,9 @@ public:
     else if (spaf && spaf_)
       return path(*spaf + "/" + *spaf_);
     else if (paf && spaf_)
-      return path(*paf / *spaf);
+      return path(*paf / *spaf_);
+    else
+      std::unreachable();
   }
 
   inline path &operator/=(const path &path_) {
@@ -123,10 +127,24 @@ public:
 
     return *this;
   }
+
+  inline path folder() const {
+    if (const std::filesystem::path *paf =
+            std::get_if<std::filesystem::path>(&Path)) {
+      std::filesystem::path paf_ = *paf;
+      paf_.remove_filename();
+      return path{paf_};
+    } else {
+      const std::string &s = std::get<std::string>(Path);
+      return path{s.substr(0, s.find_last_of('/'))};
+    }
+  }
 };
 
 class Fs {
 public:
+  virtual char separator() = 0;
+
   virtual Result<ReadResult, int>
   ReadFilex(const path &filepath, alloc_fun alloc = nullptr,
             free_fun frre = nullptr, void *allocator = nullptr) const = 0;
@@ -160,6 +178,14 @@ public:
   RealFs(const std::filesystem::path &path) : root(path) {};
   RealFs(std::filesystem::path &&path) : root(path) {};
   ~RealFs() = default;
+
+  inline char separator() override {
+#ifdef _WIN32
+    return '\\';
+#else
+    return '/';
+#endif
+  }
 
   inline Result<ReadResult, int>
   ReadFilex(const path &filepath, alloc_fun alloc = nullptr,

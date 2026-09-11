@@ -170,7 +170,7 @@ target_include_directories(renderer_model PUBLIC
   src/Renderer
   src/Components
 )
-target_link_libraries(renderer_model PUBLIC glad glm::glm fileutils PRIVATE logging assimp glfw)
+target_link_libraries(renderer_model PUBLIC glad glm::glm fileutils renderer PRIVATE logging assimp glfw)
 target_precompile_headers(renderer_model REUSE_FROM logging)
 
 add_library(Scene_resource_manager STATIC

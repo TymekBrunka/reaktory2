@@ -456,6 +456,7 @@ bool Scene::init(Renderer::Render &render) {
   skybox_loc = glGetUniformLocation(skybox_program, "skybox");
   glUniform1i(skybox_loc, 0);
   initialised = true;
+  Renderer::Model::setDefaultProgram(skinning_program);
 
   // ---------------------- model test
   resMan.ImportModel(FileUtils::RealFs{},
