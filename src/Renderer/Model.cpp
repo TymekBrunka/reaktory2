@@ -1,6 +1,7 @@
 #include "Errors/Errors.hpp"
 #include "FileUtils.hpp"
 #include "Renderer.hpp"
+#include "Translations.hpp"
 #include "assimp/anim.h"
 #include "assimp/material.h"
 #include "assimp/mesh.h"
@@ -110,15 +111,12 @@ Model::Model(Model &&other) {
   meshes = std::move(other.meshes);
   animations = std::move(other.animations);
   boneInfoMap = std::move(other.boneInfoMap);
+  finalMatrices = std::move(other.finalMatrices);
   materials = std::move(other.materials);
-  memcpy(finalMatrices, other.finalMatrices, MAX_BONES * sizeof(glm::mat4));
 
   other.initialised = false;
   other.animationTime = 0;
   other.boneCounter = 0;
-  for (int i = 0; i < MAX_BONES; i++) {
-    other.finalMatrices[i] = glm::mat4(1.0f);
-  }
 }
 
 Model &Model::operator=(Model &&other) {
@@ -134,15 +132,12 @@ Model &Model::operator=(Model &&other) {
     meshes = std::move(other.meshes);
     animations = std::move(other.animations);
     boneInfoMap = std::move(other.boneInfoMap);
+    finalMatrices = std::move(other.finalMatrices);
     materials = std::move(other.materials);
-    memcpy(finalMatrices, other.finalMatrices, MAX_BONES * sizeof(glm::mat4));
 
     other.initialised = false;
     other.animationTime = 0;
     other.boneCounter = 0;
-    for (int i = 0; i < MAX_BONES; i++) {
-      other.finalMatrices[i] = glm::mat4(1.0f);
-    }
   }
   return *this;
 }
@@ -277,8 +272,16 @@ Model Model::LoadFromFile(const FileUtils::Fs &fs,
 
   Model model{};
   Assimp::Importer import;
-  const aiScene *scene = import.ReadFile(
-      filepath.to_string(), aiProcess_Triangulate);
+  const aiScene *scene;
+  try {
+    scene = import.ReadFile(filepath.to_string(),
+                            aiProcess_Triangulate | aiProcess_GenSmoothNormals);
+  } catch (std::exception &err) {
+    std::string what = err.what();
+    Log::log(Log::ERROR | Log::SEV_MED, 0, "Assimp", TL(MSG_ASSIMP_ERROR),
+             std::make_format_args(what));
+    return {};
+  }
 
   if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
       !scene->mRootNode) {
@@ -345,8 +348,11 @@ bool Model::LoadModel(const FileUtils::Fs &fs, const FileUtils::path &path,
     model.loadAnimation(scene->mAnimations[i]);
   }
 
-  for (int i = 0; i < MAX_BONES; i++)
-    model.finalMatrices[i] = glm::mat4(1.0f);
+  // for (int i = 0; i < MAX_BONES; i++)
+  //   model.finalMatrices[i] = glm::mat4(1.0f);
+
+  for (auto &matrix : model.finalMatrices)
+    matrix = glm::mat4(1.0f);
 
   if (initialise)
     model.init();
@@ -543,6 +549,7 @@ void Model::ExtractBoneWeightForVertices(std::vector<meshVertex> &vertices,
                    .offset = AssimpGLMHelpers::ConvertMatrixToGLMFormat(
                        mesh->mBones[i]->mOffsetMatrix)};
       boneIdx = boneCounter++;
+      finalMatrices.push_back(glm::mat4(1.0f));
       std::cerr << "Loaded mesh bone " << boneName << "\n";
     } else
       boneIdx = (*boneInfoMap.find(boneName)).second.idx;

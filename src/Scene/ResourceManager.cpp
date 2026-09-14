@@ -34,13 +34,13 @@ populateTexturesFromModel(Renderer::Model &model, std::string filename,
 
 Errors::Result<Renderer::Model *, int>
 ResourceManager::ImportModel(const FileUtils::Fs &fs,
-                             const std::filesystem::path &filepath,
+                             const FileUtils::path &filepath,
                              bool allow_reload) {
-  if (!std::filesystem::exists(filepath) ||
-      !std::filesystem::is_regular_file(filepath))
+
+  if (!fs.FileExists(filepath))
     return Errors::Result<Renderer::Model *, int>::ERR(-2);
 
-  std::string filename = filepath.filename().string();
+  std::string filename = filepath.filename().to_string();
   if (!allow_reload)
     if (models.find(filename) != models.end())
       return Errors::Result<Renderer::Model *, int>::OK(
@@ -50,38 +50,25 @@ ResourceManager::ImportModel(const FileUtils::Fs &fs,
   populateTexturesFromModel(model, filename, textures);
   models[filename] = std::move(model);
 
-  FileUtils::ReadResult blob = FileUtils::ReadFile(filepath).ok_unchecked();
-  std::filesystem::create_directory(folder / filename);
-  FileUtils::WriteFile(folder / filename / filename, blob.data, blob.length);
+  if (do_copy_files) {
+    FileUtils::ReadResult blob = FileUtils::ReadFile(filepath).ok_unchecked();
+    std::filesystem::create_directory(folder / filename);
+    FileUtils::WriteFile(folder / "models" / filename / filename, blob.data,
+                         blob.length);
+  }
 
   return Errors::Result<Renderer::Model *, int>::OK(
       &(*models.find(filename)).second);
 }
 
 Errors::Result<Renderer::Model *, int>
-ResourceManager::LoadModel(const char *name) {
-  std::filesystem::path filepath = folder / name / name;
-
-  if (!std::filesystem::exists(filepath) ||
-      !std::filesystem::is_regular_file(filepath))
-    return Errors::Result<Renderer::Model *, int>::ERR(-2);
-
-  Renderer::Model model =
-      Renderer::Model::LoadFromFile(FileUtils::RealFs{}, filepath, false);
-  populateTexturesFromModel(model, name, textures);
-
-  return Errors::Result<Renderer::Model *, int>::OK(
-      &(*models.find(name)).second);
-}
-
-Errors::Result<Renderer::Model *, int>
 ResourceManager::ImportModel(const FileUtils::Fs &fs,
-                             const std::filesystem::path &filepath,
+                             const FileUtils::path &filepath,
                              Renderer::Model *model, bool allow_reload) {
 
-  std::string filename = filepath.filename().string();
+  std::string filename = filepath.filename().to_string();
 
-  model->init();
+  populateTexturesFromModel(*model, filename, textures);
 
   if (!allow_reload)
     if (models.find(filename) != models.end())
@@ -89,10 +76,121 @@ ResourceManager::ImportModel(const FileUtils::Fs &fs,
           &(*models.find(filename)).second);
 
   models[filename] = std::move(*model);
-  FileUtils::ReadResult blob = FileUtils::ReadFile(filepath).ok_unchecked();
-  std::filesystem::create_directory(folder / filename);
-  FileUtils::WriteFile(folder / filename / filename, blob.data, blob.length);
+  if (do_copy_files) {
+    FileUtils::ReadResult blob = FileUtils::ReadFile(filepath).ok_unchecked();
+    std::filesystem::create_directory(folder / "models" / filename);
+    FileUtils::WriteFile(folder / "models" / filename / filename, blob.data,
+                         blob.length);
+  }
 
   return Errors::Result<Renderer::Model *, int>::OK(
       &(*models.find(filename)).second);
+}
+
+Errors::Result<Renderer::rTexture2D, int>
+ResourceManager::ImportTexture(const FileUtils::Fs &fs,
+                               const FileUtils::path &filepath,
+                               bool allow_reload) {
+
+  if (!fs.FileExists(filepath))
+    return Errors::Result<Renderer::rTexture2D, int>::ERR(-2);
+
+  std::string filename = filepath.filename().to_string();
+  if (!allow_reload)
+    if (textures.find(filename) != textures.end())
+      return Errors::Result<Renderer::rTexture2D, int>::OK(
+          (*textures.find(filename)).second);
+
+  Errors::Result<Renderer::Image, int> res_fs =
+      Renderer::Render::sLoadImage(fs, filepath);
+
+  if (!res_fs.is_ok) {
+    std::string path = filepath.to_string();
+    switch (res_fs.value.error) {
+    case -2:
+      Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
+               TL(MSG_GENERIC_FILE_NOT_FOUND), std::make_format_args(path));
+      break;
+
+    case -1:
+      Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
+               TL(MSG_GENERIC_OPEN_ERROR), std::make_format_args(path));
+      break;
+
+    case 1:
+      Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
+               TL(MSG_GENERIC_READ_ERROR), std::make_format_args(path));
+      break;
+    case 2:
+      Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
+               TL(MSG_RENDER_LOAD_IMAGE_ERROR), std::make_format_args(path));
+      break;
+    default:
+      break;
+    }
+    return Errors::Result<Renderer::rTexture2D, int>::ERR(res_fs.value.error);
+  }
+
+  Errors::Result<Renderer::rTexture2D, Errors::no_error> res_img =
+      Renderer::Render::sLoadTexture(res_fs.ok_unchecked());
+  free(res_fs.ok_unchecked().pixels);
+
+  if (!res_img.is_ok) {
+    std::string path = filepath.to_string();
+    Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
+             TL(MSG_RENDER_LOAD_IMAGE_ERROR), std::make_format_args(path));
+    return Errors::Result<Renderer::rTexture2D, int>::ERR(3);
+  }
+
+  textures[filename] = res_img.ok_unchecked();
+
+  if (do_copy_files) {
+    FileUtils::ReadResult blob = FileUtils::ReadFile(filepath).ok_unchecked();
+    std::filesystem::create_directory(folder / "textures");
+    FileUtils::WriteFile(folder / "textures" / filename, blob.data,
+                         blob.length);
+  }
+
+  return Errors::Result<Renderer::rTexture2D, int>::OK(res_img.ok_unchecked());
+}
+
+Errors::Result<Renderer::rTexture2D, int>
+ResourceManager::ImportTexture(const FileUtils::Fs &fs,
+                               const FileUtils::path &filepath,
+                               Renderer::Image *image, bool allow_reload) {
+
+  if (!fs.FileExists(filepath)) {
+    free(image->pixels);
+    return Errors::Result<Renderer::rTexture2D, int>::ERR(-2);
+  }
+
+  std::string filename = filepath.filename().to_string();
+  if (!allow_reload)
+    if (textures.find(filename) != textures.end()) {
+      free(image->pixels);
+      return Errors::Result<Renderer::rTexture2D, int>::OK(
+          (*textures.find(filename)).second);
+    }
+
+  Errors::Result<Renderer::rTexture2D, Errors::no_error> res_img =
+      Renderer::Render::sLoadTexture(*image);
+  free(image->pixels);
+
+  if (!res_img.is_ok) {
+    std::string path = filepath.to_string();
+    Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
+             TL(MSG_RENDER_LOAD_IMAGE_ERROR), std::make_format_args(path));
+    return Errors::Result<Renderer::rTexture2D, int>::ERR(3);
+  }
+
+  textures[filename] = res_img.ok_unchecked();
+
+  if (do_copy_files) {
+    FileUtils::ReadResult blob = FileUtils::ReadFile(filepath).ok_unchecked();
+    std::filesystem::create_directory(folder / "textures");
+    FileUtils::WriteFile(folder / "textures" / filename, blob.data,
+                         blob.length);
+  }
+
+  return Errors::Result<Renderer::rTexture2D, int>::OK(res_img.ok_unchecked());
 }

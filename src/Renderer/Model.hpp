@@ -188,7 +188,8 @@ class Model {
   std::unordered_map<std::string, BoneInfo, string_hash, std::equal_to<>>
       boneInfoMap{};
 
-  glm::mat4 finalMatrices[100]{};
+  // glm::mat4 finalMatrices[100]{};
+  std::vector<glm::mat4> finalMatrices;
 
   void PrintNodeTreeImpl(const modelNode *node, int depth) const;
 
@@ -247,7 +248,7 @@ public:
 
   inline float &GetAnimationTime() { return animationTime; }
 
-  inline const glm::mat4 *GetFinalMatrices() const { return finalMatrices; }
+  inline const std::vector<glm::mat4> &GetFinalMatrices() const { return finalMatrices; }
   inline std::vector<Material> &GetMaterials() { return materials; }
 
   inline int FindMesh(const char *name) {

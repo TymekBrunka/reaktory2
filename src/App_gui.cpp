@@ -1,10 +1,10 @@
 #include "FileUtils.hpp"
 #include "Renderer.hpp"
 #include "imgui.h"
-#include "imgui_internal.h"
 #include "pfd/pfd.hpp"
 #include <App.hpp>
 #include <FontsAwesome/IconsFontAwesome6.h>
+#include <iostream>
 
 #define ICONS_MODULO 4
 #define ICONS_IDX_HEIGHT 4
@@ -51,6 +51,10 @@ bool CenteredButton(const char *label) {
 // -------------------------------------------------------------------------------------------------------------------
 
 void App::draw_gui() {
+  // static char model_name_buffer[200] = {0};
+  // static char texture_name_buffer[200] = {0};
+  // static std::string owned_string;
+
   if (ImGui::BeginMainMenuBar()) {
 
     if (ImGui::BeginMenu("Plik")) {
@@ -156,6 +160,13 @@ void App::draw_gui() {
             ImGui::EndTabItem();
 
             ImVec2 kbwnd_size(120, 160);
+            ImVec2 posi = ImVec2(pos.x + sregion.x - kbwnd_size.x,
+                                 pos.y + sregion.y - kbwnd_size.y);
+
+            drawlist->AddRectFilled(
+                posi, ImVec2(pos.x + sregion.x, pos.y + sregion.y),
+                ImColor(0, 0, 0, 128));
+
             struct {
               int icon;
               const char *label;
@@ -168,9 +179,7 @@ void App::draw_gui() {
 
             for (int i = 0;
                  i < sizeof(keybinds_prev) / sizeof(keybinds_prev[0]); i++) {
-              ImVec2 offset =
-                  ImVec2(pos.x + sregion.x - kbwnd_size.x,
-                         pos.y + sregion.y - kbwnd_size.y + (18 * i));
+              ImVec2 offset = ImVec2(posi.x, posi.y + (18 * i));
               drawlist->AddText(offset, ImColor(255, 255, 255),
                                 keybinds_prev[i].label);
 
@@ -222,22 +231,35 @@ void App::draw_gui() {
     ImGui::SameLine();
 
     if (ImGui::Button(" + ")) {
-      std::vector<std::string> models_to_load = ipfd::open_file(
-          "Wybór modeli", "",
-          {"Plik modelu (obj/gltf/glb/m3d/fbx)",
-           "*.obj;*.gltf;*.glb;*.m3d;*.fbx", "Wszystkie pliki", "*"},
-          ipfd::opt::multiselect);
+      std::vector<std::string> models_to_load =
+          ipfd::open_file("Wybór modeli", "",
+                          {"Plik modelu (obj/m3d/fbx)", "*.obj;*.m3d;*.fbx",
+                           "Wszystkie pliki", "*"},
+                          ipfd::opt::multiselect);
 
       for (const auto &model : models_to_load) {
         selected_scene->resMan.ImportModel(
-            FileUtils::RealFs{std::filesystem::path{}}, model);
+            FileUtils::RealFs{std::filesystem::path{}},
+            std::filesystem::path{model});
       }
     }
+    ImGui::SameLine();
 
-    ImGui::BeginChild("modele_child");
+    static ImGuiTextFilter filter;
+    if (ImGui::IsWindowAppearing()) {
+      ImGui::SetKeyboardFocusHere();
+      filter.Clear();
+    }
+
+    ImGui::TextUnformatted(ICON_FA_MAGNIFYING_GLASS);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    filter.Draw("##Wybierz model");
+
+    ImGui::BeginChild("###modele_child");
     for (const auto &[name, model] : selected_scene->resMan.GetModelsMap()) {
-
-      ImGui::Selectable(name.c_str(), false);
+      if (filter.PassFilter(name.c_str()))
+        ImGui::Selectable(name.c_str(), false);
     }
     ImGui::EndChild();
   }
@@ -247,15 +269,52 @@ void App::draw_gui() {
 
     ImGui::Text(ICON_FA_IMAGE " Tekstury (%d)",
                 selected_scene->resMan.GetTexturesMap().size());
-    // ImGui::SameLine();
+    ImGui::SameLine();
 
-    ImGui::BeginChild("textury_child");
+    if (ImGui::Button(" + ")) {
+      std::vector<std::string> textures_to_load =
+          ipfd::open_file("Wybór obrazka", "",
+                          {"Plik obrazka (png/jp(e)g/gif)",
+                           "*.png;*.jpg;*.jpeg;*.gif", "Wszystkie pliki", "*"},
+                          ipfd::opt::multiselect);
+
+      for (const auto &texture : textures_to_load) {
+        selected_scene->resMan.ImportTexture(
+            FileUtils::RealFs{std::filesystem::path{}},
+            std::filesystem::path{texture});
+      }
+    }
+    ImGui::SameLine();
+
+    static ImGuiTextFilter filter;
+    if (ImGui::IsWindowAppearing()) {
+      ImGui::SetKeyboardFocusHere();
+      filter.Clear();
+    }
+
+    ImGui::TextUnformatted(ICON_FA_MAGNIFYING_GLASS);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    filter.Draw("##Wybierz obraz");
+
+    ImGui::BeginChild("###textury_child");
+    float w_width = ImGui::GetWindowSize().x;
+    float width_accumulator = 0;
+    ImVec2 image_size = ImVec2(50, 50);
     for (const auto &[name, texture] :
          selected_scene->resMan.GetTexturesMap()) {
 
-      ImGui::Selectable(name.c_str(), false);
-      ImGui::Image((ImTextureRef)texture, ImVec2(50, 50), ImVec2(0, 1),
-                   ImVec2(1, 0));
+      if (!filter.PassFilter(name.c_str()))
+        continue;
+
+      ImGui::ImageButton(name.c_str(), (ImTextureRef)texture, image_size,
+                         ImVec2(0, 1), ImVec2(1, 0));
+
+      width_accumulator += image_size.x + 10;
+      if (width_accumulator + image_size.x + 10 < w_width - 8)
+        ImGui::SameLine();
+      else
+        width_accumulator = 0;
     }
     ImGui::EndChild();
   }

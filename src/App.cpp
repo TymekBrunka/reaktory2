@@ -130,8 +130,15 @@ bool App::init() {
   render.SetKeyCallback([](Renderer::Render &window, int key, int scancode,
                            int action, int mods) {
     App *app = (App *)window.userdata;
-    if (app->does_have_modal())
+    if (app->does_have_modal() || !app->is_scene_window_selected()) {
+      app->input.front = false;
+      app->input.back = false;
+      app->input.left = false;
+      app->input.right = false;
+      app->input.up = false;
+      app->input.down = false;
       return;
+    }
 
     if (action == GLFW_PRESS && mods == GLFW_MOD_CONTROL) {
       switch (key) {

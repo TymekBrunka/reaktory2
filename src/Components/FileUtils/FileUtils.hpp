@@ -139,6 +139,18 @@ public:
       return path{s.substr(0, s.find_last_of('/'))};
     }
   }
+
+  inline path filename() const {
+    if (const std::filesystem::path *paf =
+            std::get_if<std::filesystem::path>(&Path)) {
+      std::filesystem::path paf_ = *paf;
+      return path{paf_.filename()};
+    } else {
+      const std::string &s = std::get<std::string>(Path);
+      int idx = s.find_last_of('/');
+      return path{s.substr(idx, s.size() - idx)};
+    }
+  }
 };
 
 class Fs {

@@ -459,8 +459,9 @@ bool Scene::init(Renderer::Render &render) {
   Renderer::Model::setDefaultProgram(skinning_program);
 
   // ---------------------- model test
-  resMan.ImportModel(FileUtils::RealFs{},
-                     "assets/example/models/CesiumMan.m3d");
+  resMan.ImportModel(FileUtils::RealFs{}, std::filesystem::path{"assets"} /
+                                              "example" / "models" /
+                                              "CesiumMan.m3d");
   resMan.GetModel("CesiumMan.m3d")
       ->SetAnimation(&resMan.GetModel("CesiumMan.m3d")->GetAnimations()[0]);
   return true;
@@ -574,9 +575,9 @@ void Scene::render(Renderer::Render &render) {
   glUniformMatrix4fv(model_model_loc, 1, GL_FALSE, glm::value_ptr(model));
 
   resMan.GetModel("CesiumMan.m3d")->Advance(render.GetDelta());
-  const glm::mat4 *transforms =
+  const std::vector<glm::mat4> &transforms =
       resMan.GetModel("CesiumMan.m3d")->GetFinalMatrices();
-  for (int i = 0; i < 100; i++) {
+  for (int i = 0; i < transforms.size(); i++) {
     snprintf(uniformNameBuffer, 100, "finalBonesMatrices[%d]", i);
     glUniformMatrix4fv(
         glGetUniformLocation(skinning_program, uniformNameBuffer), 1, GL_FALSE,
