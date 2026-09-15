@@ -181,9 +181,17 @@ target_include_directories(Scene_resource_manager PUBLIC src/Scene/)
 target_link_libraries(Scene_resource_manager PUBLIC logging renderer renderer_model fileutils)
 target_precompile_headers(Scene_resource_manager REUSE_FROM logging)
 
+add_library(eval STATIC
+  src/Scene/FormulaEvaluator/Eval.cpp
+  src/Scene/FormulaEvaluator/Eval.hpp
+)
+target_include_directories(eval PUBLIC src/Scene/FormulaEvaluator/)
+target_link_libraries(eval PUBLIC logging)
+target_precompile_headers(eval REUSE_FROM logging)
+
 add_library(Scene STATIC src/Scene/Scene.hpp src/Scene/Scene.cpp)
 target_include_directories(Scene PUBLIC src/Scene/)
-target_link_libraries(Scene PUBLIC logging renderer renderer_model fileutils glm::glm Scene_resource_manager PRIVATE staticassets_scene shaders glad imgui)
+target_link_libraries(Scene PUBLIC eval logging renderer renderer_model fileutils glm::glm Scene_resource_manager PRIVATE staticassets_scene shaders glad imgui)
 target_precompile_headers(Scene REUSE_FROM logging)
 
 add_library(App STATIC src/App.hpp src/App.cpp)

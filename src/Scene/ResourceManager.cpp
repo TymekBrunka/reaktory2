@@ -8,11 +8,11 @@
 // ResourceManager::ResourceManager(const std::filesystem::path &folder_) {
 // }
 
-static void
-populateTexturesFromModel(Renderer::Model &model, std::string filename,
-                          std::unordered_map<std::string, Renderer::rTexture2D,
-                                             ResourceManager::string_hash,
-                                             std::equal_to<>> &textures) {
+static void populateTexturesFromModel(
+    Renderer::Model &model, ManagedModel &mmodel, std::string filename,
+    std::unordered_map<std::string, Renderer::rTexture2D,
+                       ResourceManager::string_hash, std::equal_to<>>
+        &textures) {
 
   std::unordered_map<std::string, int, ResourceManager::string_hash,
                      std::equal_to<>>
@@ -20,6 +20,7 @@ populateTexturesFromModel(Renderer::Model &model, std::string filename,
 
   for (int i = 0; i < model.GetNumMeshes(); i++) {
     const std::string &path = model.GetTmpMaterialData(i)->diffuse1;
+    mmodel.materials.push_back(ManagedModel::ManagedMaterial{.diffuse1 = path});
     if (!path.empty())
       if (path2mesh_map.find(path) == path2mesh_map.end())
         path2mesh_map[path] == i;
@@ -32,24 +33,25 @@ populateTexturesFromModel(Renderer::Model &model, std::string filename,
   }
 }
 
-Errors::Result<Renderer::Model *, int>
+Errors::Result<ManagedModel *, int>
 ResourceManager::ImportModel(const FileUtils::Fs &fs,
                              const FileUtils::path &filepath,
                              bool allow_reload) {
 
   if (!fs.FileExists(filepath))
-    return Errors::Result<Renderer::Model *, int>::ERR(-2);
+    return Errors::Result<ManagedModel *, int>::ERR(-2);
 
   std::string filename = filepath.filename().to_string();
   if (!allow_reload)
     if (models.find(filename) != models.end())
-      return Errors::Result<Renderer::Model *, int>::OK(
+      return Errors::Result<ManagedModel *, int>::OK(
           &(*models.find(filename)).second);
 
   Renderer::Model model = Renderer::Model::LoadFromFile(fs, filepath, false);
-  populateTexturesFromModel(model, filename, textures);
-  models[filename] = std::move(model);
+  ManagedModel mmodel{.model = std::move(model)};
+  populateTexturesFromModel(mmodel.model, mmodel, filename, textures);
 
+  models[filename] = std::move(mmodel);
   if (do_copy_files) {
     FileUtils::ReadResult blob = FileUtils::ReadFile(filepath).ok_unchecked();
     std::filesystem::create_directory(folder / filename);
@@ -57,25 +59,26 @@ ResourceManager::ImportModel(const FileUtils::Fs &fs,
                          blob.length);
   }
 
-  return Errors::Result<Renderer::Model *, int>::OK(
+  return Errors::Result<ManagedModel *, int>::OK(
       &(*models.find(filename)).second);
 }
 
-Errors::Result<Renderer::Model *, int>
+Errors::Result<ManagedModel *, int>
 ResourceManager::ImportModel(const FileUtils::Fs &fs,
                              const FileUtils::path &filepath,
                              Renderer::Model *model, bool allow_reload) {
 
   std::string filename = filepath.filename().to_string();
 
-  populateTexturesFromModel(*model, filename, textures);
+  ManagedModel mmodel{.model = std::move(*model)};
+  populateTexturesFromModel(mmodel.model, mmodel, filename, textures);
 
   if (!allow_reload)
     if (models.find(filename) != models.end())
-      return Errors::Result<Renderer::Model *, int>::OK(
+      return Errors::Result<ManagedModel *, int>::OK(
           &(*models.find(filename)).second);
 
-  models[filename] = std::move(*model);
+  models[filename] = std::move(mmodel);
   if (do_copy_files) {
     FileUtils::ReadResult blob = FileUtils::ReadFile(filepath).ok_unchecked();
     std::filesystem::create_directory(folder / "models" / filename);
@@ -83,7 +86,7 @@ ResourceManager::ImportModel(const FileUtils::Fs &fs,
                          blob.length);
   }
 
-  return Errors::Result<Renderer::Model *, int>::OK(
+  return Errors::Result<ManagedModel *, int>::OK(
       &(*models.find(filename)).second);
 }
 

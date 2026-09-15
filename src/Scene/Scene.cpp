@@ -463,7 +463,8 @@ bool Scene::init(Renderer::Render &render) {
                                               "example" / "models" /
                                               "CesiumMan.m3d");
   resMan.GetModel("CesiumMan.m3d")
-      ->SetAnimation(&resMan.GetModel("CesiumMan.m3d")->GetAnimations()[0]);
+      ->model.SetAnimation(
+          &resMan.GetModel("CesiumMan.m3d")->model.GetAnimations()[0]);
   return true;
 }
 
@@ -574,9 +575,9 @@ void Scene::render(Renderer::Render &render) {
 
   glUniformMatrix4fv(model_model_loc, 1, GL_FALSE, glm::value_ptr(model));
 
-  resMan.GetModel("CesiumMan.m3d")->Advance(render.GetDelta());
+  resMan.GetModel("CesiumMan.m3d")->model.Advance(render.GetDelta());
   const std::vector<glm::mat4> &transforms =
-      resMan.GetModel("CesiumMan.m3d")->GetFinalMatrices();
+      resMan.GetModel("CesiumMan.m3d")->model.GetFinalMatrices();
   for (int i = 0; i < transforms.size(); i++) {
     snprintf(uniformNameBuffer, 100, "finalBonesMatrices[%d]", i);
     glUniformMatrix4fv(
@@ -584,7 +585,7 @@ void Scene::render(Renderer::Render &render) {
         glm::value_ptr(transforms[i]));
   }
 
-  resMan.GetModel("CesiumMan.m3d")->Draw();
+  resMan.GetModel("CesiumMan.m3d")->model.Draw();
 
   // glUseProgram(tri_program);
   // glBindVertexArray(tri_vao);

@@ -17,6 +17,8 @@
   "MSG_SCENE_FRAMEBUFFER_CREATE_SUCCESS": ["Scene texture id's: {}, {}"],
   "MSG_SCENE_FRAMEBUFFER_RESIZE": ["Scene window resized to (txt_id: {}, {}) ({}, {})"],
 
+  "MSG_OBJECT_POOL_GET_ERROR": ["Invalid object handle {}"],
+
   "MSG_RENDER_INIT_ERROR": ["Couldn't initialise renderer."],
   "MSG_RENDER_INIT_SUCCESS": ["Initialised renderer"],
   "MSG_RENDER_CREATE_WINDOW_SUCCESS": ["Created new window"],

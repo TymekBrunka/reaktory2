@@ -8,6 +8,15 @@
 #include <string_view>
 #include <unordered_map>
 
+struct ManagedModel {
+  struct ManagedMaterial {
+    std::string diffuse1;
+  };
+
+  std::vector<ManagedMaterial> materials;
+  Renderer::Model model;
+};
+
 class ResourceManager {
 public:
   struct string_hash {
@@ -27,7 +36,7 @@ public:
 private:
   std::filesystem::path folder{};
 
-  std::unordered_map<std::string, Renderer::Model, string_hash, std::equal_to<>>
+  std::unordered_map<std::string, ManagedModel, string_hash, std::equal_to<>>
       models;
 
   std::unordered_map<std::string, Renderer::rTexture2D, string_hash,
@@ -46,17 +55,17 @@ public:
   inline const decltype(models) &GetModelsMap() const { return models; }
   inline const decltype(textures) &GetTexturesMap() const { return textures; }
 
-  inline Renderer::Model *GetModel(const char *txt) {
+  inline ManagedModel *GetModel(const char *txt) {
     auto iter = models.find(txt);
     return iter != models.end() ? &(*iter).second : nullptr;
   }
 
-  inline Renderer::Model *GetModel(std::string_view txt) {
+  inline ManagedModel *GetModel(std::string_view txt) {
     auto iter = models.find(txt);
     return iter != models.end() ? &(*iter).second : nullptr;
   }
 
-  inline Renderer::Model *GetModel(const std::string &txt) {
+  inline ManagedModel *GetModel(const std::string &txt) {
     auto iter = models.find(txt);
     return iter != models.end() ? &(*iter).second : nullptr;
   }
@@ -76,11 +85,11 @@ public:
     return iter != textures.end() ? (*iter).second : -1;
   }
 
-  Errors::Result<Renderer::Model *, int>
+  Errors::Result<ManagedModel *, int>
   ImportModel(const FileUtils::Fs &fs, const FileUtils::path &filepath,
               bool allow_reload = false);
 
-  Errors::Result<Renderer::Model *, int>
+  Errors::Result<ManagedModel *, int>
   ImportModel(const FileUtils::Fs &fs, const FileUtils::path &filepath,
               Renderer::Model *model, bool allow_reload = false);
 
