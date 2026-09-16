@@ -104,6 +104,7 @@ Scene::Scene(Scene &&other) {
   color_canvas = other.color_canvas;
   initialised = other.initialised;
   resMan = std::move(other.resMan);
+  objPool = std::move(other.objPool);
   other.size = {640, 480};
   other.skybox_texture = 0;
   other.framebuffer = 0;
@@ -129,6 +130,7 @@ Scene &Scene::operator=(Scene &&other) {
     color_canvas = other.color_canvas;
     initialised = other.initialised;
     resMan = std::move(other.resMan);
+    objPool = std::move(other.objPool);
     other.size = {640, 480};
     other.skybox_texture = 0;
     other.framebuffer = 0;

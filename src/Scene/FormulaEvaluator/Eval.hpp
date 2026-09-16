@@ -1,4 +1,7 @@
 #pragma once
+#include <Model.hpp>
+#include <Renderer.hpp>
+#include <ResourceManager.hpp>
 #include <functional>
 #include <string>
 #include <unordered_map>
@@ -41,10 +44,28 @@ struct None {
   bool dummy = false;
 };
 
+struct Model {
+  std::string name;
+};
+
+struct Material {
+  glm::vec4 color{};
+  std::string name;
+};
+
+struct objHFormula {
+  uint8_t gen;
+  // uint16_t idx;
+  int16_t idx; // signed integer so -1 can be returned
+  bool is_formula = false;
+};
+
 struct Value {
   std::string err_msg;
-  std::variant<None, void *, StringWrap, Class *, int, float, bool,
-               std::vector<Value>>
+  std::variant<None, void *, std::shared_ptr<StringWrap>,
+               std::shared_ptr<Model>, std::shared_ptr<Material>, objHFormula,
+               std::shared_ptr<Class>, int, float, bool,
+               std::shared_ptr<std::vector<Value>>>
       data;
 };
 
@@ -53,25 +74,6 @@ inline Value StringWrap::Get(const std::string &name) {
     return Value{.data = (int)data.size()};
   }
 }
-
-inline Value StringWrap::Call(const std::string &name,
-                              const std::vector<Value> &args) {
-
-  if (name == "podciąg") {
-    if (args.size() < 1 || args.size() > 2)
-      return Value{.err_msg = "Oczekiwano 2 argumentów dla funkcji podciąg()"};
-
-    const int *begin = std::get_if<int>(&args[0]);
-    const int *end = std::get_if<int>(&args[1]);
-
-    if (!begin || !end)
-      return Value{.err_msg = "Funkcja podciąg() przyjmuje tylko liczby całkowite"};
-
-    return Value {
-      .data = StringWrap { .data = data.substr(*begin, *end) }
-    }
-  }
-};
 
 #define EVAL_ast_tag_names                                                     \
   X(CALL)                                                                      \

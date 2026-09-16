@@ -4,6 +4,7 @@
 #include "pfd/pfd.hpp"
 #include <App.hpp>
 #include <FontsAwesome/IconsFontAwesome6.h>
+#include <cstdio>
 #include <iostream>
 
 #define ICONS_MODULO 4
@@ -49,6 +50,18 @@ bool CenteredButton(const char *label) {
 }
 
 // -------------------------------------------------------------------------------------------------------------------
+
+void App::draw_object_tree(Object *node, int idx) {
+  ImGui::PushID(idx);
+  ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0,0));
+  ImGui::Button("##collapse button", ImVec2(15,22));
+  ImVec2 bpos = ImGui::GetCursorPos();
+  ImDrawList *drawlist = ImGui::GetWindowDrawList();
+  ImGui::SameLine();
+  ImGui::Button(ICON_FA_CUBE " baton");
+  ImGui::PopStyleVar(1);
+  ImGui::PopID();
+}
 
 void App::draw_gui() {
   // static char model_name_buffer[200] = {0};
@@ -200,7 +213,7 @@ void App::draw_gui() {
   ImGui::End();
 
   scene_to_be_selected = nullptr;
-  if (ImGui::Begin(ICON_FA_CUBES " Scena")) {
+  if (ImGui::Begin(ICON_FA_CUBES " Scena") && selected_scene) {
     ImGui::Text(ICON_FA_CUBES " Sceny (%d)", scenes.size());
     ImVec2 wsize = ImGui::GetWindowSize();
     ImGui::BeginChild("scena_child", ImVec2(wsize.x - 16, 70));
@@ -213,8 +226,11 @@ void App::draw_gui() {
     }
     ImGui::EndChild();
 
-    ImGui::Text(ICON_FA_CUBE " Objekty (0)");
-  }
+    ImGui::Text(ICON_FA_CUBE " Objekty (%d)", selected_scene->objPool.size());
+
+    Object *root = selected_scene->objPool.get(selected_scene->objPool.rootH());
+    draw_object_tree(root, 0);
+  };
   ImGui::End();
 
   if (!selected_scene_idx)
@@ -309,6 +325,9 @@ void App::draw_gui() {
 
       ImGui::ImageButton(name.c_str(), (ImTextureRef)texture, image_size,
                          ImVec2(0, 1), ImVec2(1, 0));
+
+      if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNone))
+        ImGui::SetTooltip(name.c_str());
 
       width_accumulator += image_size.x + 10;
       if (width_accumulator + image_size.x + 10 < w_width - 8)

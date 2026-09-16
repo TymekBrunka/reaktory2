@@ -186,15 +186,29 @@ add_library(eval STATIC
   src/Scene/FormulaEvaluator/Eval.hpp
 )
 target_include_directories(eval PUBLIC src/Scene/FormulaEvaluator/)
-target_link_libraries(eval PUBLIC logging)
+target_link_libraries(eval PUBLIC logging Scene_resource_manager)
 target_precompile_headers(eval REUSE_FROM logging)
+
+add_library(Scene_object_pool STATIC
+  src/Scene/DataBinding.hpp
+  src/Scene/ObjectPool.hpp
+  src/Scene/ObjectPool.cpp
+)
+target_include_directories(Scene_object_pool PUBLIC src/Scene/)
+target_link_libraries(Scene_object_pool PUBLIC logging eval)
+target_precompile_headers(Scene_object_pool REUSE_FROM logging)
 
 add_library(Scene STATIC src/Scene/Scene.hpp src/Scene/Scene.cpp)
 target_include_directories(Scene PUBLIC src/Scene/)
-target_link_libraries(Scene PUBLIC eval logging renderer renderer_model fileutils glm::glm Scene_resource_manager PRIVATE staticassets_scene shaders glad imgui)
+target_link_libraries(Scene PUBLIC logging renderer renderer_model fileutils glm::glm Scene_resource_manager Scene_object_pool PRIVATE staticassets_scene shaders glad imgui)
 target_precompile_headers(Scene REUSE_FROM logging)
 
-add_library(App STATIC src/App.hpp src/App.cpp)
+add_library(App STATIC
+  src/App.hpp
+  src/App.cpp
+  src/App_gui.cpp
+  src/App_popups.cpp
+)
 target_include_directories(App PUBLIC src)
 target_link_libraries(App PUBLIC Scene icon_img logging renderer imgui fileutils images images_bigger PRIVATE pfd)
 target_precompile_headers(App REUSE_FROM logging)

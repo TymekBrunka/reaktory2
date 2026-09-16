@@ -17,7 +17,9 @@
   "MSG_SCENE_FRAMEBUFFER_CREATE_SUCCESS": ["Id tekstur sceny: {}, {}"],
   "MSG_SCENE_FRAMEBUFFER_RESIZE": ["Zmiana rozmiaru okna sceny (txt_id: {}, {}) ({}, {})"],
 
-  "MSG_OBJECT_POOL_GET_ERROR": ["Zły uchwyt objektu {}"],
+  "MSG_OBJECT_POOL_GET_ERROR": ["Zły uchwyt objektu {}:{}"],
+  "MSG_OBJECT_POOL_REMOVE_ERROR": ["Nie można usunąć objektu: zły uchwyt objektu {}:{}"],
+  "MSG_OBJECT_POOL_REMOVE_EMPTY_SLOT_ERROR": ["Nie można usunąć objektu: miejsce {} nie jest zajęte"],
 
   "MSG_RENDER_INIT_ERROR": ["Nie można zainicjować renderowania."],
   "MSG_RENDER_INIT_SUCCESS": ["Zainicjowano renderer"],

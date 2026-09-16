@@ -19,8 +19,8 @@
 #include "LogFileWriter.cpp"
 #include "Scene.hpp"
 
-#include "App_gui.cpp"
-#include "App_popups.cpp"
+// #include "App_gui.cpp"
+// #include "App_popups.cpp"
 
 static char name_buffer[200] = {0};
 static std::string owned_string;

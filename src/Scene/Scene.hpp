@@ -8,6 +8,7 @@
 #include <string>
 
 #include <ResourceManager.hpp>
+#include <ObjectPool.hpp>
 
 class Scene {
   static Renderer::rProgram skybox_program;
@@ -72,6 +73,7 @@ private:
 
 public:
   ResourceManager resMan{};
+  ObjectPool objPool{};
 
   Scene() = default;
   Scene(const std::string &name);

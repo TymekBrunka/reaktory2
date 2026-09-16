@@ -104,6 +104,7 @@ public:
 
   bool init();
   void draw_self();
+  void draw_object_tree(Object *node, int idx);
   void run();
   void shutdown();
 
