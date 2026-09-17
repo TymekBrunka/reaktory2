@@ -1,4 +1,5 @@
 #include "FileUtils.hpp"
+#include "ObjectPool.hpp"
 #include "Renderer.hpp"
 #include "imgui.h"
 #include "pfd/pfd.hpp"
@@ -53,13 +54,69 @@ bool CenteredButton(const char *label) {
 
 void App::draw_object_tree(Object *node, int idx) {
   ImGui::PushID(idx);
-  ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0,0));
-  ImGui::Button("##collapse button", ImVec2(15,22));
-  ImVec2 bpos = ImGui::GetCursorPos();
   ImDrawList *drawlist = ImGui::GetWindowDrawList();
+
+  if (node->children.size() == 0) {
+    ImGui::Dummy(ImVec2(16 + 1, 18));
+    ImVec2 bpos = ImGui::GetItemRectMin();
+
+    // drawlist->AddCircleFilled(ImVec2(bpos.x + 8, bpos.y + 9), 4,
+    //                           ImColor(100, 100, 100));
+    drawlist->AddRectFilled(ImVec2(bpos.x + 7, bpos.y),
+                            ImVec2(bpos.x + 9, bpos.y + 18),
+                            ImColor(50, 50, 50));
+    drawlist->AddRectFilled(ImVec2(bpos.x + 7, bpos.y + 8),
+                            ImVec2(bpos.x + 15, bpos.y + 10),
+                            ImColor(50, 50, 50));
+
+  } else {
+    if (ImGui::Button("##collapse_button", ImVec2(16 + 1, 18)))
+      node->collapsed = !node->collapsed;
+    ImVec2 bpos = ImGui::GetItemRectMin();
+    ImVec2 bpos_max = ImGui::GetItemRectMax();
+    drawlist->AddRectFilled(bpos, bpos_max,
+                            ImGui::GetColorU32(ImGuiCol_WindowBg));
+    if (node->collapsed)
+      drawlist->AddTriangleFilled(
+          ImVec2(bpos.x + 4, bpos.y + 5), ImVec2(bpos.x + 4, bpos.y + 13),
+          ImVec2(bpos.x + 12, bpos.y + 9), ImColor(ImColor(100, 100, 100)));
+    else
+      drawlist->AddTriangleFilled(
+          ImVec2(bpos.x + 4, bpos.y + 5), ImVec2(bpos.x + 8, bpos.y + 13),
+          ImVec2(bpos.x + 12, bpos.y + 5), ImColor(ImColor(100, 100, 100)));
+  }
+
   ImGui::SameLine();
-  ImGui::Button(ICON_FA_CUBE " baton");
-  ImGui::PopStyleVar(1);
+  if (ImGui::Button("##baton", ImVec2(ImGui::GetContentRegionAvail().x, 18)))
+    selected_scene->selected_object = node->toHandle(idx);
+  ImVec2 bpos2 = ImGui::GetItemRectMin();
+  ImVec2 bpos2_max = ImGui::GetItemRectMax();
+
+  if (node->toHandle(idx) != selected_scene->selected_object)
+    drawlist->AddRectFilled(bpos2, bpos2_max,
+                            ImGui::GetColorU32(ImGuiCol_WindowBg));
+
+  if (const oNode *onode = std::get_if<oNode>(&node->variant)) {
+    float char_vis_width = ImGui::CalcTextSize(ICON_FA_CUBE).x;
+    drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y + 1),
+                      ImColor(50, 100, 200), ICON_FA_CUBE);
+  } else if (const oModel *omodel = std::get_if<oModel>(&node->variant)) {
+    float char_vis_width = ImGui::CalcTextSize(ICON_FA_DRAW_POLYGON).x;
+    drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y + 1),
+                      ImColor(200, 50, 25), ICON_FA_DRAW_POLYGON);
+  } else if (const oFormula *oformula = std::get_if<oFormula>(&node->variant)) {
+    float char_vis_width = ImGui::CalcTextSize(ICON_FA_SQUARE_ROOT_VARIABLE).x;
+    drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y + 1),
+                      ImColor(25, 200, 50), ICON_FA_SQUARE_ROOT_VARIABLE);
+  }
+  drawlist->AddText(ImVec2(bpos2.x + 22 + 3, bpos2.y + 1),
+                    ImColor(220, 220, 220), node->name.c_str());
+
+  ImGui::Indent(8);
+  for (int16_t i = 0; i < node->children.size() && !node->collapsed; i++)
+    draw_object_tree(selected_scene->objPool.getChildOf(node, i),
+                     node->children[i]);
+  ImGui::Unindent(8);
   ImGui::PopID();
 }
 
@@ -227,9 +284,19 @@ void App::draw_gui() {
     ImGui::EndChild();
 
     ImGui::Text(ICON_FA_CUBE " Objekty (%d)", selected_scene->objPool.size());
+    ImGui::SameLine();
+    if (ImGui::BeginCombo("##dodaj_objekt", "dodaj objekt")) {
+      if (ImGui::Selectable("model", false)) {
+        selected_scene->objPool.add_model_node(
+            selected_scene->resMan, selected_scene->selected_object, "");
+      }
+      ImGui::EndCombo();
+    }
 
     Object *root = selected_scene->objPool.get(selected_scene->objPool.rootH());
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
     draw_object_tree(root, 0);
+    ImGui::PopStyleVar(1);
   };
   ImGui::End();
 

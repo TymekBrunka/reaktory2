@@ -69,6 +69,8 @@ Value StringWrap::Call(const std::string &name,
 
     return Value{.data = data.contains(tobefound->get()->data)};
   }
+
+  return Value{.data = None{}};
 };
 
 } // namespace Eval

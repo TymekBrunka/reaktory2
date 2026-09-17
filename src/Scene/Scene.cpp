@@ -1,3 +1,4 @@
+#include "Eval.hpp"
 #include "Model.hpp"
 #include "ResourceManager.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
@@ -589,12 +590,73 @@ void Scene::render(Renderer::Render &render) {
 
   resMan.GetModel("CesiumMan.m3d")->model.Draw();
 
+  draw_models_recursive(objPool.get(objPool.rootH()), render.GetDelta(),
+                        glm::mat4(1.0f));
+
   // glUseProgram(tri_program);
   // glBindVertexArray(tri_vao);
   // glDrawArrays(GL_TRIANGLES, 0, 3);
 
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+}
+
+void Scene::draw_models_recursive(Object *node, float delta,
+                                  glm::mat4 parentTransform) {
+  static char uniformNameBuffer[100];
+  glm::mat4 modelTransform = node->transform * parentTransform;
+
+  if (oModel *omodel = (oModel *)std::get_if<oModel>(&node->variant)) {
+    std::string *model_name = omodel->model->get_model();
+    std::vector<Eval::Value> *materials = omodel->materials->get_vector();
+    int *animation_idx = omodel->animation_idx->get<int>();
+    float *animation_speed = omodel->animation_speed->get<float>();
+
+    if (model_name && !model_name->empty()) {
+      ManagedModel *mmodel = resMan.GetModel(*model_name);
+      if (mmodel) {
+        Renderer::Model &model = mmodel->model;
+
+        if (animation_idx && model.GetAnimations().size() != 0 &&
+            model.GetCurrentAnimation() - &model.GetAnimations()[0] !=
+                *animation_idx) {
+          model.SetAnimation(&model.GetAnimations()[*animation_idx]);
+        } else {
+          model.SetAnimation(nullptr);
+        }
+
+        if (animation_idx) {
+          model.SetAnimationTime(omodel->animation_time);
+          model.Advance(delta);
+          omodel->animation_time = model.GetAnimationTime();
+        }
+
+        for (int i = 0; i < model.GetMaterials().size(); i++) {
+          if (Eval::Material *material = (*materials)[i].get_material()) {
+            int diffuse1 = resMan.GetTexture(material->diffuse1);
+            model.GetMaterials()[i] = Renderer::Material{
+                .diffuse1 = diffuse1, .color_diffuse = material->color};
+          }
+        }
+
+        glUniformMatrix4fv(model_model_loc, 1, GL_FALSE,
+                           glm::value_ptr(modelTransform));
+
+        const std::vector<glm::mat4> &transforms = model.GetFinalMatrices();
+        for (int i = 0; i < transforms.size(); i++) {
+          snprintf(uniformNameBuffer, 100, "finalBonesMatrices[%d]", i);
+          glUniformMatrix4fv(
+              glGetUniformLocation(skinning_program, uniformNameBuffer), 1,
+              GL_FALSE, glm::value_ptr(transforms[i]));
+        }
+
+        model.Draw();
+      }
+    }
+  }
+  for (int16_t i = 0; i < node->children.size(); i++) {
+    draw_models_recursive(objPool.getChildOf(node, i), delta, modelTransform);
+  }
 }
 
 void Scene::Cleanup() {

@@ -1,3 +1,7 @@
+#include "DataBinding.hpp"
+#include "Eval.hpp"
+#include "Model.hpp"
+#include "ResourceManager.hpp"
 #include <ObjectPool.hpp>
 #include <cstdint>
 
@@ -68,4 +72,39 @@ void ObjectPool::remove_impl(int16_t idx) {
   }
   objects[idx].variant.emplace<oEmptySlot>(oEmptySlot{});
   free_indices.push_back(idx);
+}
+
+objH ObjectPool::add_model_node(ResourceManager &resMan, objH obj,
+                                const std::string_view &model_name) {
+
+  const char *name = model_name.empty()
+                         ? (*resMan.GetModelsMap().begin()).first.c_str()
+                         : model_name.data();
+
+  ManagedModel *model = resMan.GetModel(name);
+  if (model == nullptr)
+    return objH{.gen = 0, .idx = -1};
+
+  auto model_name_ = std::make_shared<Eval::Model>();
+  model_name_.get()->name = name;
+
+  auto materials = std::make_shared<std::vector<Eval::Value>>();
+  for (const auto &material : model->materials) {
+    auto mat = std::make_shared<Eval::Material>();
+    *mat.get() = Eval::Material{.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+                                .diffuse1 = material.diffuse1};
+
+    materials.get()->push_back(Eval::Value{.data = mat});
+  }
+
+  oModel omodel{};
+  omodel.model = model_name_;
+  omodel.materials = materials;
+  omodel.animation_idx = 0;
+  omodel.animation_time = 0;
+  omodel.animation_speed = 1.0f;
+
+  objH child = add(Object{.name = "Model", .variant = std::move(omodel)});
+  get(obj)->children.push_back(child.idx);
+  return child;
 }

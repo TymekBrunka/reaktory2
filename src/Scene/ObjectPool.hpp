@@ -12,12 +12,16 @@ struct objH {
   uint8_t gen;
   // uint16_t idx;
   int16_t idx; // signed integer so -1 can be returned
+
+  inline bool operator==(objH other) {
+    return other.gen == gen && other.idx == idx;
+  }
 };
 
 struct oModel {
-  DataBinding<Eval::Model> model;
+  DataBinding<std::shared_ptr<Eval::Model>> model;
   DataBinding<std::shared_ptr<std::vector<Eval::Value>>> materials;
-  DataBinding<std::shared_ptr<Eval::StringWrap>> animation_name;
+  DataBinding<int> animation_idx;
   float animation_time;
   DataBinding<float> animation_speed;
 };
@@ -33,9 +37,9 @@ struct oNode {
 };
 
 struct Object {
-  uint8_t gen;
-  bool collapsed;
-  glm::mat4 transform;
+  uint8_t gen = 1;
+  bool collapsed = false;
+  glm::mat4 transform{};
   std::string name;
   std::vector<int16_t> children;
   std::variant<oEmptySlot, oNode, oFormula, oModel> variant;
@@ -80,4 +84,6 @@ public:
   Object *get(objH obj);
   objH add(const Object &obj);
   void remove(objH obj);
+
+  objH add_model_node(ResourceManager &resMan, objH obj, const std::string_view &model_name);
 };

@@ -3,9 +3,14 @@
 
 template <typename T> struct DataBinding {
 public:
-  bool dirty;
-  Eval::Value cached = Eval::None{};
+  bool dirty = true;
+  Eval::Value cached = Eval::Value{.data = Eval::None{}};
   Eval::ASTnode formula;
 
-  const T *try_get() { return std::get_if<T>(&cached.data); }
+  DataBinding() : cached(Eval::Value{.data = T{}}) {};
+  DataBinding(const T &t) : cached(Eval::Value{.data = t}) {};
+
+  Eval::Value *operator->() {
+    return &cached;
+  }
 };

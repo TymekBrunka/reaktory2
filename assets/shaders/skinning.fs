@@ -15,7 +15,7 @@ vec4 Blend(in vec4 fragColor, in vec4 textureColor, in float alpha)
 
 void main()
 {
-    //finalColor = texture(texture0, TexCoords);
+    //finalColor = texture(diffuse1, TexCoords);
     vec4 texcolor = texture(diffuse1, TexCoords);
     finalColor = Blend(diffuse_color, texcolor, texcolor.a);
     //finalColor = vec4(0,0,0,1);

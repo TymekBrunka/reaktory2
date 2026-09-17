@@ -19,9 +19,9 @@ static void populateTexturesFromModel(
       path2mesh_map;
 
   for (int i = 0; i < model.GetNumMeshes(); i++) {
-    const std::string &path = model.GetTmpMaterialData(i)->diffuse1;
+    const std::string path = filename + "/" + model.GetTmpMaterialData(i)->diffuse1;
     mmodel.materials.push_back(ManagedModel::ManagedMaterial{.diffuse1 = path});
-    if (!path.empty())
+    if (!model.GetTmpMaterialData(i)->diffuse1.empty())
       if (path2mesh_map.find(path) == path2mesh_map.end())
         path2mesh_map[path] == i;
   }
@@ -29,7 +29,7 @@ static void populateTexturesFromModel(
   model.init();
   for (const auto &[name, idx] : path2mesh_map) {
     std::cerr << "populated texture " << name << "\n";
-    textures[filename + "/" + name] = model.GetMaterials()[idx].diffuse1;
+    textures[name] = model.GetMaterials()[idx].diffuse1;
   }
 }
 

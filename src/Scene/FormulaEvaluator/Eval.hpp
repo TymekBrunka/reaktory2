@@ -36,8 +36,7 @@ public:
   }
 
   inline Value Get(const std::string &name) override;
-  inline Value Call(const std::string &name,
-                    const std::vector<Value> &args) override;
+  Value Call(const std::string &name, const std::vector<Value> &args) override;
 };
 
 struct None {
@@ -50,7 +49,7 @@ struct Model {
 
 struct Material {
   glm::vec4 color{};
-  std::string name;
+  std::string diffuse1;
 };
 
 struct objHFormula {
@@ -62,20 +61,46 @@ struct objHFormula {
 
 struct Value {
   std::string err_msg;
-  std::variant<None, void *, std::shared_ptr<StringWrap>,
-               std::shared_ptr<Model>, std::shared_ptr<Material>, objHFormula,
-               std::shared_ptr<Class>, int, float, bool,
-               std::shared_ptr<std::vector<Value>>>
+  std::variant<None, std::shared_ptr<StringWrap>, std::shared_ptr<Model>,
+               std::shared_ptr<Material>, objHFormula, std::shared_ptr<Class>,
+               int, float, bool, std::shared_ptr<std::vector<Value>>>
       data;
+
+  template <typename T> inline T *get_shared() {
+    auto *ptr = (std::shared_ptr<T> *)std::get_if<std::shared_ptr<T>>(&data);
+
+    return ptr ? ptr->get() : nullptr;
+  }
+
+  inline std::vector<Value> *get_vector() {
+    return get_shared<std::vector<Value>>();
+  }
+
+  inline std::string *get_string() {
+    auto *ptr = get_shared<StringWrap>();
+    return ptr ? &ptr->data : nullptr;
+  }
+
+  inline std::string *get_model() {
+    auto *ptr = get_shared<Model>();
+    return ptr ? &ptr->name : nullptr;
+  }
+
+  inline Material *get_material() { return get_shared<Material>(); }
+
+  template <typename T> inline T *get() { return (T *)std::get_if<T>(&data); }
 };
 
 inline Value StringWrap::Get(const std::string &name) {
   if (name == "długość") {
     return Value{.data = (int)data.size()};
   }
+
+  return Value{.data = None{}};
 }
 
 #define EVAL_ast_tag_names                                                     \
+  X(ROOT)                                                                      \
   X(CALL)                                                                      \
   X(GET)                                                                       \
   X(SET)                                                                       \
@@ -99,7 +124,7 @@ enum ASTtag { EVAL_ast_tag_names };
 #undef X
 
 struct ASTnode {
-  ASTtag tag;
+  ASTtag tag = aROOT;
   uint32_t node_data_idx;
   std::vector<ASTnode> children;
 };

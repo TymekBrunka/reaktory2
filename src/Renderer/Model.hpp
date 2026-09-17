@@ -220,7 +220,6 @@ public:
   Model(Model &&other);
   Model &operator=(Model &&other);
 
-
   inline int GetNumMeshes() { return meshes.size(); }
   inline const MeshLoaderTmpCtx::MaterialTmpCtx *
   GetTmpMaterialData(int n) const {
@@ -248,7 +247,12 @@ public:
 
   inline float &GetAnimationTime() { return animationTime; }
 
-  inline const std::vector<glm::mat4> &GetFinalMatrices() const { return finalMatrices; }
+  inline Animation *GetCurrentAnimation() { return current_animation; }
+  inline void SetAnimationTime(float time) { animationTime = time; }
+
+  inline const std::vector<glm::mat4> &GetFinalMatrices() const {
+    return finalMatrices;
+  }
   inline std::vector<Material> &GetMaterials() { return materials; }
 
   inline int FindMesh(const char *name) {

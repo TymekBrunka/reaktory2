@@ -70,17 +70,17 @@ public:
     return iter != models.end() ? &(*iter).second : nullptr;
   }
 
-  inline Renderer::rTexture2D GetTexture(const char *txt) {
+  inline int GetTexture(const char *txt) {
     auto iter = textures.find(txt);
     return iter != textures.end() ? (*iter).second : -1;
   }
 
-  inline Renderer::rTexture2D GetTexture(std::string_view txt) {
+  inline int GetTexture(std::string_view txt) {
     auto iter = textures.find(txt);
     return iter != textures.end() ? (*iter).second : -1;
   }
 
-  inline Renderer::rTexture2D GetTexture(const std::string &txt) {
+  inline int GetTexture(const std::string &txt) {
     auto iter = textures.find(txt);
     return iter != textures.end() ? (*iter).second : -1;
   }

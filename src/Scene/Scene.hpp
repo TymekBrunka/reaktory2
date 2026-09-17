@@ -7,8 +7,8 @@
 #include <stdatomic.h>
 #include <string>
 
-#include <ResourceManager.hpp>
 #include <ObjectPool.hpp>
+#include <ResourceManager.hpp>
 
 class Scene {
   static Renderer::rProgram skybox_program;
@@ -44,6 +44,7 @@ class Scene {
 public:
   Renderer::rTexture2D screen_canvas = 0;
   Renderer::rTexture2D color_canvas = 0;
+  objH selected_object = {.gen = 1, .idx = 0}; // scene node
 
 private:
   glm::vec3 input{};
@@ -70,6 +71,9 @@ private:
 
   static bool create_folder_structure(const std::string &name,
                                       const std::filesystem::path &path);
+
+  void draw_models_recursive(Object *node, float delta,
+                             glm::mat4 parentTransform);
 
 public:
   ResourceManager resMan{};
