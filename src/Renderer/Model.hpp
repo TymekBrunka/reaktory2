@@ -142,7 +142,7 @@ struct modelNode {
       -1; // those nodes will be stored in continous array but when loading, it
           // will be changing its size which would invalidate pointers, so index
           // has to be used instead
-  glm::mat4 transformation{};
+  glm::mat4 transformation = glm::mat4(1.0f);
   std::string name{};
 };
 
@@ -151,6 +151,10 @@ class Model {
   float animationTime = 0;
   int boneCounter = 0;
 
+public:
+  glm::mat4 transform = glm::mat4(1.0f);
+
+private:
   struct string_hash {
     using is_transparent = void;
     [[nodiscard]] inline size_t operator()(const char *txt) const {

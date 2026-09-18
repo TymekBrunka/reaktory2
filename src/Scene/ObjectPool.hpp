@@ -39,7 +39,7 @@ struct oNode {
 struct Object {
   uint8_t gen = 1;
   bool collapsed = false;
-  glm::mat4 transform{};
+  glm::mat4 transform = glm::mat4(1.0f);
   std::string name;
   std::vector<int16_t> children;
   std::variant<oEmptySlot, oNode, oFormula, oModel> variant;

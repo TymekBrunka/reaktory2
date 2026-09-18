@@ -25,6 +25,10 @@
 // #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
 
+#include <ImGuizmo.h>
+static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::UNIVERSAL);
+static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::WORLD);
+
 Renderer::rProgram Scene::skybox_program = 0;
 Renderer::rFBO Scene::skybox_fbo = 0;
 Renderer::rFBO Scene::skybox_ebo = 0;
@@ -274,7 +278,7 @@ bool Scene::resize(Renderer::rect_size size) {
 
   projection =
       glm::perspective(glm::radians(90.0f),
-                       (float)size.width / (float)size.height, 0.01f, 1000.0f);
+                       (float)size.width / (float)size.height, 0.01f, 100.0f);
 
   return true;
 }
@@ -348,6 +352,8 @@ bool Scene::Init(Renderer::Render &render) {
   model_view_loc = glGetUniformLocation(skinning_program, "view");
   model_projection_loc = glGetUniformLocation(skinning_program, "projection");
   model_model_loc = glGetUniformLocation(skinning_program, "model");
+
+  Renderer::Model::setDefaultProgram(skinning_program);
 
   glGenBuffers(1, &tri_fbo);
   glBindBuffer(GL_ARRAY_BUFFER, tri_fbo);
@@ -459,7 +465,6 @@ bool Scene::init(Renderer::Render &render) {
   skybox_loc = glGetUniformLocation(skybox_program, "skybox");
   glUniform1i(skybox_loc, 0);
   initialised = true;
-  Renderer::Model::setDefaultProgram(skinning_program);
 
   // ---------------------- model test
   resMan.ImportModel(FileUtils::RealFs{}, std::filesystem::path{"assets"} /
@@ -546,6 +551,7 @@ void Scene::render(Renderer::Render &render) {
 
   glViewport(0, 0, size.width, size.height);
   glClearColor(0, 0, 0, 0);
+  glClearDepth(1);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   glUseProgram(skybox_program);
@@ -570,24 +576,9 @@ void Scene::render(Renderer::Render &render) {
   glUniformMatrix4fv(model_projection_loc, 1, GL_FALSE,
                      glm::value_ptr(projection));
 
-  // glm::mat4 model = glm::rotate(
-  //     glm::mat4(1.0f), glm::radians((float)preview_model.GetAnimationTime()),
-  //     glm::normalize(glm::vec3(1.0f, 1.0f, 1.0f)));
-
   glm::mat4 model = glm::mat4(1.0f);
-
   glUniformMatrix4fv(model_model_loc, 1, GL_FALSE, glm::value_ptr(model));
-
   resMan.GetModel("CesiumMan.m3d")->model.Advance(render.GetDelta());
-  const std::vector<glm::mat4> &transforms =
-      resMan.GetModel("CesiumMan.m3d")->model.GetFinalMatrices();
-  for (int i = 0; i < transforms.size(); i++) {
-    snprintf(uniformNameBuffer, 100, "finalBonesMatrices[%d]", i);
-    glUniformMatrix4fv(
-        glGetUniformLocation(skinning_program, uniformNameBuffer), 1, GL_FALSE,
-        glm::value_ptr(transforms[i]));
-  }
-
   resMan.GetModel("CesiumMan.m3d")->model.Draw();
 
   draw_models_recursive(objPool.get(objPool.rootH()), render.GetDelta(),
@@ -603,7 +594,6 @@ void Scene::render(Renderer::Render &render) {
 
 void Scene::draw_models_recursive(Object *node, float delta,
                                   glm::mat4 parentTransform) {
-  static char uniformNameBuffer[100];
   glm::mat4 modelTransform = node->transform * parentTransform;
 
   if (oModel *omodel = (oModel *)std::get_if<oModel>(&node->variant)) {
@@ -617,7 +607,8 @@ void Scene::draw_models_recursive(Object *node, float delta,
       if (mmodel) {
         Renderer::Model &model = mmodel->model;
 
-        if (animation_idx && model.GetAnimations().size() != 0 &&
+        if (animation_idx && *animation_idx != -1 &&
+            model.GetAnimations().size() != 0 &&
             model.GetCurrentAnimation() - &model.GetAnimations()[0] !=
                 *animation_idx) {
           model.SetAnimation(&model.GetAnimations()[*animation_idx]);
@@ -625,11 +616,11 @@ void Scene::draw_models_recursive(Object *node, float delta,
           model.SetAnimation(nullptr);
         }
 
-        if (animation_idx) {
-          model.SetAnimationTime(omodel->animation_time);
-          model.Advance(delta);
-          omodel->animation_time = model.GetAnimationTime();
-        }
+        // if (animation_idx && *animation_idx != -1) {
+        model.SetAnimationTime(omodel->animation_time);
+        model.Advance(delta * (animation_speed ? *animation_speed : 1));
+        omodel->animation_time = model.GetAnimationTime();
+        // }
 
         for (int i = 0; i < model.GetMaterials().size(); i++) {
           if (Eval::Material *material = (*materials)[i].get_material()) {
@@ -639,17 +630,12 @@ void Scene::draw_models_recursive(Object *node, float delta,
           }
         }
 
-        glUniformMatrix4fv(model_model_loc, 1, GL_FALSE,
-                           glm::value_ptr(modelTransform));
+        ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection),
+                             mCurrentGizmoOperation, mCurrentGizmoMode,
+                             glm::value_ptr(node->transform), NULL, NULL);
 
-        const std::vector<glm::mat4> &transforms = model.GetFinalMatrices();
-        for (int i = 0; i < transforms.size(); i++) {
-          snprintf(uniformNameBuffer, 100, "finalBonesMatrices[%d]", i);
-          glUniformMatrix4fv(
-              glGetUniformLocation(skinning_program, uniformNameBuffer), 1,
-              GL_FALSE, glm::value_ptr(transforms[i]));
-        }
-
+        glm::mat4 modelTransform = node->transform * parentTransform;
+        model.transform = modelTransform;
         model.Draw();
       }
     }

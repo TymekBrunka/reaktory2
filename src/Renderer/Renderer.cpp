@@ -15,6 +15,8 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+#include <ImGuizmo.h>
+
 #include <Errors/Errors.hpp>
 #include <Logging.hpp>
 #include <placeholder_icon_img.h>
@@ -386,9 +388,11 @@ void Render::BeginFrame() {
   glViewport(0, 0, impl->window_size.width, impl->window_size.height);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   ImGui::SetCurrentContext(impl->imctx);
+  ImGuizmo::SetImGuiContext(impl->imctx);
   ImGui_ImplOpenGL3_NewFrame();
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
+  ImGuizmo::BeginFrame();
 }
 
 void Render::EndFrame() {

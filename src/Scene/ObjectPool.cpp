@@ -100,7 +100,7 @@ objH ObjectPool::add_model_node(ResourceManager &resMan, objH obj,
   oModel omodel{};
   omodel.model = model_name_;
   omodel.materials = materials;
-  omodel.animation_idx = 0;
+  omodel.animation_idx = -1;
   omodel.animation_time = 0;
   omodel.animation_speed = 1.0f;
 

@@ -114,6 +114,9 @@ Model::Model(Model &&other) {
   finalMatrices = std::move(other.finalMatrices);
   materials = std::move(other.materials);
 
+  transform = other.transform;
+  other.transform = glm::mat4(1.0f);
+
   other.initialised = false;
   other.animationTime = 0;
   other.boneCounter = 0;
@@ -134,6 +137,9 @@ Model &Model::operator=(Model &&other) {
     boneInfoMap = std::move(other.boneInfoMap);
     finalMatrices = std::move(other.finalMatrices);
     materials = std::move(other.materials);
+
+    transform = other.transform;
+    other.transform = glm::mat4(1.0f);
 
     other.initialised = false;
     other.animationTime = 0;
@@ -207,11 +213,12 @@ void Mesh::Draw(const Material &material) {
   // }
 
   unsigned int program = Model::defaultProgram;
+  glUseProgram(program);
   glUniform1i(glGetUniformLocation(program, "diffuse1"), 0);
+  glUniform1i(glGetUniformLocation(program, "diffuse1_idx"), material.diffuse1);
   glUniform4fv(glGetUniformLocation(program, "diffuse_color"), 1,
                glm::value_ptr(material.color_diffuse));
 
-  glUseProgram(program);
   glBindVertexArray(VAO);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
   glDrawElements(GL_TRIANGLES, numIndices, GL_UNSIGNED_INT, 0);
@@ -223,6 +230,18 @@ void Mesh::Draw(const Material &material) {
 }
 
 void Model::Draw() {
+  static char uniformNameBuffer[100];
+  glUseProgram(defaultProgram);
+  glUniformMatrix4fv(glGetUniformLocation(defaultProgram, "model"), 1, GL_FALSE,
+                     glm::value_ptr(transform));
+
+  const std::vector<glm::mat4> &transforms = GetFinalMatrices();
+  for (int i = 0; i < transforms.size(); i++) {
+    snprintf(uniformNameBuffer, 100, "finalBonesMatrices[%d]", i);
+    glUniformMatrix4fv(glGetUniformLocation(defaultProgram, uniformNameBuffer),
+                       1, GL_FALSE, glm::value_ptr(transforms[i]));
+  }
+
   Material *mat = &materials[0];
   for (auto &mesh : meshes) {
     mesh.Draw(*mat);
@@ -734,6 +753,10 @@ void Model::SetAnimation(const Animation *animation) {
       node.channel_binding = -1;
       node.bone_idx_binding = nullptr;
     }
+
+    // for (auto &[name, boneidx] : boneInfoMap) {
+    //   finalMatrices[boneidx.idx] = glm::mat4(1.0f);
+    // }
   }
 
   animationTime = 0;

@@ -48,7 +48,7 @@ struct Model {
 };
 
 struct Material {
-  glm::vec4 color{};
+  glm::vec4 color = glm::vec4(1.0f);
   std::string diffuse1;
 };
 

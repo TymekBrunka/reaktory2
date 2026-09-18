@@ -1,12 +1,20 @@
+#include "Errors/Errors.hpp"
+#include "Eval.hpp"
 #include "FileUtils.hpp"
+#include "Model.hpp"
 #include "ObjectPool.hpp"
 #include "Renderer.hpp"
+#include "ResourceManager.hpp"
 #include "imgui.h"
 #include "pfd/pfd.hpp"
 #include <App.hpp>
 #include <FontsAwesome/IconsFontAwesome6.h>
+#include <cfloat>
 #include <cstdio>
+#include <imgui_stdlib.h>
 #include <iostream>
+
+#include <ImGuizmo.h>
 
 #define ICONS_MODULO 4
 #define ICONS_IDX_HEIGHT 4
@@ -218,12 +226,15 @@ void App::draw_gui() {
             in_window_cursor_pos = Renderer::rect_size{
                 (int)(sp.width - imTL.x), (int)(-1 * (sp.height - imBR.y))};
 
+            ImDrawList *drawlist = ImGui::GetWindowDrawList();
+
+            ImGuizmo::SetDrawlist(drawlist);
+
             scene.updateMousePos(in_window_cursor_pos);
             scene.updateMouseButtonState(mousebuttonL, mousebuttonR);
             scene.updateBodyMovement(movement_input);
             scene.resize({(int)sregion.x, (int)sregion.y});
             scene.render(render);
-            ImDrawList *drawlist = ImGui::GetWindowDrawList();
             drawlist->AddImage((ImTextureRef)scene.screen_canvas, imTL, imBR,
                                ImVec2(0, 1), ImVec2(1, 0));
 
@@ -303,7 +314,187 @@ void App::draw_gui() {
   if (!selected_scene_idx)
     selected_scene = nullptr;
 
-  if (ImGui::Begin(ICON_FA_WRENCH " Właściwości")) {
+  if (ImGui::Begin(ICON_FA_WRENCH " Właściwości") && selected_scene) {
+    Object *node = selected_scene->objPool.get(selected_scene->selected_object);
+    if (node) {
+      if (oModel *omodel = (oModel *)std::get_if<oModel>(&node->variant)) {
+        ImGui::InputText("nazwa", &node->name);
+
+        std::string *model_name = omodel->model->get_model();
+        if (model_name) {
+          if (ImGui::BeginCombo("model", model_name->c_str())) {
+
+            static ImGuiTextFilter filter;
+            if (ImGui::IsWindowAppearing()) {
+              ImGui::SetKeyboardFocusHere();
+              filter.Clear();
+            }
+            filter.Draw("model");
+
+            for (const auto &[name, model] :
+                 selected_scene->resMan.GetModelsMap()) {
+
+              if (!filter.PassFilter(name.c_str()))
+                continue;
+
+              if (ImGui::Selectable(name.c_str(), *model_name == name)) {
+                *model_name = name;
+                omodel->animation_idx.cached.data = -1;
+                if (std::vector<Eval::Value> *materials =
+                        omodel->materials->get_vector()) {
+                  size_t old_size = materials->size();
+                  materials->resize(model.materials.size());
+                  for (int i = old_size; i < materials->size(); i++) {
+                    auto mat = std::make_shared<Eval::Material>();
+                    (*materials)[i] = Eval::Value{.data = Eval::None{}};
+                    (*materials)[i].data = mat;
+                  }
+                }
+              }
+            }
+            ImGui::EndCombo();
+          }
+        } else {
+          ImGui::TextWrapped("model: (zły typ parametru)");
+        }
+
+        ImGui::TextUnformatted("Materiały");
+        std::vector<Eval::Value> *materials = omodel->materials->get_vector();
+        if (materials) {
+          int i = 0;
+          for (auto &mat : *materials) {
+            if (Eval::Material *material = mat.get_material()) {
+              ImGui::PushID(i);
+              // ImGui::BeginChild("materials_child");
+
+              ImGui::ColorEdit4("kolor", &material->color.x,
+                                ImGuiColorEditFlags_NoInputs |
+                                    ImGuiColorEditFlags_NoLabel);
+              ImGui::SameLine();
+
+              int diffuse1 =
+                  selected_scene->resMan.GetTexture(material->diffuse1);
+
+              if (diffuse1 != -1) {
+                ImGui::Image((ImTextureRef)diffuse1, ImVec2(22, 22),
+                             ImVec2(0, 1), ImVec2(1, 0));
+              } else {
+                ImGui::Button("X", ImVec2(22, 22));
+              }
+              ImGui::SameLine();
+
+              ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+              if (ImGui::BeginCombo("##obraz", material->diffuse1.c_str())) {
+                static ImGuiTextFilter filter;
+                if (ImGui::IsWindowAppearing()) {
+                  ImGui::SetKeyboardFocusHere();
+                  filter.Clear();
+                }
+                filter.Draw("obrazy");
+
+                float w_width = ImGui::GetWindowSize().x;
+                ImVec2 image_size = ImVec2(50, 50);
+                float width_accumulator = image_size.x + 10;
+
+                {
+                  if (ImGui::Button("(brak)", ImVec2(image_size.x + 6,
+                                                     image_size.y + 6))) {
+                    material->diffuse1 = "";
+                  }
+
+                  if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNone))
+                    ImGui::SetTooltip("(brak)");
+
+                  ImGui::SameLine();
+                }
+
+                for (const auto &[name, texture] :
+                     selected_scene->resMan.GetTexturesMap()) {
+
+                  if (!filter.PassFilter(name.c_str()))
+                    continue;
+
+                  if (ImGui::ImageButton(name.c_str(), (ImTextureRef)texture,
+                                         image_size, ImVec2(0, 1),
+                                         ImVec2(1, 0))) {
+
+                    material->diffuse1 = name;
+                  }
+
+                  if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNone))
+                    ImGui::SetTooltip(name.c_str());
+
+                  width_accumulator += image_size.x + 10;
+                  if (width_accumulator + image_size.x + 10 < w_width - 8)
+                    ImGui::SameLine();
+                  else
+                    width_accumulator = 0;
+                }
+
+                ImGui::EndCombo();
+              }
+
+              // ImGui::EndChild();
+              ImGui::PopID();
+            } else {
+              ImGui::Text("materiał %d.: (zły typ parametru)", i);
+            }
+            i++;
+          }
+        } else {
+          ImGui::TextWrapped("materiały: (zły typ parametru)");
+        }
+        ImGui::Dummy(ImVec2(0, 10));
+
+        int *animation_idx = omodel->animation_idx->get<int>();
+        if (animation_idx) {
+          std::string *model_name = omodel->model->get_model();
+          ManagedModel *model =
+              model_name ? selected_scene->resMan.GetModel(*model_name)
+                         : nullptr;
+
+          if (model) {
+            const char *animation_name = "(brak)";
+            if (*animation_idx >= 0 &&
+                *animation_idx < model->model.GetAnimations().size())
+              animation_name = model->model.GetAnimations()[*animation_idx]
+                                   .GetName()
+                                   .c_str();
+
+            if (ImGui::BeginCombo("animacja", animation_name)) {
+              int i = 0;
+
+              if (ImGui::Selectable("(brak)", -1 == *animation_idx))
+                omodel->animation_idx = -1;
+
+              for (const auto &animation : model->model.GetAnimations()) {
+                if (ImGui::Selectable(animation.GetName().c_str(),
+                                      i == *animation_idx))
+                  omodel->animation_idx = i;
+                i++;
+              }
+              ImGui::EndCombo();
+            }
+          } else {
+            ImGui::TextWrapped(
+                "animacja: (objekt nie posiada prawidłowego modelu)");
+          }
+        } else {
+          ImGui::TextWrapped("animacja: (zły typ parametru)");
+        }
+
+        float *animation_speed = omodel->animation_speed->get<float>();
+        if (animation_speed) {
+          ImGui::DragFloat("prędkość animacji", animation_speed, 0.1, -FLT_MAX,
+                           FLT_MAX);
+        } else {
+          ImGui::TextWrapped("prędkość animacji: (zły typ parametru)");
+        }
+
+        ImGui::DragFloat("czas animacji", &omodel->animation_time, 0.1,
+                         -FLT_MAX, FLT_MAX);
+      }
+    }
   }
   ImGui::End();
 

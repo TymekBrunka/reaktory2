@@ -156,7 +156,7 @@ target_link_libraries(renderer
   PRIVATE
   placeholder_icon_img glad imgui
   PUBLIC
-  glfw logging fileutils
+  glfw logging fileutils imguizmo
 )
 # target_precompile_headers(renderer REUSE_FROM pch_core)
 target_precompile_headers(renderer REUSE_FROM logging)
@@ -200,7 +200,7 @@ target_precompile_headers(Scene_object_pool REUSE_FROM logging)
 
 add_library(Scene STATIC src/Scene/Scene.hpp src/Scene/Scene.cpp)
 target_include_directories(Scene PUBLIC src/Scene/)
-target_link_libraries(Scene PUBLIC logging renderer renderer_model fileutils glm::glm Scene_resource_manager Scene_object_pool PRIVATE staticassets_scene shaders glad imgui)
+target_link_libraries(Scene PUBLIC logging renderer renderer_model fileutils glm::glm Scene_resource_manager Scene_object_pool PRIVATE imgui imguizmo staticassets_scene shaders glad imgui)
 target_precompile_headers(Scene REUSE_FROM logging)
 
 add_library(App STATIC
