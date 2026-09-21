@@ -159,7 +159,7 @@ public:
 class FsStream {
 public:
   inline virtual ~FsStream() {}
-  void *file;
+  void *file = nullptr;
 
   virtual size_t Read(void *out, size_t size) = 0;
   virtual size_t Write(const void *data, size_t size) = 0;
@@ -171,7 +171,7 @@ public:
 
 class Fs {
 public:
-  virtual char Separator() = 0;
+  virtual char Separator() const = 0;
 
   virtual Result<ReadResult, int>
   ReadFilex(const path &filepath, alloc_fun alloc = nullptr,
@@ -209,6 +209,10 @@ public:
       delete (std::fstream *)file;
   };
 
+  RealFsStream() = default;
+
+  RealFsStream(std::fstream *stream) { file = stream; }
+
   RealFsStream(const RealFsStream &other) = delete;
 
   RealFsStream &operator=(const RealFsStream &other) = delete;
@@ -225,8 +229,6 @@ public:
     }
     return *this;
   }
-
-  RealFsStream(std::fstream *stream) { file = stream; }
 
   inline size_t Read(void *out, size_t size) {
     ((std::fstream *)file)->read((char *)out, size);
@@ -279,7 +281,7 @@ public:
   RealFs(std::filesystem::path &&path) : root(path) {};
   ~RealFs() = default;
 
-  inline char Separator() override {
+  inline char Separator() const override {
 #ifdef _WIN32
     return '\\';
 #else
@@ -287,13 +289,15 @@ public:
 #endif
   }
 
-  inline FsStream *Open(const path &path, const char *mode) {
+  inline FsStream *Open(const path &path, const char *mode) override {
     std::fstream *stream = new std::fstream{path.to_fs()};
     RealFsStream *file = new RealFsStream{stream};
     return file;
   }
 
-  inline void Close(FsStream *file) { ((std::fstream *)file->file)->close(); }
+  inline void Close(FsStream *file) override {
+    ((std::fstream *)file->file)->close();
+  }
 
   inline Result<ReadResult, int>
   ReadFilex(const path &filepath, alloc_fun alloc = nullptr,

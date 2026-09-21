@@ -16,6 +16,8 @@
 #include <glm/glm.hpp>
 #include <vector>
 
+#include <assimp/IOStream.hpp>
+#include <assimp/IOSystem.hpp>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
@@ -27,6 +29,57 @@
 #include <cstdlib>
 #include <iostream>
 namespace Renderer {
+
+class AssimpVFSstream : public Assimp::IOStream {
+  friend class AssimpREALFS;
+  AssimpVFSstream() = default;
+  std::unique_ptr<FileUtils::FsStream> file;
+
+public:
+  ~AssimpVFSstream();
+  size_t Read(void *pvBuffer, size_t pSize, size_t pCount) override {
+    return file->Read(pvBuffer, pSize * pCount);
+  }
+  size_t Write(const void *pvBuffer, size_t pSize, size_t pCount) override {
+    return file->Write(pvBuffer, pSize * pCount);
+  }
+  aiReturn Seek(size_t pOffset, aiOrigin pOrigin) override {
+    return file->Seek(pOffset, pOrigin == aiOrigin_END)
+               ? aiReturn::aiReturn_SUCCESS
+               : aiReturn::aiReturn_FAILURE;
+  }
+  size_t Tell() const override { return file->Tell(); }
+  size_t FileSize() const override { return file->FileSize(); }
+  void Flush() override {}
+};
+
+class AssimpREALFS : public Assimp::IOSystem {
+public:
+  // std::unique_ptr<FileUtils::Fs> fs;
+  //
+  // AssimpREALFS() { fs = std::make_unique<FileUtils::RealFs>(); }
+  //
+  // template <typename T> AssimpREALFS(T &fs) { fs = std::make_unique<T>(); }
+  FileUtils::RealFs fs{};
+  AssimpREALFS() = default;
+  AssimpREALFS(const FileUtils::RealFs &fs_) : fs(fs_) {};
+  ~AssimpREALFS() = default;
+
+  bool Exists(const char *pFile) const override { return fs.FileExists(pFile); }
+
+  char getOsSeparator() const override { return fs.Separator(); }
+
+  Assimp::IOStream *Open(const char *pFile, const char *pMode) override {
+    AssimpVFSstream *stream = new AssimpVFSstream{};
+    stream->file.reset(fs.Open(pFile, pMode));
+    return stream;
+  }
+
+  void Close(Assimp::IOStream *pFile) override {
+    fs.Close(((AssimpVFSstream *)pFile)->file.get());
+    delete pFile;
+  }
+};
 
 #define MAX_BONES 100
 
@@ -291,6 +344,9 @@ Model Model::LoadFromFile(const FileUtils::Fs &fs,
 
   Model model{};
   Assimp::Importer import;
+
+  import.SetIOHandler(new AssimpREALFS());
+
   const aiScene *scene;
   try {
     scene = import.ReadFile(filepath.to_string(),
@@ -754,7 +810,7 @@ void Model::SetAnimation(const Animation *animation) {
       node.bone_idx_binding = nullptr;
     }
 
-    for (auto& matrix : finalMatrices)
+    for (auto &matrix : finalMatrices)
       matrix = glm::mat4(1.0f);
   }
 
