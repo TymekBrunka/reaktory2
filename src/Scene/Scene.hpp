@@ -72,7 +72,7 @@ private:
   static bool create_folder_structure(const std::string &name,
                                       const std::filesystem::path &path);
 
-  void draw_models_recursive(Object *node, float delta,
+  void draw_models_recursive(int16_t idx, float delta,
                              glm::mat4 parentTransform);
 
 public:

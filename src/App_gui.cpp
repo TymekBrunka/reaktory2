@@ -229,14 +229,20 @@ void App::draw_gui() {
             ImDrawList *drawlist = ImGui::GetWindowDrawList();
 
             ImGuizmo::SetDrawlist(drawlist);
+            ImGuizmo::SetRect(imTL.x, imTL.y, imBR.x - imTL.x, imBR.y - imTL.y);
+
+            // moved this up bc otherwise the guizmo would be covered by scene
+            // canvas
+            drawlist->AddImage((ImTextureRef)scene.screen_canvas, imTL, imBR,
+                               ImVec2(0, 1), ImVec2(1, 0));
 
             scene.updateMousePos(in_window_cursor_pos);
             scene.updateMouseButtonState(mousebuttonL, mousebuttonR);
             scene.updateBodyMovement(movement_input);
             scene.resize({(int)sregion.x, (int)sregion.y});
             scene.render(render);
-            drawlist->AddImage((ImTextureRef)scene.screen_canvas, imTL, imBR,
-                               ImVec2(0, 1), ImVec2(1, 0));
+            // drawlist->AddImage((ImTextureRef)scene.screen_canvas, imTL, imBR,
+            //                    ImVec2(0, 1), ImVec2(1, 0));
 
             ImGui::EndTabItem();
 

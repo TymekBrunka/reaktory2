@@ -12,7 +12,7 @@ newmtl Cat
 	Kd 1.0000 1.0000 1.0000
 	Ks 0.0000 0.0000 0.0000
 	Ke 0.0000 0.0000 0.0000
-	map_Ka Cat_diffuse.jpg
-	map_Kd Cat_diffuse.jpg
+	map_Ka Cat_diffuse.png
+	map_Kd Cat_diffuse.png
 	map_bump Cat_bump.jpg
 	bump Cat_bump.jpg

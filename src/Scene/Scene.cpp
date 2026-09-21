@@ -1,5 +1,6 @@
 #include "Eval.hpp"
 #include "Model.hpp"
+#include "ObjectPool.hpp"
 #include "ResourceManager.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/geometric.hpp"
@@ -27,7 +28,7 @@
 
 #include <ImGuizmo.h>
 static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::UNIVERSAL);
-static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::WORLD);
+static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
 
 Renderer::rProgram Scene::skybox_program = 0;
 Renderer::rFBO Scene::skybox_fbo = 0;
@@ -581,7 +582,7 @@ void Scene::render(Renderer::Render &render) {
   resMan.GetModel("CesiumMan.m3d")->model.Advance(render.GetDelta());
   resMan.GetModel("CesiumMan.m3d")->model.Draw();
 
-  draw_models_recursive(objPool.get(objPool.rootH()), render.GetDelta(),
+  draw_models_recursive(objPool.rootH().idx, render.GetDelta(),
                         glm::mat4(1.0f));
 
   // glUseProgram(tri_program);
@@ -592,8 +593,10 @@ void Scene::render(Renderer::Render &render) {
   // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 }
 
-void Scene::draw_models_recursive(Object *node, float delta,
+void Scene::draw_models_recursive(int16_t idx, float delta,
                                   glm::mat4 parentTransform) {
+
+  Object *node = &objPool.get(objPool.rootH())[idx];
   glm::mat4 modelTransform = node->transform * parentTransform;
 
   if (oModel *omodel = (oModel *)std::get_if<oModel>(&node->variant)) {
@@ -612,7 +615,7 @@ void Scene::draw_models_recursive(Object *node, float delta,
             model.GetCurrentAnimation() - &model.GetAnimations()[0] !=
                 *animation_idx) {
           model.SetAnimation(&model.GetAnimations()[*animation_idx]);
-        } else {
+        } else if (!animation_idx || *animation_idx == -1) {
           model.SetAnimation(nullptr);
         }
 
@@ -630,9 +633,11 @@ void Scene::draw_models_recursive(Object *node, float delta,
           }
         }
 
-        ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection),
-                             mCurrentGizmoOperation, mCurrentGizmoMode,
-                             glm::value_ptr(node->transform), NULL, NULL);
+        if (node->toHandle(idx) == selected_object) {
+          ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection),
+                               mCurrentGizmoOperation, mCurrentGizmoMode,
+                               glm::value_ptr(node->transform), NULL, NULL);
+        }
 
         glm::mat4 modelTransform = node->transform * parentTransform;
         model.transform = modelTransform;
@@ -641,7 +646,7 @@ void Scene::draw_models_recursive(Object *node, float delta,
     }
   }
   for (int16_t i = 0; i < node->children.size(); i++) {
-    draw_models_recursive(objPool.getChildOf(node, i), delta, modelTransform);
+    draw_models_recursive(node->children[i], delta, modelTransform);
   }
 }
 

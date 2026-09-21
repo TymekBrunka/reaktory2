@@ -754,9 +754,8 @@ void Model::SetAnimation(const Animation *animation) {
       node.bone_idx_binding = nullptr;
     }
 
-    // for (auto &[name, boneidx] : boneInfoMap) {
-    //   finalMatrices[boneidx.idx] = glm::mat4(1.0f);
-    // }
+    for (auto& matrix : finalMatrices)
+      matrix = glm::mat4(1.0f);
   }
 
   animationTime = 0;
