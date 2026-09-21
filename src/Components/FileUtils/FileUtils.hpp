@@ -2,6 +2,7 @@
 #include <Errors/Errors.hpp>
 #include <cstddef>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <memory>
 #include <utility>
@@ -65,14 +66,16 @@ public:
   path(const char *path_) : Path(std::string(path_)) {};
   ~path() = default;
 
-  inline operator std::filesystem::path() const {
+  inline std::filesystem::path to_fs() const {
     if (const std::filesystem::path *paf =
             std::get_if<std::filesystem::path>(&Path)) {
       return *paf;
     } else {
-      return std::get<std::string>(Path);
+      return std::filesystem::path{std::get<std::string>(Path)};
     }
   }
+
+  inline operator std::filesystem::path() const { return std::move(to_fs()); }
 
   inline operator std::filesystem::path &() const {
     return *const_cast<std::filesystem::path *>(
@@ -153,9 +156,22 @@ public:
   }
 };
 
+class FsStream {
+public:
+  inline virtual ~FsStream() {}
+  void *file;
+
+  virtual size_t Read(void *out, size_t size) = 0;
+  virtual size_t Write(const void *data, size_t size) = 0;
+  virtual bool Seek(size_t offset, bool at_the_end) = 0;
+  virtual size_t Tell() const = 0;
+  virtual size_t FileSize() const = 0;
+  // void Flush () { ... }
+};
+
 class Fs {
 public:
-  virtual char separator() = 0;
+  virtual char Separator() = 0;
 
   virtual Result<ReadResult, int>
   ReadFilex(const path &filepath, alloc_fun alloc = nullptr,
@@ -179,6 +195,78 @@ public:
   }
 
   virtual bool FileExists(const path &filepath) const = 0;
+
+  virtual FsStream *Open(const path &path, const char *mode) = 0;
+
+  virtual void Close(FsStream *file) = 0;
+};
+
+class RealFsStream : public FsStream {
+public:
+  inline ~RealFsStream() {
+    if (file)
+      // ((std::fstream *)file)->~fstream();
+      delete (std::fstream *)file;
+  };
+
+  RealFsStream(const RealFsStream &other) = delete;
+
+  RealFsStream &operator=(const RealFsStream &other) = delete;
+
+  inline RealFsStream(RealFsStream &&other) {
+    file = other.file;
+    other.file = nullptr;
+  }
+
+  inline RealFsStream &operator=(RealFsStream &other) {
+    if (this != &other) {
+      file = other.file;
+      other.file = nullptr;
+    }
+    return *this;
+  }
+
+  RealFsStream(std::fstream *stream) { file = stream; }
+
+  inline size_t Read(void *out, size_t size) {
+    ((std::fstream *)file)->read((char *)out, size);
+    return ((std::fstream *)file)->gcount();
+  }
+
+  inline size_t Write(const void *data, size_t size) {
+    ((std::fstream *)file)->write((char *)data, size);
+    return ((std::fstream *)file)->gcount();
+  }
+
+  inline bool Seek(size_t offset, bool at_the_end) {
+    try {
+      ((std::fstream *)file)
+          ->seekg(offset, at_the_end ? std::ios_base::end : std::ios_base::beg);
+      return true;
+    } catch (const std::ios_base::failure &err) {
+      return false;
+    }
+  }
+
+  inline size_t Tell() const {
+    try {
+      size_t t = ((std::fstream *)file)->tellg();
+      return t;
+    } catch (const std::ios_base::failure &err) {
+      return 0;
+    }
+  }
+
+  inline size_t FileSize() const {
+    RealFsStream *dis = (RealFsStream *)this;
+    size_t t = dis->Tell();
+    if (!dis->Seek(0, true))
+      return 0;
+    size_t filesize = dis->Tell();
+    dis->Seek(0, false);
+    return filesize;
+  };
+  // void Flush () { ... }
 };
 
 class RealFs : public Fs {
@@ -191,13 +279,21 @@ public:
   RealFs(std::filesystem::path &&path) : root(path) {};
   ~RealFs() = default;
 
-  inline char separator() override {
+  inline char Separator() override {
 #ifdef _WIN32
     return '\\';
 #else
     return '/';
 #endif
   }
+
+  inline FsStream *Open(const path &path, const char *mode) {
+    std::fstream *stream = new std::fstream{path.to_fs()};
+    RealFsStream *file = new RealFsStream{stream};
+    return file;
+  }
+
+  inline void Close(FsStream *file) { ((std::fstream *)file->file)->close(); }
 
   inline Result<ReadResult, int>
   ReadFilex(const path &filepath, alloc_fun alloc = nullptr,
