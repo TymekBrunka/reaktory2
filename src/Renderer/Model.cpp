@@ -1,4 +1,3 @@
-#include "Errors/Errors.hpp"
 #include "FileUtils.hpp"
 #include "Renderer.hpp"
 #include "Translations.hpp"
@@ -333,7 +332,7 @@ void Model::PrintNodeTreeImpl(const modelNode *node, int depth) const {
   }
 }
 
-Model Model::LoadFromFile(const FileUtils::Fs &fs,
+Result<Model, no_error>  Model::LoadFromFile(const FileUtils::Fs &fs,
                           const FileUtils::path &filepath, bool initialise) {
   Model model{};
   Assimp::Importer import;
@@ -349,7 +348,7 @@ Model Model::LoadFromFile(const FileUtils::Fs &fs,
     std::string what = err.what();
     Log::log(Log::ERROR | Log::SEV_MED, 0, "Assimp", TL(MSG_ASSIMP_ERROR),
              std::make_format_args(what));
-    return {};
+    return {}.Error();
   }
 
   if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
@@ -357,16 +356,16 @@ Model Model::LoadFromFile(const FileUtils::Fs &fs,
     const char *err = import.GetErrorString();
     Log::log(Log::ERROR | Log::SEV_MED, 0, "Assimp", TL(MSG_ASSIMP_ERROR),
              std::make_format_args(err));
-    return {};
+    return {}.Error();
   }
 
   if (!LoadModel(fs, filepath, scene, model, initialise)) {
-    return {};
+    return {}.Error();
   }
 
   // delete vfs; // this mf (assimp) deletes the thing internally so putting it
   //             // this would create double free
-  return model;
+  return {}.Ok(model);
 }
 
 // Model Model::LoadFromMemory(const FileUtils::Fs &fs, const void *data, size_t

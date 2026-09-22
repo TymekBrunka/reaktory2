@@ -17,7 +17,7 @@
 
 #include <ImGuizmo.h>
 
-#include <Errors/Errors.hpp>
+#include <Errors/Result.hpp>
 #include <Logging.hpp>
 #include <placeholder_icon_img.h>
 
@@ -286,9 +286,9 @@ Result<Image, no_error> Render::sLoadImageFromMemory(const unsigned char *data,
                             &image.channels, desired_channels);
 
   if (!image.pixels)
-    return Result<Image, no_error>::ERR(false);
+    return {}.Error(false);
 
-  return Result<Image, no_error>::OK(image);
+  return {}.Ok(image);
 }
 
 Result<Image, int> Render::sLoadImage(const FileUtils::Fs &fs,
@@ -298,11 +298,11 @@ Result<Image, int> Render::sLoadImage(const FileUtils::Fs &fs,
   FileUtils::Fs &fs_ = *(FileUtils::Fs *)&fs;
 
   if (!fs_.FileExists(filepath))
-    return Result<Image, int>::ERR(-2);
+    return {}.Error(-2);
 
   Result<FileUtils::ReadResult, int> res_fs = fs_.ReadFile(filepath);
   if (!res_fs.is_ok) {
-    return Result<Image, int>::ERR(res_fs.value.error);
+    return {}.Error(res_fs.value.error);
   }
 
   Result<Image, no_error> res_img =
@@ -311,17 +311,17 @@ Result<Image, int> Render::sLoadImage(const FileUtils::Fs &fs,
 
   if (!res_img.is_ok) {
     delete[] res_fs.value.success.data;
-    return Result<Image, int>::ERR(2);
+    return {}.Error(2);
   }
 
-  return Result<Image, int>::OK(res_img.value.success);
+  return {}.Ok(res_img.value.success);
 }
 
 Result<rTexture2D, no_error> Render::sLoadTexture(const Image &image,
                                                   bool pixelated, bool repeat) {
 
   if (image.channels <= 0 || image.channels > 4)
-    return Result<rTexture2D, no_error>::ERR(false);
+    return {}.Error(false);
 
   GLuint texture;
   glGenTextures(1, &texture);
@@ -367,11 +367,11 @@ Result<rTexture2D, no_error> Render::sLoadTexture(const Image &image,
     glGenerateMipmap(GL_TEXTURE_2D);
 
   // if (glGetError() == GL_NO_ERROR)
-  //   return Result<rTexture2D, no_error>::OK(texture);
+  //   return {}.Ok(texture);
   // else
-  //   return Result<rTexture2D, no_error>::ERR(false);
+  //   return {}.Error(false);
 
-  return Result<rTexture2D, no_error>::OK(texture);
+  return {}.Ok(texture);
 }
 
 void Render::BindTexture(rTexture2D id, int slot) {

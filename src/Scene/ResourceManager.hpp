@@ -1,5 +1,5 @@
 #pragma once
-#include <Errors/Errors.hpp>
+#include <Errors/Result.hpp>
 #include <FileUtils.hpp>
 #include <Model.hpp>
 #include <Renderer.hpp>
@@ -33,6 +33,7 @@ public:
   };
 
   bool do_copy_files = true;
+
 private:
   std::filesystem::path folder{};
 
@@ -85,19 +86,20 @@ public:
     return iter != textures.end() ? (*iter).second : -1;
   }
 
-  Errors::Result<ManagedModel *, int>
-  ImportModel(const FileUtils::Fs &fs, const FileUtils::path &filepath,
-              bool allow_reload = false);
+  Result<ManagedModel *, int> ImportModel(const FileUtils::Fs &fs,
+                                          const FileUtils::path &filepath,
+                                          bool allow_reload = false);
 
-  Errors::Result<ManagedModel *, int>
-  ImportModel(const FileUtils::Fs &fs, const FileUtils::path &filepath,
-              Renderer::Model *model, bool allow_reload = false);
+  Result<ManagedModel *, int> ImportModel(const FileUtils::Fs &fs,
+                                          const FileUtils::path &filepath,
+                                          Renderer::Model *model,
+                                          bool allow_reload = false);
 
-  Errors::Result<Renderer::rTexture2D, int>
+  Result<Renderer::rTexture2D, int>
   ImportTexture(const FileUtils::Fs &fs, const FileUtils::path &filepath,
                 bool allow_reload = false);
 
-  Errors::Result<Renderer::rTexture2D, int>
+  Result<Renderer::rTexture2D, int>
   ImportTexture(const FileUtils::Fs &fs, const FileUtils::path &filepath,
                 Renderer::Image *image, bool allow_reload = false);
 };

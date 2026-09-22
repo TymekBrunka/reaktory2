@@ -11,11 +11,11 @@ Result<ReadResult, int> ReadFilex(const std::filesystem::path &filepath,
                                   void *allocator) {
 
   if (!std::filesystem::exists(filepath))
-    return Result<ReadResult, int>::ERR(-2);
+    return Error<int>(-2);
 
   std::ifstream file(filepath, std::ios_base::in | std::ios_base::binary);
   if (!file.is_open())
-    return Result<ReadResult, int>::ERR(-1);
+    return Error<int>(-1);
 
   file.seekg(0, std::ios_base::end);
   size_t fsize = file.tellg();
@@ -33,11 +33,11 @@ Result<ReadResult, int> ReadFilex(const std::filesystem::path &filepath,
       frre(outbuffer, allocator, fsize);
     else
       delete[] outbuffer;
-    return Result<ReadResult, int>::ERR(1);
+    return Error<int>(1);
   }
 
-  return Result<ReadResult, int>::OK(
-      ReadResult{.data = outbuffer, .length = fsize});
+  return Result<ReadResult, int>(
+      Ok<ReadResult>(ReadResult{.data = outbuffer, .length = fsize}));
 }
 
 Result<no_error, int> WriteFile(const std::filesystem::path &filepath,
@@ -45,17 +45,17 @@ Result<no_error, int> WriteFile(const std::filesystem::path &filepath,
 
   std::ofstream file(filepath, std::ios_base::out | std::ios_base::binary);
   if (!file.is_open())
-    return Result<no_error, int>::ERR(-1);
+    return Error<int>::ERR(-1);
 
   try {
     file.write((const char *)data, size);
   } catch (std::exception &err) {
     file.close();
-    return Result<no_error, int>::ERR(1);
+    return Error<int>(1);
   }
 
   file.close();
-  return Result<no_error, int>::OK(false);
+  return Ok<no_error>();
 }
 
 Result<no_error, int>
@@ -65,7 +65,7 @@ WriteFileIfNotExists(const std::filesystem::path &filepath, const void *data,
   std::ifstream file(filepath, std::ios_base::in | std::ios_base::binary);
   if (file.is_open()) {
     file.close();
-    return Result<no_error, int>::OK(false);
+    return Ok<no_error>();
   }
   file.close();
   return WriteFile(filepath, data, size);

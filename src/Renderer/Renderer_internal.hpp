@@ -1,6 +1,6 @@
 #pragma once
 #include "imgui.h"
-#include <Errors/Errors.hpp>
+#include <Errors/Result.hpp>
 #include <Renderer.hpp>
 #include <glad/gl.h>
 

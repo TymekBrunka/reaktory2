@@ -6,14 +6,12 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
+#include <Errors/Result.hpp>
 
 #include <string>
 #include <string_view>
 #include <unordered_map>
 namespace Renderer {
-
-template <typename T, typename E> using Result = Errors::Result<T, E>;
-using no_error = Errors::no_error;
 
 struct Material {
   int diffuse1 = -1;

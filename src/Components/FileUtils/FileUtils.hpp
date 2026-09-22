@@ -1,5 +1,5 @@
 #pragma once
-#include <Errors/Errors.hpp>
+#include <Errors/Result.hpp>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
@@ -8,9 +8,6 @@
 #include <utility>
 #include <variant>
 namespace FileUtils {
-
-template <typename T, typename E> using Result = Errors::Result<T, E>;
-using no_error = Errors::no_error;
 
 extern std::filesystem::path HOME_DIR;
 extern std::filesystem::path APP_ROOT;
@@ -179,11 +176,11 @@ public:
                                            free_fun frre = nullptr,
                                            void *allocator = nullptr) {
     if (!FileExists(filepath))
-      return Result<ReadResult, int>::ERR(-2);
+      return {}.Error(-2);
 
     FsStream *file = Open(filepath, "rb");
     if (!file)
-      return Result<ReadResult, int>::ERR(-1);
+      return {}.Error(-1);
 
     size_t fsize = file->FileSize();
     char *outbuffer;
@@ -198,11 +195,11 @@ public:
         frre(outbuffer, allocator, fsize);
       else
         delete[] outbuffer;
-      return Result<ReadResult, int>::ERR(1);
+      return {}.Error(1);
     }
 
-    return Result<ReadResult, int>::OK(
-        ReadResult{.data = outbuffer, .length = fsize});
+    return Result<ReadResult, int>(
+        Ok<ReadResult>(ReadResult{.data = outbuffer, .length = fsize}));
   }
 
   template <class Allocator = std::allocator<char>>

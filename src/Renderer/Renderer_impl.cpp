@@ -1,6 +1,6 @@
 #include "Logging.hpp"
 #include "Translations.hpp"
-#include <Errors/Errors.hpp>
+#include <Errors/Result.hpp>
 #include <Renderer.hpp>
 #include <Renderer_internal.hpp>
 #include <cstdio>
@@ -12,7 +12,7 @@ Result<rShader, no_error> Render::Impl::CreateShader(GLenum shader_type,
 
   if (shader_type != GL_VERTEX_SHADER && shader_type != GL_FRAGMENT_SHADER &&
       shader_type != GL_GEOMETRY_SHADER) {
-    return Result<rShader, no_error>::ERR(false);
+    return {}.Error(false);
   }
 
   rShader shader = glCreateShader(shader_type);
@@ -43,10 +43,10 @@ Result<rShader, no_error> Render::Impl::CreateShader(GLenum shader_type,
              std::make_format_args(shader_type_s, message));
 
     glDeleteShader(shader);
-    return Result<rShader, no_error>::ERR(false);
+    return {}.Error(false);
   }
 
-  return Result<rShader, no_error>::OK(shader);
+  return {}.Ok(shader);
 }
 
 Result<rProgram, no_error> Render::Impl::LinkProgram(rProgram program,
@@ -62,10 +62,10 @@ Result<rProgram, no_error> Render::Impl::LinkProgram(rProgram program,
              std::make_format_args(name, message));
 
     glDeleteProgram(program);
-    return Result<rProgram, no_error>::ERR(false);
+    return {}.Error(false);
   }
 
-  return Result<rProgram, no_error>::OK(program);
+  return {}.Ok(program);
 }
 
 bool Render::Impl::ValidateProgram(rProgram program, char *const message,
@@ -92,14 +92,14 @@ Result<rProgram, no_error> Render::Impl::CreateProgram(const char *name,
       CreateShader(GL_VERTEX_SHADER, vs_source);
 
   if (!vertex_shader_.is_ok) {
-    return Result<rProgram, no_error>::ERR(false);
+    return {}.Error(false);
   }
 
   Result<rShader, no_error> fragment_shader_ =
       CreateShader(GL_FRAGMENT_SHADER, fs_source);
 
   if (!fragment_shader_.is_ok) {
-    return Result<rProgram, no_error>::ERR(false);
+    return {}.Error(false);
   }
 
   rProgram program = glCreateProgram();

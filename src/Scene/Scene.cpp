@@ -9,7 +9,6 @@
 
 #include "glm/common.hpp"
 #include "glm/trigonometric.hpp"
-#include <Errors/Errors.hpp>
 #include <FileUtils.hpp>
 #include <Logging.hpp>
 #include <Renderer.hpp>
@@ -161,9 +160,8 @@ static bool
 write_file_if_not_exists_reported(const std::filesystem::path &filepath,
                                   const void *data, size_t size) {
 
-  Errors::Result<Errors::no_error, int> err =
-      FileUtils::WriteFileIfNotExists(filepath, data, size);
-  if (!err.is_ok) {
+  auto err = FileUtils::WriteFileIfNotExists(filepath, data, size);
+  if (!err.is_ok()) {
     std::string path = filepath.string();
     Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
              err.value.error == -1 ? TL(MSG_GENERIC_OPEN_ERROR)

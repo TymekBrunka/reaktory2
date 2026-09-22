@@ -1,13 +1,10 @@
 #pragma once
 #define GLFW_INCLUDE_NONE
-#include <Errors/Errors.hpp>
+#include <Errors/Result.hpp>
 #include <FileUtils.hpp>
 #include <GLFW/glfw3.h>
 #include <filesystem>
 namespace Renderer {
-
-template <typename T, typename E> using Result = Errors::Result<T, E>;
-using Errors::no_error;
 
 // vertex buffer object
 typedef unsigned int rVBO;
