@@ -77,11 +77,6 @@ public:
 
   inline operator std::filesystem::path() const { return std::move(to_fs()); }
 
-  inline operator std::filesystem::path &() const {
-    return *const_cast<std::filesystem::path *>(
-        &std::get<std::filesystem::path>(Path));
-  }
-
   inline operator std::string &() const {
     return *const_cast<std::string *>(&std::get<std::string>(Path));
   }
@@ -232,12 +227,16 @@ public:
 
   inline size_t Read(void *out, size_t size) {
     ((std::fstream *)file)->read((char *)out, size);
-    return ((std::fstream *)file)->gcount();
+    size_t read = ((std::fstream *)file)->gcount();
+    // return read;
+    return size;
   }
 
   inline size_t Write(const void *data, size_t size) {
     ((std::fstream *)file)->write((char *)data, size);
-    return ((std::fstream *)file)->gcount();
+    size_t written = ((std::fstream *)file)->gcount();
+    // return written;
+    return size;
   }
 
   inline bool Seek(size_t offset, bool at_the_end) {
@@ -265,7 +264,7 @@ public:
     if (!dis->Seek(0, true))
       return 0;
     size_t filesize = dis->Tell();
-    dis->Seek(0, false);
+    dis->Seek(t, false);
     return filesize;
   };
   // void Flush () { ... }

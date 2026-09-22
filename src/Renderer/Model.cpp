@@ -27,16 +27,17 @@
 
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <iostream>
 namespace Renderer {
 
 class AssimpVFSstream : public Assimp::IOStream {
-  friend class AssimpREALFS;
+  friend class AssimpVFS;
   AssimpVFSstream() = default;
   std::unique_ptr<FileUtils::FsStream> file;
 
 public:
-  ~AssimpVFSstream();
+  ~AssimpVFSstream() override {};
   size_t Read(void *pvBuffer, size_t pSize, size_t pCount) override {
     return file->Read(pvBuffer, pSize * pCount);
   }
@@ -53,32 +54,45 @@ public:
   void Flush() override {}
 };
 
-class AssimpREALFS : public Assimp::IOSystem {
+class AssimpVFS : public Assimp::IOSystem {
 public:
-  // std::unique_ptr<FileUtils::Fs> fs;
+  static constexpr std::string dummy_string{};
+  FileUtils::Fs *fs;
   //
   // AssimpREALFS() { fs = std::make_unique<FileUtils::RealFs>(); }
   //
-  // template <typename T> AssimpREALFS(T &fs) { fs = std::make_unique<T>(); }
-  FileUtils::RealFs fs{};
-  AssimpREALFS() = default;
-  AssimpREALFS(const FileUtils::RealFs &fs_) : fs(fs_) {};
-  ~AssimpREALFS() = default;
+  AssimpVFS(FileUtils::Fs *fs_) : fs(fs_) {};
+  AssimpVFS() {};
+  ~AssimpVFS() override {};
 
-  bool Exists(const char *pFile) const override { return fs.FileExists(pFile); }
+  bool Exists(const char *pFile) const override {
+    return fs->FileExists(pFile);
+  }
 
-  char getOsSeparator() const override { return fs.Separator(); }
+  char getOsSeparator() const override { return fs->Separator(); }
 
   Assimp::IOStream *Open(const char *pFile, const char *pMode) override {
     AssimpVFSstream *stream = new AssimpVFSstream{};
-    stream->file.reset(fs.Open(pFile, pMode));
+    stream->file.reset(fs->Open(pFile, pMode));
     return stream;
   }
 
   void Close(Assimp::IOStream *pFile) override {
-    fs.Close(((AssimpVFSstream *)pFile)->file.get());
+    fs->Close(((AssimpVFSstream *)pFile)->file.get());
     delete pFile;
   }
+
+  bool ComparePaths(const char *one, const char *second) const override {
+    return !strcmp(one, second);
+  }
+
+  bool PushDirectory(const std::string &path) override { return false; }
+  const std::string &CurrentDirectory() const override { return dummy_string; }
+  size_t StackSize() const override { return 0; }
+  bool PopDirectory() override { return false; }
+  bool CreateDirectory(const std::string &path) override { return false; }
+  bool ChangeDirectory(const std::string &path) override { return false; }
+  bool DeleteFile(const std::string &file) override { return false; }
 };
 
 #define MAX_BONES 100
@@ -318,34 +332,11 @@ void Model::PrintNodeTreeImpl(const modelNode *node, int depth) const {
 
 Model Model::LoadFromFile(const FileUtils::Fs &fs,
                           const FileUtils::path &filepath, bool initialise) {
-  // Result<FileUtils::ReadResult, int> res_fs = fs.ReadFile(filepath);
-  // if (!res_fs.is_ok) {
-  //   std::string path = filepath.to_string();
-  //   switch (res_fs.value.error) {
-  //   case -2:
-  //     Log::log(Log::ERROR | Log::SEV_MED, 0, "Model loader",
-  //              TL(MSG_GENERIC_FILE_NOT_FOUND), std::make_format_args(path));
-  //     break;
-  //
-  //   case -1:
-  //     Log::log(Log::ERROR | Log::SEV_MED, 0, "Model loader",
-  //              TL(MSG_GENERIC_OPEN_ERROR), std::make_format_args(path));
-  //     break;
-  //
-  //   case 1:
-  //     Log::log(Log::ERROR | Log::SEV_MED, 0, "Model loader",
-  //              TL(MSG_GENERIC_READ_ERROR), std::make_format_args(path));
-  //     break;
-  //   default:
-  //     break;
-  //   }
-  //   return {};
-  // }
-
   Model model{};
   Assimp::Importer import;
 
-  import.SetIOHandler(new AssimpREALFS());
+  auto vfs = new AssimpVFS((FileUtils::Fs *)&fs);
+  import.SetIOHandler(vfs);
 
   const aiScene *scene;
   try {
@@ -370,6 +361,8 @@ Model Model::LoadFromFile(const FileUtils::Fs &fs,
     return {};
   }
 
+  // delete vfs; // this mf (assimp) deletes the thing internally so putting it
+  //             // this would create double free
   return model;
 }
 
