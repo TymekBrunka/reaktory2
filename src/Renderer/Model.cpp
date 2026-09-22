@@ -72,8 +72,11 @@ public:
   char getOsSeparator() const override { return fs->Separator(); }
 
   Assimp::IOStream *Open(const char *pFile, const char *pMode) override {
+    FileUtils::FsStream *fss = fs->Open(pFile, pMode);
+    if (!fss)
+      return nullptr;
     AssimpVFSstream *stream = new AssimpVFSstream{};
-    stream->file.reset(fs->Open(pFile, pMode));
+    stream->file.reset(fss);
     return stream;
   }
 

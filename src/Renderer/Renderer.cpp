@@ -295,10 +295,12 @@ Result<Image, int> Render::sLoadImage(const FileUtils::Fs &fs,
                                       const FileUtils::path &filepath,
                                       int desired_channels) {
 
-  if (!fs.FileExists(filepath))
+  FileUtils::Fs &fs_ = *(FileUtils::Fs *)&fs;
+
+  if (!fs_.FileExists(filepath))
     return Result<Image, int>::ERR(-2);
 
-  Result<FileUtils::ReadResult, int> res_fs = fs.ReadFile(filepath);
+  Result<FileUtils::ReadResult, int> res_fs = fs_.ReadFile(filepath);
   if (!res_fs.is_ok) {
     return Result<Image, int>::ERR(res_fs.value.error);
   }

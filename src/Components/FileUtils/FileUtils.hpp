@@ -168,14 +168,47 @@ class Fs {
 public:
   virtual char Separator() const = 0;
 
-  virtual Result<ReadResult, int>
-  ReadFilex(const path &filepath, alloc_fun alloc = nullptr,
-            free_fun frre = nullptr, void *allocator = nullptr) const = 0;
+  virtual bool FileExists(const path &filepath) const = 0;
+
+  virtual FsStream *Open(const path &path, const char *mode) = 0;
+
+  virtual void Close(FsStream *file) = 0;
+
+  inline Result<ReadResult, int> ReadFilex(const path &filepath,
+                                           alloc_fun alloc = nullptr,
+                                           free_fun frre = nullptr,
+                                           void *allocator = nullptr) {
+    if (!FileExists(filepath))
+      return Result<ReadResult, int>::ERR(-2);
+
+    FsStream *file = Open(filepath, "rb");
+    if (!file)
+      return Result<ReadResult, int>::ERR(-1);
+
+    size_t fsize = file->FileSize();
+    char *outbuffer;
+    if (alloc)
+      outbuffer = alloc(allocator, fsize);
+    else
+      outbuffer = new char[fsize];
+    outbuffer[fsize] = '\0';
+
+    if (file->Read(outbuffer, fsize) < fsize) {
+      if (frre)
+        frre(outbuffer, allocator, fsize);
+      else
+        delete[] outbuffer;
+      return Result<ReadResult, int>::ERR(1);
+    }
+
+    return Result<ReadResult, int>::OK(
+        ReadResult{.data = outbuffer, .length = fsize});
+  }
 
   template <class Allocator = std::allocator<char>>
   Result<ReadResult, int>
   ReadFile(const path &filepath,
-           const Allocator &alloc = std::allocator<char>()) const {
+           const Allocator &alloc = std::allocator<char>()) {
 
     alloc_fun allo = [](void *aloc, size_t n) {
       return std::allocator_traits<Allocator>::allocate((Allocator &)aloc, n);
@@ -188,12 +221,6 @@ public:
 
     return ReadFilex(filepath, allo, frre, (void *)&alloc);
   }
-
-  virtual bool FileExists(const path &filepath) const = 0;
-
-  virtual FsStream *Open(const path &path, const char *mode) = 0;
-
-  virtual void Close(FsStream *file) = 0;
 };
 
 class RealFsStream : public FsStream {
@@ -228,15 +255,15 @@ public:
   inline size_t Read(void *out, size_t size) {
     ((std::fstream *)file)->read((char *)out, size);
     size_t read = ((std::fstream *)file)->gcount();
-    // return read;
-    return size;
+    return read;
+    // return size;
   }
 
   inline size_t Write(const void *data, size_t size) {
     ((std::fstream *)file)->write((char *)data, size);
     size_t written = ((std::fstream *)file)->gcount();
-    // return written;
-    return size;
+    return written;
+    // return size;
   }
 
   inline bool Seek(size_t offset, bool at_the_end) {
@@ -289,7 +316,18 @@ public:
   }
 
   inline FsStream *Open(const path &path, const char *mode) override {
-    std::fstream *stream = new std::fstream{path.to_fs()};
+    if (!FileExists(path))
+      return nullptr;
+
+    std::fstream *stream =
+        new std::fstream{path.to_fs(), std::ios_base::in | std::ios_base::out |
+                                           std::ios_base::binary};
+
+    if (!stream->is_open()) {
+      delete stream;
+      return nullptr;
+    }
+
     RealFsStream *file = new RealFsStream{stream};
     return file;
   }
@@ -297,13 +335,6 @@ public:
   inline void Close(FsStream *file) override {
     ((std::fstream *)file->file)->close();
   }
-
-  inline Result<ReadResult, int>
-  ReadFilex(const path &filepath, alloc_fun alloc = nullptr,
-            free_fun frre = nullptr, void *allocator = nullptr) const override {
-
-    return FileUtils::ReadFilex(root / filepath, alloc, frre, allocator);
-  };
 
   inline bool FileExists(const path &filepath) const override {
     return std::filesystem::exists(root / filepath) &&
