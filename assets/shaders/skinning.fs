@@ -1,11 +1,14 @@
 #version 330
 
 in vec2 TexCoords;
-out vec4 finalColor;
+layout (location = 0) out vec4 finalColor;
+layout (location = 1) out vec4 colorBuffer;
 
 uniform int diffuse1_idx;
 uniform sampler2D diffuse1;
 uniform vec4 diffuse_color;
+
+uniform vec3 ID;
 
 vec4 Blend(in vec4 fragColor, in vec4 textureColor)
 {
@@ -20,5 +23,6 @@ void main()
     //finalColor = texture(diffuse1, TexCoords);
     vec4 texcolor = diffuse1_idx != -1 ? texture(diffuse1, TexCoords) : vec4(0,0,0,0);
     finalColor = Blend(diffuse_color, texcolor);
+    colorBuffer = vec4(ID, 1);
     //finalColor = diffuse_color;
 }

@@ -256,12 +256,12 @@ bool App::init() {
 
   new_scene_img =
       render.LoadImageFromMemory(scene_new_png_data, scene_new_png_size)
-          .ok_unchecked();
-  new_scene_tex = render.LoadTexture(new_scene_img).ok_unchecked();
+          .value();
+  new_scene_tex = render.LoadTexture(new_scene_img).value();
 
-  icon_tex = render.LoadTexture(icon).ok_unchecked();
-  icons = render.LoadTexture(icons_, true).ok_unchecked();
-  keybinds_tex = render.LoadTexture(keybind_icons, true).ok_unchecked();
+  icon_tex = render.LoadTexture(icon).value();
+  icons = render.LoadTexture(icons_, true).value();
+  keybinds_tex = render.LoadTexture(keybind_icons, true).value();
 
   render.SetWindowIcon(icon);
 

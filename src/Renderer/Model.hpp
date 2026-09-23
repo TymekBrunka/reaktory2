@@ -6,7 +6,7 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
-#include <Errors/Result.hpp>
+#include <expected>
 
 #include <string>
 #include <string_view>
@@ -234,7 +234,7 @@ public:
     defaultProgram = program;
   }
 
-  static Model LoadFromFile(const FileUtils::Fs &fs,
+  static std::expected<Model, int> LoadFromFile(const FileUtils::Fs &fs,
                             const FileUtils::path &filepath,
                             bool initialise = true);
   // static Model LoadFromMemory(const FileUtils::Fs &fs, const void *data,

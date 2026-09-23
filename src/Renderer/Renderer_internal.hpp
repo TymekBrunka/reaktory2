@@ -1,6 +1,6 @@
 #pragma once
 #include "imgui.h"
-#include <Errors/Result.hpp>
+#include <expected>
 #include <Renderer.hpp>
 #include <glad/gl.h>
 
@@ -26,11 +26,11 @@ struct Render::Impl {
   RENDERscrollfun scroll_callback = nullptr;
   RENDERdropfun drop_callback = nullptr;
 
-  Result<rShader, no_error> CreateShader(GLenum shader_type, const char *src);
-  Result<rProgram, no_error> LinkProgram(rProgram program, const char *name);
+  std::expected<rShader, bool> CreateShader(GLenum shader_type, const char *src);
+  std::expected<rProgram, bool> LinkProgram(rProgram program, const char *name);
   bool ValidateProgram(rProgram program, char *const message, int buflen);
 
-  Result<rProgram, no_error>
+  std::expected<rProgram, bool>
   CreateProgram(const char *name, const char *vs_source, const char *fs_source);
 };
 

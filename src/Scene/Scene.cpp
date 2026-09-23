@@ -4,6 +4,7 @@
 #include "ResourceManager.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/geometric.hpp"
+#include "glm/matrix.hpp"
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
 
@@ -45,6 +46,7 @@ Renderer::rLocation Scene::skybox_projection_loc = 0;
 
 Renderer::rLocation Scene::model_view_loc = 0;
 Renderer::rLocation Scene::model_projection_loc = 0;
+Renderer::rLocation Scene::model_ID_loc = 0;
 Renderer::rLocation Scene::model_model_loc = 0;
 
 static GLuint skybox_indiecies[] = {
@@ -161,11 +163,11 @@ write_file_if_not_exists_reported(const std::filesystem::path &filepath,
                                   const void *data, size_t size) {
 
   auto err = FileUtils::WriteFileIfNotExists(filepath, data, size);
-  if (!err.is_ok()) {
+  if (!err.has_value()) {
     std::string path = filepath.string();
     Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
-             err.value.error == -1 ? TL(MSG_GENERIC_OPEN_ERROR)
-                                   : TL(MSG_GENERIC_WRITE_ERROR),
+             err.error() == -1 ? TL(MSG_GENERIC_OPEN_ERROR)
+                               : TL(MSG_GENERIC_WRITE_ERROR),
              std::make_format_args(path));
     return false;
   }
@@ -315,30 +317,29 @@ void Scene::resize_framebuffer(Renderer::rect_size size) {
 }
 
 bool Scene::Init(Renderer::Render &render) {
-  Errors::Result<Renderer::rProgram, Errors::no_error> res_shader =
-      render.LoadProgram("simple", (const char *)simple_vs_data,
-                         (const char *)simple_fs_data);
+  auto res_shader = render.LoadProgram("simple", (const char *)simple_vs_data,
+                                       (const char *)simple_fs_data);
 
-  if (!res_shader.is_ok)
+  if (!res_shader.has_value())
     return false;
 
-  tri_program = res_shader.ok_unchecked();
+  tri_program = res_shader.value();
 
   res_shader = render.LoadProgram("skybox", (const char *)skybox_vs_data,
                                   (const char *)skybox_fs_data);
 
-  if (!res_shader.is_ok) {
+  if (!res_shader.has_value()) {
     render.UnloadProgram(tri_program);
     tri_program = 0;
     return false;
   }
 
-  skybox_program = res_shader.ok_unchecked();
+  skybox_program = res_shader.value();
 
   res_shader = render.LoadProgram("skinning", (const char *)skinning_vs_data,
                                   (const char *)skinning_fs_data);
 
-  if (!res_shader.is_ok) {
+  if (!res_shader.has_value()) {
     render.UnloadProgram(tri_program);
     render.UnloadProgram(skybox_program);
     tri_program = 0;
@@ -346,11 +347,12 @@ bool Scene::Init(Renderer::Render &render) {
     return false;
   }
 
-  skinning_program = res_shader.ok_unchecked();
+  skinning_program = res_shader.value();
 
   model_view_loc = glGetUniformLocation(skinning_program, "view");
   model_projection_loc = glGetUniformLocation(skinning_program, "projection");
   model_model_loc = glGetUniformLocation(skinning_program, "model");
+  model_ID_loc = glGetUniformLocation(skinning_program, "ID");
 
   Renderer::Model::setDefaultProgram(skinning_program);
 
@@ -408,12 +410,11 @@ bool Scene::init(Renderer::Render &render) {
 
   std::filesystem::path filepath =
       FileUtils::APP_ROOT / "scenes" / name / "skybox.png";
-  Errors::Result<Renderer::Image, int> res_img_read =
-      render.LoadImage(FileUtils::RealFs{}, filepath);
+  auto res_img_read = render.LoadImage(FileUtils::RealFs{}, filepath);
 
-  if (!res_img_read.is_ok) {
+  if (!res_img_read.has_value()) {
     std::string path = filepath.string();
-    switch (res_img_read.value.error) {
+    switch (res_img_read.error()) {
     case -2:
       Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
                TL(MSG_GENERIC_FILE_NOT_FOUND), std::make_format_args(path));
@@ -443,14 +444,14 @@ bool Scene::init(Renderer::Render &render) {
     return false;
   }
 
-  Errors::Result<Renderer::rTexture2D, Errors::no_error> res_txt =
-      render.LoadTexture(res_img_read.ok_unchecked());
-  if (!res_txt.is_ok) {
+  auto res_txt = render.LoadTexture(res_img_read.value());
+
+  if (!res_txt.has_value()) {
     std::string path = filepath.string();
     Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
              TL(MSG_RENDER_LOAD_IMAGE_ERROR), std::make_format_args(path));
 
-    free(res_img_read.ok_unchecked().pixels);
+    free(res_img_read.value().pixels);
 
     glDeleteFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -458,20 +459,20 @@ bool Scene::init(Renderer::Render &render) {
     return false;
   }
 
-  free(res_img_read.ok_unchecked().pixels);
+  free(res_img_read.value().pixels);
 
-  skybox_texture = res_txt.ok_unchecked();
+  skybox_texture = res_txt.value();
   skybox_loc = glGetUniformLocation(skybox_program, "skybox");
   glUniform1i(skybox_loc, 0);
   initialised = true;
 
-  // ---------------------- model test
-  resMan.ImportModel(FileUtils::RealFs{}, std::filesystem::path{"assets"} /
-                                              "example" / "models" /
-                                              "CesiumMan.m3d");
-  resMan.GetModel("CesiumMan.m3d")
-      ->model.SetAnimation(
-          &resMan.GetModel("CesiumMan.m3d")->model.GetAnimations()[0]);
+  // // ---------------------- model test
+  // auto e1 = resMan.ImportModel(FileUtils::RealFs{},
+  //                              std::filesystem::path{"assets"} / "example" /
+  //                                  "models" / "CesiumMan.m3d");
+  // resMan.GetModel("CesiumMan.m3d")
+  //     ->model.SetAnimation(
+  //         &resMan.GetModel("CesiumMan.m3d")->model.GetAnimations()[0]);
   return true;
 }
 
@@ -575,13 +576,34 @@ void Scene::render(Renderer::Render &render) {
   glUniformMatrix4fv(model_projection_loc, 1, GL_FALSE,
                      glm::value_ptr(projection));
 
-  glm::mat4 model = glm::mat4(1.0f);
-  glUniformMatrix4fv(model_model_loc, 1, GL_FALSE, glm::value_ptr(model));
-  resMan.GetModel("CesiumMan.m3d")->model.Advance(render.GetDelta());
-  resMan.GetModel("CesiumMan.m3d")->model.Draw();
+  // glm::mat4 model = glm::mat4(1.0f);
+  // glUniformMatrix4fv(model_model_loc, 1, GL_FALSE, glm::value_ptr(model));
+  // resMan.GetModel("CesiumMan.m3d")->model.Advance(render.GetDelta());
+  // resMan.GetModel("CesiumMan.m3d")->model.Draw();
 
-  draw_models_recursive(objPool.rootH().idx, render.GetDelta(),
-                        glm::mat4(1.0f));
+  draw_models_recursive(objPool.rootH().idx, render.GetDelta(), glm::mat4(1.0f),
+                        objPool.rootH());
+
+  if (mousebuttonLclick && mpos.width <= size.width &&
+      mpos.height <= size.height) {
+
+    unsigned char pixel[4] = {0};
+    glReadBuffer(GL_COLOR_ATTACHMENT1);
+    glReadPixels(mpos.width, mpos.height, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE,
+                 &pixel);
+
+    // if (pixel[3] == 255) {
+    objH obj =
+        objH{.gen = pixel[0], .idx = (int16_t)(pixel[1] + (pixel[2] * 256))};
+    if (selected_object.idx == 0 ||
+        (!ImGuizmo::IsOver() && selected_object.idx != 0))
+      selected_object = objPool.get(obj) ? obj : objPool.rootH();
+    // }
+
+    // std::cerr << "objH pixel is " << (int)pixel[0] << ", "
+    //           << (int)(pixel[1] + (pixel[2] * 256)) << " alpha "
+    //           << (int)pixel[3] << "\n";
+  }
 
   // glUseProgram(tri_program);
   // glBindVertexArray(tri_vao);
@@ -592,10 +614,13 @@ void Scene::render(Renderer::Render &render) {
 }
 
 void Scene::draw_models_recursive(int16_t idx, float delta,
-                                  glm::mat4 parentTransform) {
+                                  glm::mat4 parentTransform, objH parentObj) {
 
   Object *node = &objPool.get(objPool.rootH())[idx];
   glm::mat4 modelTransform = node->transform * parentTransform;
+  parentObj = node->toHandle(idx) == selected_object || parentObj.idx == 0
+                  ? node->toHandle(idx)
+                  : parentObj;
 
   if (oModel *omodel = (oModel *)std::get_if<oModel>(&node->variant)) {
     std::string *model_name = omodel->model->get_model();
@@ -632,19 +657,29 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
         }
 
         if (node->toHandle(idx) == selected_object) {
+          glm::mat4 world2local = parentTransform * node->transform;
           ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection),
                                mCurrentGizmoOperation, mCurrentGizmoMode,
-                               glm::value_ptr(node->transform), NULL, NULL);
+                               glm::value_ptr(world2local), NULL, NULL);
+
+          node->transform = glm::inverse(parentTransform) * world2local;
         }
 
-        glm::mat4 modelTransform = node->transform * parentTransform;
+        modelTransform = parentTransform * node->transform;
         model.transform = modelTransform;
+
+        glm::vec3 color = glm::vec3(((float)parentObj.gen) / 256,
+                                    ((float)(parentObj.idx % 256)) / 256,
+                                    ((float)(parentObj.idx / 256)) / 256);
+
+        glUseProgram(skinning_program);
+        glUniform3fv(model_ID_loc, 1, glm::value_ptr(color));
         model.Draw();
       }
     }
   }
   for (int16_t i = 0; i < node->children.size(); i++) {
-    draw_models_recursive(node->children[i], delta, modelTransform);
+    draw_models_recursive(node->children[i], delta, modelTransform, parentObj);
   }
 }
 

@@ -1,18 +1,18 @@
 #include "Logging.hpp"
 #include "Translations.hpp"
-#include <Errors/Result.hpp>
+#include "utility"
 #include <Renderer.hpp>
 #include <Renderer_internal.hpp>
 #include <cstdio>
 #include <cstring>
 namespace Renderer {
 
-Result<rShader, no_error> Render::Impl::CreateShader(GLenum shader_type,
-                                                     const char *source) {
+std::expected<rShader, bool> Render::Impl::CreateShader(GLenum shader_type,
+                                                        const char *source) {
 
   if (shader_type != GL_VERTEX_SHADER && shader_type != GL_FRAGMENT_SHADER &&
       shader_type != GL_GEOMETRY_SHADER) {
-    return {}.Error(false);
+    return std::unexpected(false);
   }
 
   rShader shader = glCreateShader(shader_type);
@@ -43,14 +43,14 @@ Result<rShader, no_error> Render::Impl::CreateShader(GLenum shader_type,
              std::make_format_args(shader_type_s, message));
 
     glDeleteShader(shader);
-    return {}.Error(false);
+    return std::unexpected(false);
   }
 
-  return {}.Ok(shader);
+  return (shader);
 }
 
-Result<rProgram, no_error> Render::Impl::LinkProgram(rProgram program,
-                                                     const char *name) {
+std::expected<rProgram, bool> Render::Impl::LinkProgram(rProgram program,
+                                                        const char *name) {
   glLinkProgram(program);
   int linking_status;
   glGetProgramiv(program, GL_LINK_STATUS, &linking_status);
@@ -62,10 +62,10 @@ Result<rProgram, no_error> Render::Impl::LinkProgram(rProgram program,
              std::make_format_args(name, message));
 
     glDeleteProgram(program);
-    return {}.Error(false);
+    return std::unexpected(false);
   }
 
-  return {}.Ok(program);
+  return (program);
 }
 
 bool Render::Impl::ValidateProgram(rProgram program, char *const message,
@@ -84,28 +84,26 @@ bool Render::Impl::ValidateProgram(rProgram program, char *const message,
   return true;
 }
 
-Result<rProgram, no_error> Render::Impl::CreateProgram(const char *name,
-                                                       const char *vs_source,
-                                                       const char *fs_source) {
+std::expected<rProgram, bool>
+Render::Impl::CreateProgram(const char *name, const char *vs_source,
+                            const char *fs_source) {
 
-  Result<rShader, no_error> vertex_shader_ =
-      CreateShader(GL_VERTEX_SHADER, vs_source);
+  auto vertex_shader_ = CreateShader(GL_VERTEX_SHADER, vs_source);
 
-  if (!vertex_shader_.is_ok) {
-    return {}.Error(false);
+  if (!vertex_shader_.has_value()) {
+    return std::unexpected(false);
   }
 
-  Result<rShader, no_error> fragment_shader_ =
-      CreateShader(GL_FRAGMENT_SHADER, fs_source);
+  auto fragment_shader_ = CreateShader(GL_FRAGMENT_SHADER, fs_source);
 
-  if (!fragment_shader_.is_ok) {
-    return {}.Error(false);
+  if (!fragment_shader_.has_value()) {
+    return std::unexpected(false);
   }
 
   rProgram program = glCreateProgram();
   // labelObject(GL_PROGRAM, program, name);
-  glAttachShader(program, vertex_shader_.ok_unchecked());
-  glAttachShader(program, fragment_shader_.ok_unchecked());
+  glAttachShader(program, vertex_shader_.value());
+  glAttachShader(program, fragment_shader_.value());
 
   return LinkProgram(program, name);
 }

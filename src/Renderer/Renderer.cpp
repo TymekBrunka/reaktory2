@@ -2,8 +2,8 @@
 #include <Renderer.hpp>
 #include <fstream>
 #include <glad/gl.h>
-#include <stdexcept>
 #include <iostream>
+#include <stdexcept>
 
 #include <GLFW/glfw3.h>
 #include <Renderer_internal.hpp>
@@ -17,7 +17,6 @@
 
 #include <ImGuizmo.h>
 
-#include <Errors/Result.hpp>
 #include <Logging.hpp>
 #include <placeholder_icon_img.h>
 
@@ -269,16 +268,16 @@ bool Render::WindowShouldClose() const {
   return glfwWindowShouldClose(impl->window);
 }
 
-Result<rProgram, no_error> Render::LoadProgram(const char *name, const char *vs,
-                                               const char *fs) {
+std::expected<rProgram, bool>
+Render::LoadProgram(const char *name, const char *vs, const char *fs) {
   return impl->CreateProgram(name, vs, fs);
 }
 
 void Render::UnloadProgram(rProgram program) { glDeleteProgram(program); }
 
-Result<Image, no_error> Render::sLoadImageFromMemory(const unsigned char *data,
-                                                     int length,
-                                                     int desired_channels) {
+std::expected<Image, bool>
+Render::sLoadImageFromMemory(const unsigned char *data, int length,
+                             int desired_channels) {
 
   Image image;
   image.pixels =
@@ -286,42 +285,42 @@ Result<Image, no_error> Render::sLoadImageFromMemory(const unsigned char *data,
                             &image.channels, desired_channels);
 
   if (!image.pixels)
-    return {}.Error(false);
+    return std::unexpected(false);
 
-  return {}.Ok(image);
+  return (image);
 }
 
-Result<Image, int> Render::sLoadImage(const FileUtils::Fs &fs,
-                                      const FileUtils::path &filepath,
-                                      int desired_channels) {
+std::expected<Image, int> Render::sLoadImage(const FileUtils::Fs &fs,
+                                             const FileUtils::path &filepath,
+                                             int desired_channels) {
 
   FileUtils::Fs &fs_ = *(FileUtils::Fs *)&fs;
 
   if (!fs_.FileExists(filepath))
-    return {}.Error(-2);
+    return std::unexpected(-2);
 
-  Result<FileUtils::ReadResult, int> res_fs = fs_.ReadFile(filepath);
-  if (!res_fs.is_ok) {
-    return {}.Error(res_fs.value.error);
+  auto res_fs = fs_.ReadFile(filepath);
+  if (!res_fs.has_value()) {
+    return std::unexpected(res_fs.error());
   }
 
-  Result<Image, no_error> res_img =
-      sLoadImageFromMemory((unsigned char *)res_fs.ok_unchecked().data,
-                           res_fs.ok_unchecked().length, desired_channels);
+  std::expected<Image, bool> res_img =
+      sLoadImageFromMemory((unsigned char *)res_fs.value().data,
+                           res_fs.value().length, desired_channels);
 
-  if (!res_img.is_ok) {
-    delete[] res_fs.value.success.data;
-    return {}.Error(2);
+  if (!res_img.has_value()) {
+    delete[] res_fs.value().data;
+    return std::unexpected(2);
   }
 
-  return {}.Ok(res_img.value.success);
+  return (res_img.value());
 }
 
-Result<rTexture2D, no_error> Render::sLoadTexture(const Image &image,
-                                                  bool pixelated, bool repeat) {
+std::expected<rTexture2D, bool>
+Render::sLoadTexture(const Image &image, bool pixelated, bool repeat) {
 
-  if (image.channels <= 0 || image.channels > 4)
-    return {}.Error(false);
+  if (image.channels <= 0 || image.channels > 4 || image.pixels == nullptr)
+    return std::unexpected(false);
 
   GLuint texture;
   glGenTextures(1, &texture);
@@ -366,12 +365,12 @@ Result<rTexture2D, no_error> Render::sLoadTexture(const Image &image,
   if (image.mipmap_levels > 0)
     glGenerateMipmap(GL_TEXTURE_2D);
 
-  // if (glGetError() == GL_NO_ERROR)
-  //   return {}.Ok(texture);
+  // if (glGetError() == GL_bool)
+  //   return (texture);
   // else
-  //   return {}.Error(false);
+  //   return std::unexpected(false);
 
-  return {}.Ok(texture);
+  return (texture);
 }
 
 void Render::BindTexture(rTexture2D id, int slot) {

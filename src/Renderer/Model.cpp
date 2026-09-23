@@ -332,8 +332,9 @@ void Model::PrintNodeTreeImpl(const modelNode *node, int depth) const {
   }
 }
 
-Result<Model, no_error>  Model::LoadFromFile(const FileUtils::Fs &fs,
-                          const FileUtils::path &filepath, bool initialise) {
+std::expected<Model, int> Model::LoadFromFile(const FileUtils::Fs &fs,
+                                              const FileUtils::path &filepath,
+                                              bool initialise) {
   Model model{};
   Assimp::Importer import;
 
@@ -348,7 +349,7 @@ Result<Model, no_error>  Model::LoadFromFile(const FileUtils::Fs &fs,
     std::string what = err.what();
     Log::log(Log::ERROR | Log::SEV_MED, 0, "Assimp", TL(MSG_ASSIMP_ERROR),
              std::make_format_args(what));
-    return {}.Error();
+    return std::unexpected(false);
   }
 
   if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE ||
@@ -356,16 +357,16 @@ Result<Model, no_error>  Model::LoadFromFile(const FileUtils::Fs &fs,
     const char *err = import.GetErrorString();
     Log::log(Log::ERROR | Log::SEV_MED, 0, "Assimp", TL(MSG_ASSIMP_ERROR),
              std::make_format_args(err));
-    return {}.Error();
+    return std::unexpected(false);
   }
 
   if (!LoadModel(fs, filepath, scene, model, initialise)) {
-    return {}.Error();
+    return std::unexpected(false);
   }
 
   // delete vfs; // this mf (assimp) deletes the thing internally so putting it
   //             // this would create double free
-  return {}.Ok(model);
+  return (model);
 }
 
 // Model Model::LoadFromMemory(const FileUtils::Fs &fs, const void *data, size_t
@@ -439,11 +440,12 @@ void Model::init() {
     if (!mesh.ctx->material.diffuse1.empty()) {
       Model::img_with_id &img =
           (*texture_data->find(mesh.ctx->material.diffuse1)).second;
+
       if (img.id == -1) {
-        Result<rTexture2D, no_error> res_img = Render::sLoadTexture(img.image);
-        if (res_img.is_ok) {
-          img.id = res_img.ok_unchecked();
-          diffuse1_id = res_img.ok_unchecked();
+        auto res_img = Render::sLoadTexture(img.image);
+        if (res_img.has_value()) {
+          img.id = res_img.value();
+          diffuse1_id = res_img.value();
         }
       }
     }
@@ -547,12 +549,12 @@ Mesh Model::processMesh(const FileUtils::Fs &fs, const FileUtils::path &path,
       std::cerr << "the image path for texture is " << path_.data << "\n";
 
       if (texture_data->find(path_.data) == texture_data->end()) {
-        Result<Renderer::Image, int> res_fs =
+        std::expected<Renderer::Image, int> res_fs =
             Render::sLoadImage(fs, path.folder() / path_.data);
 
-        if (!res_fs.is_ok) {
+        if (!res_fs.has_value()) {
           std::string s_path = (path.folder() / path_.data).to_string();
-          switch (res_fs.value.error) {
+          switch (res_fs.error()) {
           case -2:
             Log::log(Log::ERROR | Log::SEV_MED, 0, "Model loader",
                      TL(MSG_GENERIC_FILE_NOT_FOUND),
@@ -579,7 +581,7 @@ Mesh Model::processMesh(const FileUtils::Fs &fs, const FileUtils::path &path,
         } else {
           std::cerr << "Loaded required texture\n";
           (*texture_data)[path_.data] =
-              Model::img_with_id{.image = res_fs.ok_unchecked()};
+              Model::img_with_id{.image = res_fs.value()};
           Mesh.ctx->material.diffuse1 = path_.data;
         }
       } else {

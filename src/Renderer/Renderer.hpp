@@ -1,6 +1,6 @@
 #pragma once
 #define GLFW_INCLUDE_NONE
-#include <Errors/Result.hpp>
+#include <expected>
 #include <FileUtils.hpp>
 #include <GLFW/glfw3.h>
 #include <filesystem>
@@ -114,36 +114,36 @@ public:
 
   rect_size GetCursorPosition() const;
 
-  Result<rProgram, no_error> LoadProgram(const char *name, const char *vs,
+  std::expected<rProgram, bool> LoadProgram(const char *name, const char *vs,
                                          const char *fs);
   void UnloadProgram(rProgram program);
 
-  static Result<Image, int> sLoadImage(const FileUtils::Fs &fs,
+  static std::expected<Image, int> sLoadImage(const FileUtils::Fs &fs,
                                        const FileUtils::path &filepath,
                                        int desired_channels = 0);
 
-  static Result<Image, no_error> sLoadImageFromMemory(const unsigned char *data,
+  static std::expected<Image, bool> sLoadImageFromMemory(const unsigned char *data,
                                                       int length,
                                                       int desired_channels = 0);
 
-  static Result<rTexture2D, no_error>
+  static std::expected<rTexture2D, bool>
   sLoadTexture(const Image &image, bool pixelated = false, bool repeat = false);
 
-  inline Result<Image, int> LoadImage(const FileUtils::Fs &fs,
+  inline std::expected<Image, int> LoadImage(const FileUtils::Fs &fs,
                                       const FileUtils::path &filepath,
                                       int desired_channels = 0) {
 
     return sLoadImage(fs, filepath, desired_channels);
   }
 
-  inline Result<Image, no_error> LoadImageFromMemory(const unsigned char *data,
+  inline std::expected<Image, bool> LoadImageFromMemory(const unsigned char *data,
                                                      int length,
                                                      int desired_channels = 0) {
 
     return sLoadImageFromMemory(data, length, desired_channels);
   }
 
-  inline Result<rTexture2D, no_error>
+  inline std::expected<rTexture2D, bool>
   LoadTexture(const Image &image, bool pixelated = false, bool repeat = false) {
     return sLoadTexture(image, pixelated, repeat);
   }

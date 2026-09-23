@@ -1,4 +1,3 @@
-#include "Errors/Result.hpp"
 #include "Eval.hpp"
 #include "FileUtils.hpp"
 #include "Model.hpp"
@@ -518,7 +517,7 @@ void App::draw_gui() {
                           ipfd::opt::multiselect);
 
       for (const auto &model : models_to_load) {
-        selected_scene->resMan.ImportModel(
+        auto e1 = selected_scene->resMan.ImportModel(
             FileUtils::RealFs{std::filesystem::path{}},
             std::filesystem::path{model});
       }
@@ -539,7 +538,10 @@ void App::draw_gui() {
     ImGui::BeginChild("###modele_child");
     for (const auto &[name, model] : selected_scene->resMan.GetModelsMap()) {
       if (filter.PassFilter(name.c_str()))
-        ImGui::Selectable(name.c_str(), false);
+        if (ImGui::Selectable(name.c_str(), false)) {
+          selected_scene->objPool.add_model_node(
+              selected_scene->resMan, selected_scene->selected_object, name);
+        }
     }
     ImGui::EndChild();
   }
@@ -559,7 +561,7 @@ void App::draw_gui() {
                           ipfd::opt::multiselect);
 
       for (const auto &texture : textures_to_load) {
-        selected_scene->resMan.ImportTexture(
+        auto e1 = selected_scene->resMan.ImportTexture(
             FileUtils::RealFs{std::filesystem::path{}},
             std::filesystem::path{texture});
       }

@@ -27,11 +27,13 @@ class Scene {
 
   static Renderer::rLocation model_view_loc;
   static Renderer::rLocation model_projection_loc;
+  static Renderer::rLocation model_ID_loc;
   static Renderer::rLocation model_model_loc;
 
   bool initialised = false;
   bool mousebuttonL = false;
   bool mousebuttonR = false;
+  bool mousebuttonLclick = false;
   atomic_bool is_busy = true;
   Renderer::rect_size size{640, 480};
   glm::vec2 last_mpos{0, 0};
@@ -73,7 +75,7 @@ private:
                                       const std::filesystem::path &path);
 
   void draw_models_recursive(int16_t idx, float delta,
-                             glm::mat4 parentTransform);
+                             glm::mat4 parentTransform, objH parentObj);
 
 public:
   ResourceManager resMan{};
@@ -106,6 +108,7 @@ public:
   inline void updateMousePos(const Renderer::rect_size &pos) { mpos = pos; }
 
   inline void updateMouseButtonState(bool left, bool right) {
+    mousebuttonLclick = left && !mousebuttonL;
     mousebuttonL = left;
     mousebuttonR = right;
   }

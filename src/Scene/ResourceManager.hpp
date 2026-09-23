@@ -1,5 +1,5 @@
 #pragma once
-#include <Errors/Result.hpp>
+#include <expected>
 #include <FileUtils.hpp>
 #include <Model.hpp>
 #include <Renderer.hpp>
@@ -86,20 +86,20 @@ public:
     return iter != textures.end() ? (*iter).second : -1;
   }
 
-  Result<ManagedModel *, int> ImportModel(const FileUtils::Fs &fs,
+  std::expected<ManagedModel *, int> ImportModel(const FileUtils::Fs &fs,
                                           const FileUtils::path &filepath,
                                           bool allow_reload = false);
 
-  Result<ManagedModel *, int> ImportModel(const FileUtils::Fs &fs,
+  std::expected<ManagedModel *, int> ImportModel(const FileUtils::Fs &fs,
                                           const FileUtils::path &filepath,
                                           Renderer::Model *model,
                                           bool allow_reload = false);
 
-  Result<Renderer::rTexture2D, int>
+  std::expected<Renderer::rTexture2D, int>
   ImportTexture(const FileUtils::Fs &fs, const FileUtils::path &filepath,
                 bool allow_reload = false);
 
-  Result<Renderer::rTexture2D, int>
+  std::expected<Renderer::rTexture2D, int>
   ImportTexture(const FileUtils::Fs &fs, const FileUtils::path &filepath,
                 Renderer::Image *image, bool allow_reload = false);
 };

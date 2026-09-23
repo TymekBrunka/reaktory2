@@ -6,16 +6,16 @@ namespace FileUtils {
 std::filesystem::path HOME_DIR = "";
 std::filesystem::path APP_ROOT = "";
 
-Result<ReadResult, int> ReadFilex(const std::filesystem::path &filepath,
+std::expected<ReadResult, int> ReadFilex(const std::filesystem::path &filepath,
                                   alloc_fun alloc, free_fun frre,
                                   void *allocator) {
 
   if (!std::filesystem::exists(filepath))
-    return Error<int>(-2);
+    return std::unexpected(-2);
 
   std::ifstream file(filepath, std::ios_base::in | std::ios_base::binary);
   if (!file.is_open())
-    return Error<int>(-1);
+    return std::unexpected(-1);
 
   file.seekg(0, std::ios_base::end);
   size_t fsize = file.tellg();
@@ -33,39 +33,38 @@ Result<ReadResult, int> ReadFilex(const std::filesystem::path &filepath,
       frre(outbuffer, allocator, fsize);
     else
       delete[] outbuffer;
-    return Error<int>(1);
+    return std::unexpected(1);
   }
 
-  return Result<ReadResult, int>(
-      Ok<ReadResult>(ReadResult{.data = outbuffer, .length = fsize}));
+  return ReadResult{.data = outbuffer, .length = fsize};
 }
 
-Result<no_error, int> WriteFile(const std::filesystem::path &filepath,
+std::expected<bool, int> WriteFile(const std::filesystem::path &filepath,
                                 const void *data, size_t size) {
 
   std::ofstream file(filepath, std::ios_base::out | std::ios_base::binary);
   if (!file.is_open())
-    return Error<int>::ERR(-1);
+    return std::unexpected(-1);
 
   try {
     file.write((const char *)data, size);
   } catch (std::exception &err) {
     file.close();
-    return Error<int>(1);
+    return std::unexpected(1);
   }
 
   file.close();
-  return Ok<no_error>();
+  return true;
 }
 
-Result<no_error, int>
+std::expected<bool, int>
 WriteFileIfNotExists(const std::filesystem::path &filepath, const void *data,
                      size_t size) {
 
   std::ifstream file(filepath, std::ios_base::in | std::ios_base::binary);
   if (file.is_open()) {
     file.close();
-    return Ok<no_error>();
+    return true;
   }
   file.close();
   return WriteFile(filepath, data, size);

@@ -1,5 +1,5 @@
 #pragma once
-#include <Errors/Result.hpp>
+#include <expected>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
@@ -20,13 +20,13 @@ struct ReadResult {
   size_t length;
 };
 
-Result<ReadResult, int> ReadFilex(const std::filesystem::path &filepath,
-                                  alloc_fun alloc = nullptr,
-                                  free_fun frre = nullptr,
-                                  void *allocator = nullptr);
+std::expected<ReadResult, int> ReadFilex(const std::filesystem::path &filepath,
+                                         alloc_fun alloc = nullptr,
+                                         free_fun frre = nullptr,
+                                         void *allocator = nullptr);
 
 template <class Allocator = std::allocator<char>>
-Result<ReadResult, int>
+std::expected<ReadResult, int>
 ReadFile(const std::filesystem::path &filepath,
          const Allocator &alloc = std::allocator<char>()) {
 
@@ -42,10 +42,10 @@ ReadFile(const std::filesystem::path &filepath,
   return ReadFilex(filepath, allo, frre, (void *)&alloc);
 }
 
-Result<no_error, int> WriteFile(const std::filesystem::path &filepath,
-                                const void *data, size_t size);
+std::expected<bool, int> WriteFile(const std::filesystem::path &filepath,
+                                       const void *data, size_t size);
 
-Result<no_error, int>
+std::expected<bool, int>
 WriteFileIfNotExists(const std::filesystem::path &filepath, const void *data,
                      size_t size);
 
@@ -171,16 +171,16 @@ public:
 
   virtual void Close(FsStream *file) = 0;
 
-  inline Result<ReadResult, int> ReadFilex(const path &filepath,
-                                           alloc_fun alloc = nullptr,
-                                           free_fun frre = nullptr,
-                                           void *allocator = nullptr) {
+  inline std::expected<ReadResult, int> ReadFilex(const path &filepath,
+                                                  alloc_fun alloc = nullptr,
+                                                  free_fun frre = nullptr,
+                                                  void *allocator = nullptr) {
     if (!FileExists(filepath))
-      return {}.Error(-2);
+      return std::unexpected(-2);
 
     FsStream *file = Open(filepath, "rb");
     if (!file)
-      return {}.Error(-1);
+      return std::unexpected(-1);
 
     size_t fsize = file->FileSize();
     char *outbuffer;
@@ -195,15 +195,14 @@ public:
         frre(outbuffer, allocator, fsize);
       else
         delete[] outbuffer;
-      return {}.Error(1);
+      return std::unexpected(1);
     }
 
-    return Result<ReadResult, int>(
-        Ok<ReadResult>(ReadResult{.data = outbuffer, .length = fsize}));
+    return ReadResult{.data = outbuffer, .length = fsize};
   }
 
   template <class Allocator = std::allocator<char>>
-  Result<ReadResult, int>
+  std::expected<ReadResult, int>
   ReadFile(const path &filepath,
            const Allocator &alloc = std::allocator<char>()) {
 
