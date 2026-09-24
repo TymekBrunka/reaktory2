@@ -104,7 +104,7 @@ public:
 
   bool init();
   void draw_self();
-  void draw_object_tree(Object *node, int idx);
+  void draw_object_tree(Object *node, int idx, bool is_descendant = false);
   void run();
   void shutdown();
 

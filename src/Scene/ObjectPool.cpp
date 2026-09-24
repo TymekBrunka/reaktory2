@@ -77,9 +77,12 @@ void ObjectPool::remove_impl(int16_t idx) {
 objH ObjectPool::add_model_node(ResourceManager &resMan, objH obj,
                                 const std::string_view &model_name) {
 
-  const char *name = model_name.empty()
-                         ? (*resMan.GetModelsMap().begin()).first.c_str()
-                         : model_name.data();
+  const char *name =
+      model_name.empty()
+          ? (resMan.GetModelsMap().size() == 0
+                 ? ""
+                 : (*resMan.GetModelsMap().begin()).first.c_str())
+          : model_name.data();
 
   ManagedModel *model = resMan.GetModel(name);
   if (model == nullptr)
@@ -104,7 +107,8 @@ objH ObjectPool::add_model_node(ResourceManager &resMan, objH obj,
   omodel.animation_time = 0;
   omodel.animation_speed = 1.0f;
 
-  objH child = add(Object{.name = "Model", .variant = std::move(omodel)});
+  objH child =
+      add(Object{.parent = obj, .name = name, .variant = std::move(omodel)});
   get(obj)->children.push_back(child.idx);
   return child;
 }

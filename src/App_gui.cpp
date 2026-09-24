@@ -4,6 +4,7 @@
 #include "ObjectPool.hpp"
 #include "Renderer.hpp"
 #include "ResourceManager.hpp"
+#include "glm/gtc/type_ptr.hpp"
 #include "imgui.h"
 #include "pfd/pfd.hpp"
 #include <App.hpp>
@@ -59,9 +60,20 @@ bool CenteredButton(const char *label) {
 
 // -------------------------------------------------------------------------------------------------------------------
 
-void App::draw_object_tree(Object *node, int idx) {
+void App::draw_object_tree(Object *node, int idx, bool is_descendant) {
   ImGui::PushID(idx);
   ImDrawList *drawlist = ImGui::GetWindowDrawList();
+  static bool is_dragging = false;
+  static objH object_to_drop = objH{.gen = 0, .idx = -1};
+
+  ImVec2 wsize = ImGui::GetWindowSize();
+  ImVec2 cpos = ImGui::GetMousePos();
+  cpos = ImVec2(cpos.x - ImGui::GetWindowPos().x,
+                cpos.y - ImGui::GetWindowPos().y + 20);
+
+  if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+    is_dragging = false;
+  }
 
   if (node->children.size() == 0) {
     ImGui::Dummy(ImVec2(16 + 1, 18));
@@ -94,14 +106,37 @@ void App::draw_object_tree(Object *node, int idx) {
   }
 
   ImGui::SameLine();
-  if (ImGui::Button("##baton", ImVec2(ImGui::GetContentRegionAvail().x, 18)))
+  if (ImGui::Button("##baton", ImVec2(ImGui::GetContentRegionAvail().x, 18))) {
     selected_scene->selected_object = node->toHandle(idx);
+  }
+
+  if (ImGui::IsItemActive()) {
+    is_dragging = true;
+    object_to_drop = node->toHandle(idx);
+  }
+
   ImVec2 bpos2 = ImGui::GetItemRectMin();
   ImVec2 bpos2_max = ImGui::GetItemRectMax();
 
   if (node->toHandle(idx) != selected_scene->selected_object)
     drawlist->AddRectFilled(bpos2, bpos2_max,
                             ImGui::GetColorU32(ImGuiCol_WindowBg));
+
+  if (cpos.x <= wsize.x && cpos.x >= 0 && cpos.y <= wsize.y && cpos.y >= 0)
+    if (!is_descendant && cpos.y < bpos2_max.y && cpos.y > bpos2.y)
+      if (is_dragging)
+        drawlist->AddRectFilled(ImVec2(bpos2.x, bpos2_max.y),
+                                ImVec2(bpos2_max.x, bpos2_max.y - 2),
+                                ImColor(0, 100, 200));
+
+      else if (Object *obj = selected_scene->objPool.get(object_to_drop)) {
+        node->children.push_back(object_to_drop.idx);
+        obj->parent = node->toHandle(idx);
+        object_to_drop.idx = -1;
+
+        ImGui::PopID();
+        return;
+      }
 
   if (const oNode *onode = std::get_if<oNode>(&node->variant)) {
     float char_vis_width = ImGui::CalcTextSize(ICON_FA_CUBE).x;
@@ -122,9 +157,12 @@ void App::draw_object_tree(Object *node, int idx) {
   ImGui::Indent(8);
   for (int16_t i = 0; i < node->children.size() && !node->collapsed; i++)
     draw_object_tree(selected_scene->objPool.getChildOf(node, i),
-                     node->children[i]);
+                     node->children[i],
+                     node->toHandle(idx) == object_to_drop || is_descendant);
   ImGui::Unindent(8);
   ImGui::PopID();
+
+  drawlist->AddCircleFilled(cpos, 3, ImColor(255, 255, 255));
 }
 
 void App::draw_gui() {

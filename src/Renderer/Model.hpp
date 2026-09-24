@@ -2,11 +2,11 @@
 #include "FileUtils.hpp"
 #include "Renderer.hpp"
 #include <cstddef>
+#include <expected>
 #include <glm/gtc/quaternion.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
-#include <expected>
 
 #include <string>
 #include <string_view>
@@ -144,10 +144,17 @@ struct modelNode {
   std::string name{};
 };
 
+struct BoundingBox {
+  glm::vec3 min = glm::vec3(0.0f);
+  glm::vec3 max = glm::vec3(0.0f);
+};
+
 class Model {
   bool initialised = false;
   float animationTime = 0;
   int boneCounter = 0;
+
+  BoundingBox bounding_box{};
 
 public:
   glm::mat4 transform = glm::mat4(1.0f);
@@ -235,13 +242,15 @@ public:
   }
 
   static std::expected<Model, int> LoadFromFile(const FileUtils::Fs &fs,
-                            const FileUtils::path &filepath,
-                            bool initialise = true);
+                                                const FileUtils::path &filepath,
+                                                bool initialise = true);
   // static Model LoadFromMemory(const FileUtils::Fs &fs, const void *data,
   //                             size_t length, bool initialise = true,
   //                             const char *hint = "");
 
   void init();
+
+  inline const BoundingBox &GetBoundingBox() const { return bounding_box; }
 
   inline const std::vector<Animation> &GetAnimations() const {
     return animations;

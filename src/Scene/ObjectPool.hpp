@@ -37,6 +37,7 @@ struct oNode {
 struct Object {
   uint8_t gen = 1;
   bool collapsed = false;
+  objH parent = objH{.gen = 1, .idx = 0};
   glm::mat4 transform = glm::mat4(1.0f);
   std::string name;
   std::vector<int16_t> children;
@@ -83,5 +84,6 @@ public:
   objH add(const Object &obj);
   void remove(objH obj);
 
-  objH add_model_node(ResourceManager &resMan, objH obj, const std::string_view &model_name);
+  objH add_model_node(ResourceManager &resMan, objH obj,
+                      const std::string_view &model_name);
 };

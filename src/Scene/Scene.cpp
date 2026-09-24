@@ -27,13 +27,18 @@
 #include <glm/ext/matrix_transform.hpp>
 
 #include <ImGuizmo.h>
-static ImGuizmo::OPERATION mCurrentGizmoOperation(ImGuizmo::UNIVERSAL);
+static ImGuizmo::OPERATION mCurrentGizmoOperation(
+    (ImGuizmo::OPERATION)((int)ImGuizmo::UNIVERSAL | (int)ImGuizmo::BOUNDS));
 static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
 
+bool Scene::render_selection_bb = false;
 Renderer::rProgram Scene::skybox_program = 0;
 Renderer::rFBO Scene::skybox_fbo = 0;
 Renderer::rFBO Scene::skybox_ebo = 0;
 Renderer::rVAO Scene::skybox_vao = 0;
+Renderer::rProgram Scene::selection_bb_program = 0;
+Renderer::rFBO Scene::selection_bb_fbo = 0;
+Renderer::rVAO Scene::selection_bb_vao = 0;
 Renderer::rProgram Scene::tri_program = 0;
 Renderer::rFBO Scene::tri_fbo = 0;
 Renderer::rVAO Scene::tri_vao = 0;
@@ -48,6 +53,12 @@ Renderer::rLocation Scene::model_view_loc = 0;
 Renderer::rLocation Scene::model_projection_loc = 0;
 Renderer::rLocation Scene::model_ID_loc = 0;
 Renderer::rLocation Scene::model_model_loc = 0;
+
+Renderer::rLocation Scene::selection_bb_view_loc = 0;
+Renderer::rLocation Scene::selection_bb_projection_loc = 0;
+Renderer::rLocation Scene::selection_bb_model_loc = 0;
+Renderer::rLocation Scene::selection_bb_min_loc = 0;
+Renderer::rLocation Scene::selection_bb_max_loc = 0;
 
 static GLuint skybox_indiecies[] = {
     0,  1,  2,  0,  2,  3,  4,  5,  6,  4,  6,  7,  8,  9,  10, 8,  10, 11,
@@ -95,6 +106,25 @@ static skybox_vert skybox_verticies[] = {
     {{1.0, 1.0, -1.0}, {0.251, 1.000}},
     {{1.0, 1.0, 1.0}, {0.251, 0.667}},
 };
+
+static float selection_cube_vertices[] = {
+    -0.5, -0.5, 0.5,  0.5,  -0.5, 0.5,  0.5,  0.5,  0.5,
+    -0.5, -0.5, 0.5,  0.5,  0.5,  0.5,  -0.5, 0.5,  0.5,
+
+    -0.5, -0.5, -0.5, -0.5, 0.5,  -0.5, 0.5,  0.5,  -0.5,
+    -0.5, -0.5, -0.5, 0.5,  0.5,  -0.5, 0.5,  -0.5, -0.5,
+
+    -0.5, 0.5,  -0.5, -0.5, 0.5,  0.5,  0.5,  0.5,  0.5,
+    -0.5, 0.5,  -0.5, 0.5,  0.5,  0.5,  0.5,  0.5,  -0.5,
+
+    -0.5, -0.5, -0.5, 0.5,  -0.5, -0.5, 0.5,  -0.5, 0.5,
+    -0.5, -0.5, -0.5, 0.5,  -0.5, 0.5,  -0.5, -0.5, 0.5,
+
+    0.5,  -0.5, -0.5, 0.5,  0.5,  -0.5, 0.5,  0.5,  0.5,
+    0.5,  -0.5, -0.5, 0.5,  0.5,  0.5,  0.5,  -0.5, 0.5,
+
+    -0.5, -0.5, -0.5, -0.5, -0.5, 0.5,  -0.5, 0.5,  0.5,
+    -0.5, -0.5, -0.5, -0.5, 0.5,  0.5,  -0.5, 0.5,  -0.5};
 
 Scene::Scene(Scene &&other) {
   bool b = atomic_load_explicit(&other.is_busy, memory_order_seq_cst);
@@ -349,12 +379,50 @@ bool Scene::Init(Renderer::Render &render) {
 
   skinning_program = res_shader.value();
 
+  res_shader = render.LoadProgram("selection_bounding_box",
+                                  (const char *)selection_bb_vs_data,
+                                  (const char *)selection_bb_fs_data);
+
+  if (!res_shader.has_value()) {
+    render.UnloadProgram(tri_program);
+    render.UnloadProgram(skybox_program);
+    render.UnloadProgram(skinning_program);
+    tri_program = 0;
+    skybox_program = 0;
+    skinning_program = 0;
+    return false;
+  }
+
+  selection_bb_program = res_shader.value();
+
   model_view_loc = glGetUniformLocation(skinning_program, "view");
   model_projection_loc = glGetUniformLocation(skinning_program, "projection");
   model_model_loc = glGetUniformLocation(skinning_program, "model");
   model_ID_loc = glGetUniformLocation(skinning_program, "ID");
 
   Renderer::Model::setDefaultProgram(skinning_program);
+
+  selection_bb_view_loc = glGetUniformLocation(selection_bb_program, "view");
+  selection_bb_projection_loc =
+      glGetUniformLocation(selection_bb_program, "projection");
+  selection_bb_model_loc = glGetUniformLocation(selection_bb_program, "model");
+  selection_bb_min_loc = glGetUniformLocation(selection_bb_program, "min");
+  selection_bb_max_loc = glGetUniformLocation(selection_bb_program, "max");
+
+  glGenBuffers(1, &selection_bb_fbo);
+  glBindBuffer(GL_ARRAY_BUFFER, selection_bb_fbo);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(selection_cube_vertices),
+               selection_cube_vertices, GL_STATIC_DRAW);
+
+  const Renderer::rLocation bb_position_loc =
+      glGetAttribLocation(selection_bb_program, "position");
+
+  glGenVertexArrays(1, &selection_bb_vao);
+  glBindVertexArray(selection_bb_vao);
+  glEnableVertexAttribArray(bb_position_loc);
+  glVertexAttribPointer(bb_position_loc, 3, GL_FLOAT, GL_FALSE,
+                        sizeof(float) * 3, (void *)0);
+  glBindVertexArray(0);
 
   glGenBuffers(1, &tri_fbo);
   glBindBuffer(GL_ARRAY_BUFFER, tri_fbo);
@@ -581,6 +649,7 @@ void Scene::render(Renderer::Render &render) {
   // resMan.GetModel("CesiumMan.m3d")->model.Advance(render.GetDelta());
   // resMan.GetModel("CesiumMan.m3d")->model.Draw();
 
+  render_selection_bb = false;
   draw_models_recursive(objPool.rootH().idx, render.GetDelta(), glm::mat4(1.0f),
                         objPool.rootH());
 
@@ -603,6 +672,20 @@ void Scene::render(Renderer::Render &render) {
     // std::cerr << "objH pixel is " << (int)pixel[0] << ", "
     //           << (int)(pixel[1] + (pixel[2] * 256)) << " alpha "
     //           << (int)pixel[3] << "\n";
+  }
+
+  if (render_selection_bb) {
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glUseProgram(selection_bb_program);
+    glBindVertexArray(selection_bb_vao);
+
+    glUniformMatrix4fv(selection_bb_view_loc, 1, GL_FALSE,
+                       glm::value_ptr(view));
+    glUniformMatrix4fv(selection_bb_projection_loc, 1, GL_FALSE,
+                       glm::value_ptr(projection));
+
+    glDrawArrays(GL_TRIANGLES, 0,
+                 sizeof(selection_cube_vertices) / sizeof(float));
   }
 
   // glUseProgram(tri_program);
@@ -660,9 +743,18 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
           glm::mat4 world2local = parentTransform * node->transform;
           ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection),
                                mCurrentGizmoOperation, mCurrentGizmoMode,
-                               glm::value_ptr(world2local), NULL, NULL);
+                               glm::value_ptr(world2local), NULL, NULL,
+                               glm::value_ptr(model.GetBoundingBox().min));
 
           node->transform = glm::inverse(parentTransform) * world2local;
+          glUseProgram(selection_bb_program);
+          glUniformMatrix4fv(selection_bb_model_loc, 1, GL_FALSE,
+                             glm::value_ptr(world2local));
+          glUniform3fv(selection_bb_min_loc, 1,
+                       glm::value_ptr(model.GetBoundingBox().min));
+          glUniform3fv(selection_bb_max_loc, 1,
+                       glm::value_ptr(model.GetBoundingBox().max));
+          render_selection_bb = true;
         }
 
         modelTransform = parentTransform * node->transform;
@@ -706,6 +798,14 @@ void Scene::Cleanup() {
 
   glDeleteProgram(skinning_program);
   skinning_program = 0;
+
+  if (!selection_bb_program)
+    return;
+
+  glDeleteVertexArrays(1, &selection_bb_vao);
+  glDeleteBuffers(1, &selection_bb_fbo);
+  glDeleteProgram(selection_bb_program);
+  selection_bb_program = 0;
 }
 
 Scene::~Scene() {

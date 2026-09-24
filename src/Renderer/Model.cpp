@@ -185,6 +185,8 @@ Model::Model(Model &&other) {
 
   transform = other.transform;
   other.transform = glm::mat4(1.0f);
+  bounding_box = other.bounding_box;
+  other.bounding_box = BoundingBox{glm::vec3(0.0f), glm::vec3(0.0f)};
 
   other.initialised = false;
   other.animationTime = 0;
@@ -209,6 +211,8 @@ Model &Model::operator=(Model &&other) {
 
     transform = other.transform;
     other.transform = glm::mat4(1.0f);
+    bounding_box = other.bounding_box;
+    other.bounding_box = BoundingBox{glm::vec3(0.0f), glm::vec3(0.0f)};
 
     other.initialised = false;
     other.animationTime = 0;
@@ -509,6 +513,12 @@ Mesh Model::processMesh(const FileUtils::Fs &fs, const FileUtils::path &path,
   Mesh.name = mesh->mName.data;
   Mesh.ctx = new MeshLoaderTmpCtx{};
 
+  if (mesh->mNumVertices > 0 && meshes.size() == 0) {
+    glm::vec3 position = AssimpGLMHelpers::GetGLMVec(mesh->mVertices[0]);
+    bounding_box.min = position;
+    bounding_box.max = position;
+  }
+
   std::cerr << "mesh consists of " << mesh->mNumVertices << " vertices\n";
   for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
     meshVertex vertex;
@@ -524,6 +534,31 @@ Mesh Model::processMesh(const FileUtils::Fs &fs, const FileUtils::path &path,
       vertex.TexCoords = glm::vec2(0.0f, 0.0f);
 
     Mesh.ctx->vertices.push_back(vertex);
+
+    // update bounding box
+    bounding_box.min.x = bounding_box.min.x < vertex.Position.x
+                             ? bounding_box.min.x
+                             : vertex.Position.x;
+
+    bounding_box.min.y = bounding_box.min.y < vertex.Position.y
+                             ? bounding_box.min.y
+                             : vertex.Position.y;
+
+    bounding_box.min.z = bounding_box.min.z < vertex.Position.z
+                             ? bounding_box.min.z
+                             : vertex.Position.z;
+
+    bounding_box.max.x = bounding_box.max.x > vertex.Position.x
+                             ? bounding_box.max.x
+                             : vertex.Position.x;
+
+    bounding_box.max.y = bounding_box.max.y > vertex.Position.y
+                             ? bounding_box.max.y
+                             : vertex.Position.y;
+
+    bounding_box.max.z = bounding_box.max.z > vertex.Position.z
+                             ? bounding_box.max.z
+                             : vertex.Position.z;
   }
 
   std::cerr << "mesh consists of ~" << mesh->mNumFaces * 3 << " indices\n";

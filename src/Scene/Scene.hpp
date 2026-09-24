@@ -11,10 +11,14 @@
 #include <ResourceManager.hpp>
 
 class Scene {
+  static bool render_selection_bb;
   static Renderer::rProgram skybox_program;
   static Renderer::rFBO skybox_fbo;
   static Renderer::rEBO skybox_ebo;
   static Renderer::rVAO skybox_vao;
+  static Renderer::rProgram selection_bb_program;
+  static Renderer::rFBO selection_bb_fbo;
+  static Renderer::rVAO selection_bb_vao;
   static Renderer::rProgram tri_program;
   static Renderer::rFBO tri_fbo;
   static Renderer::rVAO tri_vao;
@@ -29,6 +33,12 @@ class Scene {
   static Renderer::rLocation model_projection_loc;
   static Renderer::rLocation model_ID_loc;
   static Renderer::rLocation model_model_loc;
+
+  static Renderer::rLocation selection_bb_view_loc;
+  static Renderer::rLocation selection_bb_projection_loc;
+  static Renderer::rLocation selection_bb_model_loc;
+  static Renderer::rLocation selection_bb_min_loc;
+  static Renderer::rLocation selection_bb_max_loc;
 
   bool initialised = false;
   bool mousebuttonL = false;

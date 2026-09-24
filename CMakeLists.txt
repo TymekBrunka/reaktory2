@@ -39,6 +39,8 @@ add_subdirectory(src/BuildTools)
 bytepack_(
   OUTPUT shaders
   SOURCES
+    assets/shaders/selection_bb.vs
+    assets/shaders/selection_bb.fs
     assets/shaders/simple.vs
     assets/shaders/simple.fs
     assets/shaders/skybox.vs
