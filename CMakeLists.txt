@@ -12,7 +12,7 @@ if (SANS)
 endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
-  if (CMAKE_C_COMPILER_ID MATCHES "MSVC") # not sure if this project will build on msvc but regardless, ill set this flags for it just in case
+  if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC") # not sure if this project will build on msvc but regardless, ill set this flags for it just in case
 
     if(NOT CMAKE_C_FLAGS_RELEASE)
       set(CMAKE_C_FLAGS_RELEASE "/O2 /DNDEBUG")

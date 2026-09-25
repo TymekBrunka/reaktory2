@@ -13,6 +13,9 @@ Object *ObjectPool::get(objH obj) {
     return nullptr;
   }
 
+  if (std::get_if<oEmptySlot>(&objects[obj.idx].variant))
+    return nullptr;
+
   uint8_t gen = objects[obj.idx].gen;
   if (gen != obj.gen) {
     // Log::log(Log::ERROR | Log::SEV_MED, 0, "Object pool",

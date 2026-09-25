@@ -79,6 +79,7 @@ public:
   }
 
   inline int16_t size() const { return objects.size() - free_indices.size(); };
+  inline int16_t real_size() const { return objects.size(); };
 
   Object *get(objH obj);
   objH add(const Object &obj);

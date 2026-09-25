@@ -123,17 +123,28 @@ void App::draw_object_tree(Object *node, int idx, bool is_descendant) {
                             ImGui::GetColorU32(ImGuiCol_WindowBg));
 
   if (cpos.x <= wsize.x && cpos.x >= 0 && cpos.y <= wsize.y && cpos.y >= 0)
-    if (!is_descendant && cpos.y < bpos2_max.y && cpos.y > bpos2.y)
+    if (!is_descendant && node->toHandle(idx) != object_to_drop &&
+        cpos.y < bpos2_max.y && cpos.y > bpos2.y)
+
       if (is_dragging)
         drawlist->AddRectFilled(ImVec2(bpos2.x, bpos2_max.y),
                                 ImVec2(bpos2_max.x, bpos2_max.y - 2),
                                 ImColor(0, 100, 200));
 
       else if (Object *obj = selected_scene->objPool.get(object_to_drop)) {
+
+        if (Object *parent = selected_scene->objPool.get(obj->parent)) {
+          for (int16_t i = 0; i < parent->children.size(); i++) {
+            if (parent->children[i] == object_to_drop.idx) {
+              parent->children.erase(parent->children.begin() + i);
+              break;
+            }
+          }
+        }
+
         node->children.push_back(object_to_drop.idx);
         obj->parent = node->toHandle(idx);
         object_to_drop.idx = -1;
-
         ImGui::PopID();
         return;
       }
@@ -162,7 +173,7 @@ void App::draw_object_tree(Object *node, int idx, bool is_descendant) {
   ImGui::Unindent(8);
   ImGui::PopID();
 
-  drawlist->AddCircleFilled(cpos, 3, ImColor(255, 255, 255));
+  object_to_drop.idx = idx == 0 && !is_dragging ? -1 : object_to_drop.idx;
 }
 
 void App::draw_gui() {
@@ -205,11 +216,24 @@ void App::draw_gui() {
   if (ImGui::Begin("Debug")) {
     ImGui::Text("LMB: %1b", mousebuttonL);
     ImGui::Text("RMB: %1b", mousebuttonR);
-    if (selected_scene_idx)
+    if (selected_scene_idx) {
       ImGui::Text("Selected scene %s\n  %p", selected_scene_idx->c_str(),
                   selected_scene);
-    else
-      ImGui::Text("Selected scene (no name)\n  %p", selected_scene);
+
+      ImGui::TextUnformatted("objPool");
+      Object *root =
+          selected_scene->objPool.get(selected_scene->objPool.rootH());
+      for (int16_t i = 0; i < selected_scene->objPool.real_size(); i++) {
+        Object *obj = root + i;
+        if (std::get_if<oEmptySlot>(&obj->variant))
+          ImGui::Text("idx: %d (free slot)", i);
+        else {
+          ImGui::Text("idx: %d, parent: %d:%d, name: %s", i, obj->parent.idx,
+                      obj->parent.gen, obj->name.c_str());
+        }
+      }
+    } else
+      ImGui::Text("Selected scene (none)\n  %p", selected_scene);
   }
   ImGui::End();
 #endif
