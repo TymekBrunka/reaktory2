@@ -35,6 +35,11 @@ message(imgui)
 add_library(imgui OBJECT ${imgui_SRC})
 target_include_directories(imgui PUBLIC deps/imgui)
 target_link_libraries(imgui glad glfw)
+if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC") # not sure if this project will build on msvc but regardless, ill set this flags for it just in case
+  target_compile_options(imgui PRIVATE "/DIMGUI_IMPL_OPENGL_LOADER_CUSTOM <glad/gl.h>")
+else()
+  target_compile_options(imgui PRIVATE "-DIMGUI_IMPL_OPENGL_LOADER_CUSTOM <glad/gl.h>")
+endif()
 
 message(imguizmo)
 CPMAddPackage(
