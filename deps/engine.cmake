@@ -52,29 +52,6 @@ CPMAddPackage(
 target_compile_features(imguizmo PRIVATE cxx_std_11)
 target_link_libraries(imguizmo PUBLIC imgui)
 
-message(imnodeflow)
-CPMAddPackage(
-  NAME imNodeFlow
-  VERSION 1.2.3
-  GITHUB_REPOSITORY Fattorino/ImNodeFlow
-  GIT_TAG e4cb0989c302e0ae324ff03ed1b3f0d2851ee630
-  DOWNLOAD_ONLY
-)
-
-file(GLOB imNodeFlow_SRC
-  ${imNodeFlow_SOURCE_DIR}/include/ImNodeFlow.h
-  ${imNodeFlow_SOURCE_DIR}/src/*.h
-  ${imNodeFlow_SOURCE_DIR}/src/*.cpp
-)
-
-add_library(imnodeflow STATIC ${imNodeFlow_SRC})
-target_include_directories(imnodeflow PUBLIC ${imNodeFlow_SOURCE_DIR}/include)
-target_link_libraries(imnodeflow PUBLIC imgui)
-if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC") # not sure if this project will build on msvc but regardless, ill set this flags for it just in case
-  target_compile_options(imnodeflow PRIVATE /DIMGUI_DEFINE_MATH_OPERATORS)
-else()
-  target_compile_options(imnodeflow PRIVATE -DIMGUI_DEFINE_MATH_OPERATORS)
-endif()
 
 # # for assimp_view
 # if (CMAKE_SYSTEM_NAME MATCHES "Windows")

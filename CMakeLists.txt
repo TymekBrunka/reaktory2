@@ -212,7 +212,7 @@ add_library(App STATIC
   src/App_popups.cpp
 )
 target_include_directories(App PUBLIC src)
-target_link_libraries(App PUBLIC Scene icon_img logging renderer imgui imnodeflow fileutils images images_bigger PRIVATE pfd)
+target_link_libraries(App PUBLIC Scene icon_img logging renderer imgui fileutils images images_bigger PRIVATE pfd)
 target_precompile_headers(App REUSE_FROM logging)
 
 add_executable(main src/main.cpp)
