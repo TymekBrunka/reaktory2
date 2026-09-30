@@ -6,10 +6,16 @@
 #include <typeinfo>
 #include <vector>
 
+inline constexpr ImU32 imColor(int32_t x) {
+  char *in = (char *)&x;
+  char out[4] = {in[3], in[2], in[1], in[0]};
+  return *(ImU32 *)&out;
+};
+
 class ImNodeEditor;
 
 struct Template {
-  // ImU32 headerColor;
+  ImU32 headerColor = imColor(0x35A544FF);
   // ImU32 backgroundColor;
   // ImU32 backgroundColorOver;
   uint8_t inputCount = 0;
@@ -20,20 +26,64 @@ struct Template {
   const char **outputNames = nullptr; // can be nullptr. No text displayed.
   ImU32 *outputColors =
       nullptr; // can be nullptr, default slot color will be used.
+
+  const char *name = "example node";
 };
+
+// struct Link {
+//   int8_t inputPinIdx = -1;
+//   int8_t outputPinIdx = -1;
+//   int32_t inputNodeIdx = -1;
+//   int32_t outputNodeIdx = -1;
+// };
 
 struct Link {
-  int8_t inputidx = -1;
-  int8_t outputidx = -1;
-  int32_t inputNodeidx = -1;
-  int32_t outputNodeidx = -1;
+  int8_t pinIdx = -1;
+  int32_t nodeIdx = -1;
 };
 
-class Node {
+struct Node {
   bool selected = false;
-  int32_t template_idx = -1;
+  bool hovered = false;
+  int32_t templateIdx = -1;
   ImVec2 position = ImVec2(0, 0);
   ImVec2 size = ImVec2(100, 20);
+  void *userData = nullptr;
 };
 
-class ImNodeEditor {};
+class ImNodeEditor {
+protected:
+  float zoom = 1;
+  ImVec2 offset = ImVec2(0,0);
+  ImVec2 last_mpos = ImVec2(0,0);
+
+  virtual ~ImNodeEditor() = default;
+
+  virtual void selectNode(int32_t nodeIdx, bool selected) = 0;
+  virtual void moveSelectedNodes(const ImVec2 delta) = 0;
+
+  virtual int32_t getTemplateCount() = 0;
+  virtual const Template getTemplate(int32_t templateIdx) = 0;
+
+  virtual int32_t getNodeCount() = 0;
+  virtual Node getNode(int32_t nodeIdx) = 0;
+
+  virtual void drawNodeWidgets(int32_t nodeIdx, Node *node) = 0;
+
+  virtual Link getNodeInputLink(int32_t nodeIdx, int8_t pinIdx) = 0;
+  // virtual int32_t getNodeOutputPinLinksNum(int32_t nodeIdx, int8_t pinIdx) =
+  // 0; virtual Link getNodeOutputLink(int32_t nodeIdx, int8_t pinIdx, int32_t
+  // outputIdx) = 0;
+
+  virtual void addLink(int32_t inputNodeIdx, int8_t inputPinIdx,
+                       int32_t outputNodeIdx, int8_t outputPinIdx) = 0;
+  virtual void delLink(int32_t inputNodeIdx, int8_t inputPinIdx,
+                       int32_t outputNodeIdx, int8_t outputPinIdx) = 0;
+
+  ImVec2 screen2world(ImVec2 vec);
+  ImVec2 world2screen(ImVec2 vec);
+public:
+  void update();
+};
+
+void nodedit_update();

@@ -52,7 +52,6 @@ CPMAddPackage(
 target_compile_features(imguizmo PRIVATE cxx_std_11)
 target_link_libraries(imguizmo PUBLIC imgui)
 
-
 # # for assimp_view
 # if (CMAKE_SYSTEM_NAME MATCHES "Windows")
 #   find_package(DirectX)

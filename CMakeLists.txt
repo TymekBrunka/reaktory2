@@ -99,6 +99,14 @@ add_library(pfd OBJECT
 
 target_include_directories(pfd PUBLIC src/Components/pfd PRIVATE deps)
 
+add_library(nodedit STATIC
+  src/NodeEditor/NodeEditor.cpp
+  src/NodeEditor/NodeEditor.hpp
+)
+
+target_link_libraries(nodedit PUBLIC imgui)
+target_include_directories(nodedit PUBLIC src/NodeEditor)
+
 add_library(pch_core STATIC
   src/precompiled_headers/core.hpp
   src/precompiled_headers/core.cpp
@@ -212,7 +220,7 @@ add_library(App STATIC
   src/App_popups.cpp
 )
 target_include_directories(App PUBLIC src)
-target_link_libraries(App PUBLIC Scene icon_img logging renderer imgui fileutils images images_bigger PRIVATE pfd)
+target_link_libraries(App PUBLIC Scene icon_img logging renderer imgui fileutils images images_bigger nodedit PRIVATE pfd)
 target_precompile_headers(App REUSE_FROM logging)
 
 add_executable(main src/main.cpp)
