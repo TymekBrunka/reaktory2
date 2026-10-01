@@ -54,8 +54,12 @@ struct Node {
 class ImNodeEditor {
 protected:
   float zoom = 1;
-  ImVec2 offset = ImVec2(0,0);
-  ImVec2 last_mpos = ImVec2(0,0);
+  ImVec2 offset = ImVec2(0, 0);
+  ImVec2 last_mpos = ImVec2(0, 0);
+  ImVec2 global_wsize = ImVec2(0, 0);
+  ImVec2 global_wpos = ImVec2(0, 0);
+  Link currently_dragged_pin = {-1, -1};
+  bool is_it_output_pin = false;
 
   virtual ~ImNodeEditor() = default;
 
@@ -68,7 +72,8 @@ protected:
   virtual int32_t getNodeCount() = 0;
   virtual Node getNode(int32_t nodeIdx) = 0;
 
-  virtual void drawNodeWidgets(int32_t nodeIdx, Node *node) = 0;
+  virtual void drawNodeWidgets(int32_t nodeIdx, Node *node,
+                               ImNodeEditor *nodedit) = 0;
 
   virtual Link getNodeInputLink(int32_t nodeIdx, int8_t pinIdx) = 0;
   // virtual int32_t getNodeOutputPinLinksNum(int32_t nodeIdx, int8_t pinIdx) =
@@ -80,10 +85,18 @@ protected:
   virtual void delLink(int32_t inputNodeIdx, int8_t inputPinIdx,
                        int32_t outputNodeIdx, int8_t outputPinIdx) = 0;
 
+  ImVec2 getInputPinPos(const Node &node, const Template &templ,
+                        int8_t pinIdx) const;
+
+  ImVec2 getOutputPinPos(const Node &node, const Template &templ,
+                         int8_t pinIdx) const;
+
+public:
   ImVec2 screen2world(ImVec2 vec);
   ImVec2 world2screen(ImVec2 vec);
-public:
   void update();
+
+  inline float getZoomFactor() const { return zoom; }
 };
 
 void nodedit_update();
