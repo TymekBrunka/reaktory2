@@ -7,8 +7,8 @@
 #include <vector>
 
 inline constexpr ImU32 imColor(int32_t x) {
-  char *in = (char *)&x;
-  char out[4] = {in[3], in[2], in[1], in[0]};
+  uint8_t *in = (uint8_t *)&x;
+  uint8_t out[4] = {in[3], in[2], in[1], in[0]};
   return *(ImU32 *)&out;
 };
 
@@ -16,7 +16,7 @@ class ImNodeEditor;
 
 struct Template {
   ImU32 headerColor = imColor(0x35A544FF);
-  // ImU32 backgroundColor;
+  ImU32 backgroundColor = imColor(0x24292BFF);
   // ImU32 backgroundColorOver;
   uint8_t inputCount = 0;
   uint8_t outputCount = 0;
@@ -55,10 +55,10 @@ class ImNodeEditor {
 protected:
   float zoom = 1;
   ImVec2 offset = ImVec2(0, 0);
-  ImVec2 last_mpos = ImVec2(0, 0);
   ImVec2 global_wsize = ImVec2(0, 0);
   ImVec2 global_wpos = ImVec2(0, 0);
   Link currently_dragged_pin = {-1, -1};
+  Link currently_selected_link[2] = {{-1, -1}, {-1, -1}};
   bool is_it_output_pin = false;
 
   virtual ~ImNodeEditor() = default;

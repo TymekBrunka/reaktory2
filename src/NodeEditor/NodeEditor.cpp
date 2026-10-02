@@ -1,5 +1,7 @@
 #include "imgui.h"
 #include <NodeEditor.hpp>
+#include <cmath>
+#include <cstdint>
 #include <iostream>
 #include <vector>
 
@@ -53,7 +55,21 @@ public:
 
   int32_t getTemplateCount() override { return 1; }
   const Template getTemplate(int32_t templateIdx) {
-    return Template{.inputCount = 2, .outputCount = 3};
+    static ImU32 inColors[] = {
+        ImColor(200, 100, 0),
+        ImColor(200, 0, 200),
+    };
+
+    static ImU32 outColors[] = {
+        ImColor(200, 0, 0),
+        ImColor(0, 200, 0),
+        ImColor(0, 0, 200),
+    };
+
+    return Template{.inputCount = 2,
+                    .outputCount = 3,
+                    .inputColors = inColors,
+                    .outputColors = outColors};
   }
 
   int32_t getNodeCount() override { return nodes.size(); }
@@ -145,6 +161,15 @@ static bool rect_in_rect(ImVec2 a1, ImVec2 a2, ImVec2 b1, ImVec2 b2) {
          in_rect(ImVec2(a2.x, a1.y), b1, b2);
 }
 
+static float sdf_line_squered(ImVec2 p, ImVec2 a, ImVec2 b) {
+  ImVec2 pa = sub_vector(p, a);
+  ImVec2 ba = sub_vector(b, a);
+  float h =
+      ((pa.x * ba.x) + (pa.y * ba.y)) / vec_length_squered(ImVec2(0, 0), ba);
+  h = h < 0 ? 0 : (h > 1 ? 1 : h);
+  return vec_length_squered(scale_vector(ba, h), pa);
+}
+
 ImVec2 ImNodeEditor::world2screen(ImVec2 vec) {
   return add_vector(add_vector(scale_vector(add_vector(vec, offset), zoom),
                                scale_vector(global_wsize, 0.5)),
@@ -174,8 +199,140 @@ ImVec2 ImNodeEditor::getOutputPinPos(const Node &node, const Template &templ,
                 node.position.y + 25 + (frac * (pinIdx + 0.5)));
 }
 
+struct RgbColor {
+  unsigned char r;
+  unsigned char g;
+  unsigned char b;
+};
+
+struct HsvColor {
+  unsigned char h;
+  unsigned char s;
+  unsigned char v;
+};
+
+static RgbColor HsvToRgb(HsvColor hsv) {
+  RgbColor rgb;
+  unsigned char region, p, q, t;
+  unsigned int h, s, v, remainder;
+
+  if (hsv.s == 0) {
+    rgb.r = hsv.v;
+    rgb.g = hsv.v;
+    rgb.b = hsv.v;
+    return rgb;
+  }
+
+  // converting to 16 bit to prevent overflow
+  h = hsv.h;
+  s = hsv.s;
+  v = hsv.v;
+
+  region = h / 43;
+  remainder = (h - (region * 43)) * 6;
+
+  p = (v * (255 - s)) >> 8;
+  q = (v * (255 - ((s * remainder) >> 8))) >> 8;
+  t = (v * (255 - ((s * (255 - remainder)) >> 8))) >> 8;
+
+  switch (region) {
+  case 0:
+    rgb.r = v;
+    rgb.g = t;
+    rgb.b = p;
+    break;
+  case 1:
+    rgb.r = q;
+    rgb.g = v;
+    rgb.b = p;
+    break;
+  case 2:
+    rgb.r = p;
+    rgb.g = v;
+    rgb.b = t;
+    break;
+  case 3:
+    rgb.r = p;
+    rgb.g = q;
+    rgb.b = v;
+    break;
+  case 4:
+    rgb.r = t;
+    rgb.g = p;
+    rgb.b = v;
+    break;
+  default:
+    rgb.r = v;
+    rgb.g = p;
+    rgb.b = q;
+    break;
+  }
+
+  return rgb;
+}
+
+static HsvColor RgbToHsv(RgbColor rgb) {
+  HsvColor hsv;
+  unsigned char rgbMin, rgbMax;
+
+  rgbMin = rgb.r < rgb.g ? (rgb.r < rgb.b ? rgb.r : rgb.b)
+                         : (rgb.g < rgb.b ? rgb.g : rgb.b);
+  rgbMax = rgb.r > rgb.g ? (rgb.r > rgb.b ? rgb.r : rgb.b)
+                         : (rgb.g > rgb.b ? rgb.g : rgb.b);
+
+  hsv.v = rgbMax;
+  if (hsv.v == 0) {
+    hsv.h = 0;
+    hsv.s = 0;
+    return hsv;
+  }
+
+  hsv.s = 255 * ((long)(rgbMax - rgbMin)) / hsv.v;
+  if (hsv.s == 0) {
+    hsv.h = 0;
+    return hsv;
+  }
+
+  if (rgbMax == rgb.r)
+    hsv.h = 0 + 43 * (rgb.g - rgb.b) / (rgbMax - rgbMin);
+  else if (rgbMax == rgb.g)
+    hsv.h = 85 + 43 * (rgb.b - rgb.r) / (rgbMax - rgbMin);
+  else
+    hsv.h = 171 + 43 * (rgb.r - rgb.g) / (rgbMax - rgbMin);
+
+  return hsv;
+}
+
+inline ImU32 imColorBrighten(ImU32 x, float factor) {
+  uint8_t *in = (uint8_t *)&x;
+  RgbColor rgb{.r = in[2], .g = in[1], .b = in[0]};
+  HsvColor color = RgbToHsv(rgb);
+
+  std::cerr << "color is " << (int)color.h << "," << (int)color.s << ","
+            << (int)color.v << "\n";
+  // color.v = color.v + factor > 1 ? 1 : color.v + factor;
+  float fac = 0.5;
+  // float frac = (float)color.v / (float)color.s;
+  float s = (float)color.s;
+  float sat = sat - (fac * 2.5 * sqrt(s));
+  float val = (float)color.v + (fac * 1 / (s ? s : 0.1));
+  // float val = (float)color.v + fac;
+  color.s = sat < 0 ? 0 : color.s - (uint8_t)sat;
+  // color.v = val > 255 ? 255 : color.v + (uint8_t)val;
+
+  // color.v += 20;
+
+  // color.v = color.v > 1 ? 1 : color.v;
+
+  rgb = HsvToRgb(color);
+  uint8_t out[4] = {rgb.b, rgb.g, rgb.r, in[3]};
+  // uint8_t out[4] = {in[0], rgb.b, rgb.g, rgb.r};
+  return *(ImU32 *)&out;
+}
+
 void ImNodeEditor::update() {
   bool link_is_being_dropped = false;
+  bool has_output_pin_been_clicked = false;
 
   global_wpos = ImGui::GetWindowPos();
   global_wsize = ImGui::GetWindowSize();
@@ -208,6 +365,8 @@ void ImNodeEditor::update() {
       for (int32_t i = 0; i < getNodeCount(); i++) {
         selectNode(i, false);
       }
+      currently_selected_link[0] = {-1, -1};
+      currently_selected_link[1] = {-1, -1};
     }
   }
 
@@ -215,20 +374,55 @@ void ImNodeEditor::update() {
   for (int32_t nodeIdx = 0; nodeIdx < getNodeCount(); nodeIdx++) {
     Node node = getNode(nodeIdx);
     Template templ = getTemplate(node.templateIdx);
+
     // draw links (from input to output)
     for (int8_t i = 0; i < templ.inputCount; i++) {
       ImVec2 circle_pos = world2screen(getInputPinPos(node, templ, i));
       Link link = getNodeInputLink(nodeIdx, i);
 
-      // draw link
+      // draw link and handle user input to it
       if (link.nodeIdx != -1 && link.pinIdx != -1) {
+        if (vec_length_squered(ImGui::GetMousePos(), circle_pos) <=
+                100 * zoom * zoom &&
+            ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+          delLink(nodeIdx, i, link.nodeIdx, link.pinIdx);
+          currently_selected_link[0] = {-1, -1};
+          currently_selected_link[1] = {-1, -1};
+          continue;
+        }
         Node node2 = getNode(link.nodeIdx);
+        Template templ = getTemplate(node2.templateIdx);
+
+        ImU32 color = templ.outputColors ? templ.outputColors[link.pinIdx]
+                                         : ImU32(ImColor(100, 100, 100));
 
         ImVec2 output_pin_pos = world2screen(getOutputPinPos(
             node2, getTemplate(node2.templateIdx), link.pinIdx));
 
-        drawlist->AddLine(circle_pos, output_pin_pos, ImColor(100, 100, 100),
-                          6 * zoom);
+        bool selected = currently_selected_link[0].pinIdx == i &&
+                        currently_selected_link[0].nodeIdx == nodeIdx &&
+                        currently_selected_link[1].pinIdx == link.pinIdx &&
+                        currently_selected_link[1].nodeIdx == link.nodeIdx;
+
+        bool hovered = sdf_line_squered(ImGui::GetMousePos(), circle_pos,
+                                        output_pin_pos) <= 36 * zoom * zoom;
+
+        if ((hovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) ||
+            (selected && ImGui::IsKeyPressed(ImGuiKey_Delete))) {
+
+          delLink(nodeIdx, i, link.nodeIdx, link.pinIdx);
+          currently_selected_link[0] = {-1, -1};
+          currently_selected_link[1] = {-1, -1};
+        } else if (hovered && click && !has_output_pin_been_clicked) {
+          currently_selected_link[0] = {.pinIdx = i, .nodeIdx = nodeIdx};
+          currently_selected_link[1] = link;
+        }
+
+        drawlist->AddLine(
+            circle_pos, output_pin_pos,
+            selected ? imColor(0xffaa00ff)
+                     : (hovered ? ImU32(ImColor(200, 200, 200)) : color),
+            6 * zoom);
       }
 
       // handle input only for on-screen nodes
@@ -238,11 +432,14 @@ void ImNodeEditor::update() {
         continue;
 
       // when hovering over input pin
-      if (vec_length_squered(ImGui::GetMousePos(), world2screen(getInputPinPos(
-                                                       node, templ, i))) < 36) {
+      if (vec_length_squered(ImGui::GetMousePos(),
+                             world2screen(getInputPinPos(node, templ, i))) <
+          100 * zoom * zoom) {
 
         if (click) {
           currently_dragged_pin = {.pinIdx = i, .nodeIdx = nodeIdx};
+          currently_selected_link[0] = {-1, -1};
+          currently_selected_link[1] = {-1, -1};
           is_it_output_pin = false;
         }
 
@@ -273,11 +470,17 @@ void ImNodeEditor::update() {
 
     for (int8_t i = 0; i < templ.outputCount; i++) {
       // when hovering over output pin
-      if (vec_length_squered(ImGui::GetMousePos(), world2screen(getOutputPinPos(
-                                                       node, templ, i))) < 36) {
+      if (vec_length_squered(ImGui::GetMousePos(),
+                             world2screen(getOutputPinPos(node, templ, i))) <
+          100 * zoom * zoom) {
         if (click) {
           currently_dragged_pin = {.pinIdx = i, .nodeIdx = nodeIdx};
+          currently_selected_link[0] = {-1, -1};
+          currently_selected_link[1] = {-1, -1};
           is_it_output_pin = true;
+          has_output_pin_been_clicked =
+              true; // only in this specific scenario, link migh be still
+                    // selected when dragging new one
         }
 
         // when output pin is getting linked
@@ -304,6 +507,8 @@ void ImNodeEditor::update() {
                                                  ImVec2(node.size.x, 25))))) {
 
       selectNode(nodeIdx, true);
+      currently_selected_link[0] = {-1, -1};
+      currently_selected_link[1] = {-1, -1};
     }
   }
 
@@ -317,15 +522,23 @@ void ImNodeEditor::update() {
       currently_dragged_pin.nodeIdx != -1) {
 
     Node node = getNode(currently_dragged_pin.nodeIdx);
+    Template templ = getTemplate(node.templateIdx);
     ImVec2 pinpos = is_it_output_pin
                         ? getOutputPinPos(node, getTemplate(node.templateIdx),
                                           currently_dragged_pin.pinIdx)
                         : getInputPinPos(node, getTemplate(node.templateIdx),
                                          currently_dragged_pin.pinIdx);
 
+    ImU32 color = is_it_output_pin
+                      ? (templ.outputColors
+                             ? templ.outputColors[currently_dragged_pin.pinIdx]
+                             : ImU32(ImColor(100, 100, 100)))
+                      : (templ.inputColors
+                             ? templ.inputColors[currently_dragged_pin.pinIdx]
+                             : ImU32(ImColor(100, 100, 100)));
+
     pinpos = world2screen(pinpos);
-    drawlist->AddLine(pinpos, ImGui::GetMousePos(),
-                      ImU32(ImColor(200, 200, 200)), 6 * zoom);
+    drawlist->AddLine(pinpos, ImGui::GetMousePos(), color, 6 * zoom);
   }
 
   // 2nd pass, only for drawing
@@ -338,7 +551,9 @@ void ImNodeEditor::update() {
     ImVec2 wpos2 = add_vector(wpos, wsize);
     bool hovered = in_rect(ImGui::GetMousePos(), wpos, wpos2);
     drawlist->AddRectFilled(wpos, wpos2,
-                            hovered ? imColor(0x2C3335FF) : imColor(0x24292BFF),
+                            hovered
+                                ? imColorBrighten(templ.backgroundColor, 0.1)
+                                : templ.backgroundColor,
                             4 * zoom);
 
     drawlist->AddRectFilled(wpos, ImVec2(wpos2.x, wpos.y + (25 * zoom)),
@@ -361,11 +576,31 @@ void ImNodeEditor::update() {
 
         ImVec2 circle_pos = world2screen(getInputPinPos(node, templ, i));
 
-        bool hovered = vec_length_squered(ImGui::GetMousePos(), circle_pos) <
-                       36 * zoom * zoom;
+        bool dragged = currently_dragged_pin.pinIdx == i &&
+                       currently_dragged_pin.nodeIdx == nodeIdx &&
+                       !is_it_output_pin;
+
+        float mdist = vec_length_squered(ImGui::GetMousePos(), circle_pos);
+
         drawlist->AddCircleFilled(circle_pos, 6 * zoom,
-                                  hovered ? ImU32(ImColor(200, 200, 200))
-                                          : color);
+                                  mdist <= 36 * zoom * zoom || dragged
+                                      ? imColorBrighten(color, 0.1)
+                                      : color);
+
+        if (node.selected)
+          drawlist->AddCircle(circle_pos, 6 * zoom, imColor(0xffaa00ff), 16, 2);
+
+        if (mdist <= 64 && currently_dragged_pin.pinIdx != -1 &&
+            currently_dragged_pin.nodeIdx != -1 && is_it_output_pin) {
+          Node node2 = getNode(currently_dragged_pin.nodeIdx);
+          Template templ = getTemplate(node2.templateIdx);
+          ImU32 color = templ.outputColors
+                            ? templ.outputColors[currently_dragged_pin.pinIdx]
+                            : ImU32(ImColor(100, 100, 100));
+
+          drawlist->AddCircle(circle_pos, 10 * zoom, ImColor(200, 200, 200), 16,
+                              2);
+        }
       }
     }
     // draw output pins
@@ -382,19 +617,37 @@ void ImNodeEditor::update() {
         //     0.5)));
         ImVec2 circle_pos = world2screen(getOutputPinPos(node, templ, i));
 
-        bool hovered = vec_length_squered(ImGui::GetMousePos(), circle_pos) <
-                       36 * zoom * zoom;
+        bool dragged = currently_dragged_pin.pinIdx == i &&
+                       currently_dragged_pin.nodeIdx == nodeIdx &&
+                       is_it_output_pin;
+
+        float mdist = vec_length_squered(ImGui::GetMousePos(), circle_pos);
+
         drawlist->AddCircleFilled(circle_pos, 6 * zoom,
-                                  hovered ? ImU32(ImColor(200, 200, 200))
-                                          : color);
+                                  mdist <= 36 * zoom * zoom || dragged
+                                      ? imColorBrighten(color, 0.1)
+                                      : color);
+
+        if (node.selected)
+          drawlist->AddCircle(circle_pos, 6 * zoom, imColor(0xffaa00ff), 16, 2);
+
+        if (mdist <= 64 && currently_dragged_pin.pinIdx != -1 &&
+            currently_dragged_pin.nodeIdx != -1 && !is_it_output_pin) {
+          Node node2 = getNode(currently_dragged_pin.nodeIdx);
+          Template templ = getTemplate(node2.templateIdx);
+          ImU32 color = templ.inputColors
+                            ? templ.inputColors[currently_dragged_pin.pinIdx]
+                            : ImU32(ImColor(100, 100, 100));
+
+          drawlist->AddCircle(circle_pos, 10 * zoom, color, 16, 2);
+        }
       }
     }
 
     ImGui::SetNextWindowPos(
         add_vector(wpos, scale_vector(ImVec2(10, 35), zoom)));
-    ImGui::BeginChild(
-        nodeIdx + 1, add_vector(wsize, ImVec2(-20 * zoom, -45 * zoom)),
-        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    ImGui::BeginChild(nodeIdx + 1,
+                      add_vector(wsize, ImVec2(-20 * zoom, -45 * zoom)));
     drawNodeWidgets(nodeIdx, &node, this);
     ImGui::EndChild();
   }
