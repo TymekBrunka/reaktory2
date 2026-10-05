@@ -1,9 +1,11 @@
 #pragma once
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <type_traits>
 #include <typeinfo>
 #include <variant>
+#include <vector>
 
 template <typename> struct TypeIdHack {};
 

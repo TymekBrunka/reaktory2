@@ -1,137 +1,156 @@
 #include "imgui.h"
-#include <NodeEditor.hpp>
 #include <cmath>
 #include <cstdint>
+#include <imNodedit.hpp>
 #include <iostream>
 #include <vector>
+namespace ImNodedit {
 
-struct nNode {
-  bool selected = false;
-  bool hovered = false;
-  int32_t templateIdx = -1;
-  ImVec2 position = ImVec2(0, 0);
-  ImVec2 size = ImVec2(100, 20);
-  const char *name;
-
-  Link inputs[2];
-  std::vector<Link> outputs[3];
-};
-
-class Nodedit : public ImNodeEditor {
-protected:
-  std::vector<nNode> nodes{
-      nNode{.position = ImVec2(-100, 0),
-            .size = ImVec2(100, 300),
-            .name = "node 1"},
-      nNode{
-          .size = ImVec2(300, 100),
-          .name = "node 2",
-          .outputs = {{{0, 2}}, {}, {}},
-      },
-      nNode{
-          .position = ImVec2(-200, -400),
-          .size = ImVec2(200, 400),
-          .name = "node 3",
-          .inputs = {{0, 1}, {-1, -1}},
-      },
-  };
-
-public:
-  Nodedit() = default;
-  ~Nodedit() override = default;
-
-  void selectNode(int32_t nodeIdx, bool selected) override {
-    nodes[nodeIdx].selected = selected;
-  }
-
-  void moveSelectedNodes(const ImVec2 delta) override {
-    for (auto &node : nodes) {
-      if (node.selected) {
-        node.position.x += delta.x;
-        node.position.y += delta.y;
-      }
-    }
-  }
-
-  int32_t getTemplateCount() override { return 1; }
-  const Template getTemplate(int32_t templateIdx) {
-    static ImU32 inColors[] = {
-        ImColor(200, 100, 0),
-        ImColor(200, 0, 200),
-    };
-
-    static ImU32 outColors[] = {
-        ImColor(200, 0, 0),
-        ImColor(0, 200, 0),
-        ImColor(0, 0, 200),
-    };
-
-    return Template{.inputCount = 2,
-                    .outputCount = 3,
-                    .inputColors = inColors,
-                    .outputColors = outColors};
-  }
-
-  int32_t getNodeCount() override { return nodes.size(); }
-  Node getNode(int32_t nodeIdx) override {
-    nNode &node = nodes[nodeIdx];
-    return Node{
-        .selected = node.selected,
-        .hovered = node.hovered,
-        .templateIdx = 0,
-        .position = ImVec2(((int)node.position.x / 10) * 10,
-                           (((int)node.position.y) / 10) * 10),
-        .size = node.size,
-        .userData = (void *)node.name,
-    };
-  }
-
-  Link getNodeInputLink(int32_t nodeIdx, int8_t pinIdx) override {
-    return nodes[nodeIdx].inputs[pinIdx];
-  }
-
-  void addLink(int32_t inputNodeIdx, int8_t inputPinIdx, int32_t outputNodeIdx,
-               int8_t outputPinIdx) {
-
-    std::cerr << "linking {" << inputNodeIdx << "," << (int)inputPinIdx
-              << "} and {" << outputNodeIdx << "," << (int)outputPinIdx
-              << "}\n";
-
-    nodes[inputNodeIdx].inputs[inputPinIdx] =
-        Link{.pinIdx = outputPinIdx, .nodeIdx = outputNodeIdx};
-
-    nodes[outputNodeIdx].outputs[outputPinIdx].push_back(
-        Link{.pinIdx = inputPinIdx, .nodeIdx = inputNodeIdx});
-  }
-
-  void delLink(int32_t inputNodeIdx, int8_t inputPinIdx, int32_t outputNodeIdx,
-               int8_t outputPinIdx) {
-
-    std::cerr << "UNlinking {" << inputNodeIdx << "," << (int)inputPinIdx
-              << "} and {" << outputNodeIdx << "," << (int)outputPinIdx
-              << "}\n";
-
-    nodes[inputNodeIdx].inputs[inputPinIdx] = Link{.pinIdx = -1, .nodeIdx = -1};
-
-    std::vector<Link> &outputs = nodes[outputNodeIdx].outputs[outputPinIdx];
-    for (int i = 0; i < outputs.size(); i++) {
-
-      if (outputs[i].pinIdx == inputPinIdx &&
-          outputs[i].nodeIdx == inputNodeIdx) {
-
-        outputs.erase(outputs.begin() + i);
-        return;
-      }
-    }
-  }
-
-  void drawNodeWidgets(int32_t nodeIdx, Node *node,
-                       ImNodeEditor *nodedit) override {
-
-    ImGui::Text("Hi I'm %s", (const char *)node->userData);
-    ImGui::Button((const char *)node->userData);
-  }
-};
+// struct nNode {
+//   bool selected = false;
+//   bool hovered = false;
+//   int32_t templateIdx = -1;
+//   ImVec2 position = ImVec2(0, 0);
+//   ImVec2 size = ImVec2(100, 20);
+//   const char *name;
+//
+//   Link inputs[2];
+//   std::vector<Link> outputs[3];
+// };
+//
+// class Nodedit : public ImNodeEditor {
+// protected:
+//   std::vector<nNode> nodes{
+//       nNode{.position = ImVec2(-100, 0),
+//             .size = ImVec2(100, 300),
+//             .name = "node 1"},
+//       nNode{
+//           .size = ImVec2(300, 100),
+//           .name = "node 2",
+//           .outputs = {{{0, 2}}, {}, {}},
+//       },
+//       nNode{
+//           .position = ImVec2(-200, -400),
+//           .size = ImVec2(200, 400),
+//           .name = "node 3",
+//           .inputs = {{0, 1}, {-1, -1}},
+//       },
+//   };
+//
+// public:
+//   Nodedit() = default;
+//   ~Nodedit() override = default;
+//
+//   void selectNode(int32_t nodeIdx, bool selected) override {
+//     nodes[nodeIdx].selected = selected;
+//   }
+//
+//   void moveSelectedNodes(const ImVec2 delta) override {
+//     for (auto &node : nodes) {
+//       if (node.selected) {
+//         node.position.x += delta.x;
+//         node.position.y += delta.y;
+//       }
+//     }
+//   }
+//
+//   int32_t getTemplateCount() override { return 1; }
+//   const Template getTemplate(int32_t templateIdx) {
+//     static ImU32 inColors[] = {
+//         ImColor(200, 100, 0),
+//         ImColor(200, 0, 200),
+//     };
+//
+//     static ImU32 outColors[] = {
+//         ImColor(200, 0, 0),
+//         ImColor(0, 200, 0),
+//         ImColor(0, 0, 200),
+//     };
+//
+//     static const char *inNames[] = {
+//         "jeden ",
+//         "2  ",
+//     };
+//
+//     static const char *outNames[] = {
+//         "a  ",
+//         "bb  ",
+//         "delta ",
+//     };
+//
+//     return Template{.inputCount = 2,
+//                     .outputCount = 3,
+//                     .inputNames = inNames,
+//                     .inputColors = inColors,
+//                     .outputNames = outNames,
+//                     .outputColors = outColors};
+//   }
+//
+//   int32_t getNodeCount() override { return nodes.size(); }
+//   Node getNode(int32_t nodeIdx) override {
+//     nNode &node = nodes[nodeIdx];
+//     return Node{
+//         .selected = node.selected,
+//         .hovered = node.hovered,
+//         .templateIdx = 0,
+//         .position = ImVec2(((int)node.position.x / 10) * 10,
+//                            (((int)node.position.y) / 10) * 10),
+//         .size = node.size,
+//         .userData = (void *)node.name,
+//     };
+//   }
+//
+//   Link getNodeInputLink(int32_t nodeIdx, int8_t pinIdx) override {
+//     return nodes[nodeIdx].inputs[pinIdx];
+//   }
+//
+//   bool allowLink(int32_t inputNodeIdx, int8_t inputPinIdx,
+//                  int32_t outputNodeIdx, int8_t outputPinIdx) override {
+//     return true;
+//   };
+//
+//   void addLink(int32_t inputNodeIdx, int8_t inputPinIdx, int32_t outputNodeIdx,
+//                int8_t outputPinIdx) {
+//
+//     std::cerr << "linking {" << inputNodeIdx << "," << (int)inputPinIdx
+//               << "} and {" << outputNodeIdx << "," << (int)outputPinIdx
+//               << "}\n";
+//
+//     nodes[inputNodeIdx].inputs[inputPinIdx] =
+//         Link{.pinIdx = outputPinIdx, .nodeIdx = outputNodeIdx};
+//
+//     nodes[outputNodeIdx].outputs[outputPinIdx].push_back(
+//         Link{.pinIdx = inputPinIdx, .nodeIdx = inputNodeIdx});
+//   }
+//
+//   void delLink(int32_t inputNodeIdx, int8_t inputPinIdx, int32_t outputNodeIdx,
+//                int8_t outputPinIdx) {
+//
+//     std::cerr << "UNlinking {" << inputNodeIdx << "," << (int)inputPinIdx
+//               << "} and {" << outputNodeIdx << "," << (int)outputPinIdx
+//               << "}\n";
+//
+//     nodes[inputNodeIdx].inputs[inputPinIdx] = Link{.pinIdx = -1, .nodeIdx = -1};
+//
+//     std::vector<Link> &outputs = nodes[outputNodeIdx].outputs[outputPinIdx];
+//     for (int i = 0; i < outputs.size(); i++) {
+//
+//       if (outputs[i].pinIdx == inputPinIdx &&
+//           outputs[i].nodeIdx == inputNodeIdx) {
+//
+//         outputs.erase(outputs.begin() + i);
+//         return;
+//       }
+//     }
+//   }
+//
+//   void drawNodeWidgets(int32_t nodeIdx, Node *node,
+//                        ImNodeEditor *nodedit) override {
+//
+//     ImGui::Text("Hi I'm %s", (const char *)node->userData);
+//     ImGui::Button((const char *)node->userData);
+//   }
+// };
 
 static ImVec2 negative_vector(ImVec2 vec) { return ImVec2(-vec.x, -vec.y); }
 
@@ -199,153 +218,33 @@ ImVec2 ImNodeEditor::getOutputPinPos(const Node &node, const Template &templ,
                 node.position.y + 25 + (frac * (pinIdx + 0.5)));
 }
 
-struct RgbColor {
-  unsigned char r;
-  unsigned char g;
-  unsigned char b;
-};
-
-struct HsvColor {
-  unsigned char h;
-  unsigned char s;
-  unsigned char v;
-};
-
-static RgbColor HsvToRgb(HsvColor hsv) {
-  RgbColor rgb;
-  unsigned char region, p, q, t;
-  unsigned int h, s, v, remainder;
-
-  if (hsv.s == 0) {
-    rgb.r = hsv.v;
-    rgb.g = hsv.v;
-    rgb.b = hsv.v;
-    return rgb;
-  }
-
-  // converting to 16 bit to prevent overflow
-  h = hsv.h;
-  s = hsv.s;
-  v = hsv.v;
-
-  region = h / 43;
-  remainder = (h - (region * 43)) * 6;
-
-  p = (v * (255 - s)) >> 8;
-  q = (v * (255 - ((s * remainder) >> 8))) >> 8;
-  t = (v * (255 - ((s * (255 - remainder)) >> 8))) >> 8;
-
-  switch (region) {
-  case 0:
-    rgb.r = v;
-    rgb.g = t;
-    rgb.b = p;
-    break;
-  case 1:
-    rgb.r = q;
-    rgb.g = v;
-    rgb.b = p;
-    break;
-  case 2:
-    rgb.r = p;
-    rgb.g = v;
-    rgb.b = t;
-    break;
-  case 3:
-    rgb.r = p;
-    rgb.g = q;
-    rgb.b = v;
-    break;
-  case 4:
-    rgb.r = t;
-    rgb.g = p;
-    rgb.b = v;
-    break;
-  default:
-    rgb.r = v;
-    rgb.g = p;
-    rgb.b = q;
-    break;
-  }
-
-  return rgb;
-}
-
-static HsvColor RgbToHsv(RgbColor rgb) {
-  HsvColor hsv;
-  unsigned char rgbMin, rgbMax;
-
-  rgbMin = rgb.r < rgb.g ? (rgb.r < rgb.b ? rgb.r : rgb.b)
-                         : (rgb.g < rgb.b ? rgb.g : rgb.b);
-  rgbMax = rgb.r > rgb.g ? (rgb.r > rgb.b ? rgb.r : rgb.b)
-                         : (rgb.g > rgb.b ? rgb.g : rgb.b);
-
-  hsv.v = rgbMax;
-  if (hsv.v == 0) {
-    hsv.h = 0;
-    hsv.s = 0;
-    return hsv;
-  }
-
-  hsv.s = 255 * ((long)(rgbMax - rgbMin)) / hsv.v;
-  if (hsv.s == 0) {
-    hsv.h = 0;
-    return hsv;
-  }
-
-  if (rgbMax == rgb.r)
-    hsv.h = 0 + 43 * (rgb.g - rgb.b) / (rgbMax - rgbMin);
-  else if (rgbMax == rgb.g)
-    hsv.h = 85 + 43 * (rgb.b - rgb.r) / (rgbMax - rgbMin);
-  else
-    hsv.h = 171 + 43 * (rgb.r - rgb.g) / (rgbMax - rgbMin);
-
-  return hsv;
-}
-
 inline ImU32 imColorBrighten(ImU32 x, float factor) {
-  uint8_t *in = (uint8_t *)&x;
-  RgbColor rgb{.r = in[2], .g = in[1], .b = in[0]};
-  HsvColor color = RgbToHsv(rgb);
-
-  std::cerr << "color is " << (int)color.h << "," << (int)color.s << ","
-            << (int)color.v << "\n";
-  // color.v = color.v + factor > 1 ? 1 : color.v + factor;
-  float fac = 0.5;
-  // float frac = (float)color.v / (float)color.s;
-  float s = (float)color.s;
-  float sat = sat - (fac * 2.5 * sqrt(s));
-  float val = (float)color.v + (fac * 1 / (s ? s : 0.1));
-  // float val = (float)color.v + fac;
-  color.s = sat < 0 ? 0 : color.s - (uint8_t)sat;
-  // color.v = val > 255 ? 255 : color.v + (uint8_t)val;
-
-  // color.v += 20;
-
-  // color.v = color.v > 1 ? 1 : color.v;
-
-  rgb = HsvToRgb(color);
-  uint8_t out[4] = {rgb.b, rgb.g, rgb.r, in[3]};
-  // uint8_t out[4] = {in[0], rgb.b, rgb.g, rgb.r};
-  return *(ImU32 *)&out;
+  return imColorBlendRGBA(x, 0xffffffff, factor);
 }
 
-void ImNodeEditor::update() {
+void ImNodeEditor::update(const char *name) {
   bool link_is_being_dropped = false;
   bool has_output_pin_been_clicked = false;
+  bool do_move_with_mouse = false;
+  bool has_any_node_been_selected_this_frame = false;
 
   global_wpos = ImGui::GetWindowPos();
-  global_wsize = ImGui::GetWindowSize();
+  // global_wsize = ImGui::GetWindowSize();
   ImDrawList *drawlist = ImGui::GetWindowDrawList();
   float original_font_scale = ImGui::GetIO().FontGlobalScale;
   ImGui::GetIO().FontGlobalScale = zoom;
 
-  if (ImGui::IsWindowFocused() || ImGui::IsWindowHovered()) {
+  ImGui::BeginChild(name, global_wsize, 0,
+                    ImGuiWindowFlags_NoScrollWithMouse |
+                        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove);
+
+  is_focused = ImGui::IsWindowFocused();
+  if (is_focused || ImGui::IsWindowHovered()) {
 
     zoom += ImGui::GetIO().MouseWheel * 0.1;
     zoom = zoom <= 0.1 ? 0.1 : zoom;
 
-    if (ImGui::IsMouseDown(ImGuiMouseButton_Middle)) {
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Middle) || is_moving_with_mouse) {
       ImVec2 delta = ImGui::GetIO().MouseDelta;
       // offset = ImVec2(offset.x + (delta.x / zoom), offset.y + (delta.y /
       // zoom));
@@ -354,7 +253,8 @@ void ImNodeEditor::update() {
   }
 
   bool click = ImGui::IsMouseClicked(ImGuiMouseButton_Left);
-  if (ImGui::IsWindowFocused() ||
+  do_move_with_mouse = ImGui::IsMouseDown(ImGuiMouseButton_Left);
+  if (is_focused ||
       ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)) {
 
     link_is_being_dropped = !ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
@@ -388,6 +288,7 @@ void ImNodeEditor::update() {
           delLink(nodeIdx, i, link.nodeIdx, link.pinIdx);
           currently_selected_link[0] = {-1, -1};
           currently_selected_link[1] = {-1, -1};
+          do_move_with_mouse = false;
           continue;
         }
         Node node2 = getNode(link.nodeIdx);
@@ -413,16 +314,18 @@ void ImNodeEditor::update() {
           delLink(nodeIdx, i, link.nodeIdx, link.pinIdx);
           currently_selected_link[0] = {-1, -1};
           currently_selected_link[1] = {-1, -1};
+          do_move_with_mouse = false;
         } else if (hovered && click && !has_output_pin_been_clicked) {
           currently_selected_link[0] = {.pinIdx = i, .nodeIdx = nodeIdx};
           currently_selected_link[1] = link;
+          do_move_with_mouse = false;
         }
 
-        drawlist->AddLine(
-            circle_pos, output_pin_pos,
-            selected ? imColor(0xffaa00ff)
-                     : (hovered ? ImU32(ImColor(200, 200, 200)) : color),
-            6 * zoom);
+        drawlist->AddLine(circle_pos, output_pin_pos,
+                          selected
+                              ? imColor(0xffaa00ff)
+                              : (hovered ? imColorBrighten(color, 0.5) : color),
+                          6 * zoom);
       }
 
       // handle input only for on-screen nodes
@@ -441,12 +344,14 @@ void ImNodeEditor::update() {
           currently_selected_link[0] = {-1, -1};
           currently_selected_link[1] = {-1, -1};
           is_it_output_pin = false;
+          do_move_with_mouse = false;
         }
 
         // when input pin is getting linked
         else if (link_is_being_dropped && is_it_output_pin &&
                  currently_dragged_pin.pinIdx != -1 &&
-                 currently_dragged_pin.nodeIdx != -1) {
+                 currently_dragged_pin.nodeIdx != -1 &&
+                 currently_dragged_pin.nodeIdx != nodeIdx) {
 
           link_is_being_dropped = false;
           Link current_link = getNodeInputLink(nodeIdx, i);
@@ -454,10 +359,13 @@ void ImNodeEditor::update() {
             delLink(nodeIdx, i, currently_dragged_pin.nodeIdx,
                     currently_dragged_pin.pinIdx);
 
-          addLink(nodeIdx, i, currently_dragged_pin.nodeIdx,
-                  currently_dragged_pin.pinIdx);
+          if (allowLink(nodeIdx, i, currently_dragged_pin.nodeIdx,
+                        currently_dragged_pin.pinIdx))
+            addLink(nodeIdx, i, currently_dragged_pin.nodeIdx,
+                    currently_dragged_pin.pinIdx);
 
           currently_dragged_pin = {-1, -1};
+          do_move_with_mouse = false;
         }
       }
     }
@@ -481,12 +389,14 @@ void ImNodeEditor::update() {
           has_output_pin_been_clicked =
               true; // only in this specific scenario, link migh be still
                     // selected when dragging new one
+          do_move_with_mouse = false;
         }
 
         // when output pin is getting linked
         else if (link_is_being_dropped && !is_it_output_pin &&
                  currently_dragged_pin.pinIdx != -1 &&
-                 currently_dragged_pin.nodeIdx != -1) {
+                 currently_dragged_pin.nodeIdx != -1 &&
+                 currently_dragged_pin.nodeIdx != nodeIdx) {
 
           link_is_being_dropped = false;
           Link old_link = getNodeInputLink(currently_dragged_pin.nodeIdx,
@@ -494,9 +404,13 @@ void ImNodeEditor::update() {
           if (old_link.pinIdx != -1 && old_link.nodeIdx != -1)
             delLink(currently_dragged_pin.nodeIdx, currently_dragged_pin.pinIdx,
                     old_link.nodeIdx, old_link.pinIdx);
-          addLink(currently_dragged_pin.nodeIdx, currently_dragged_pin.pinIdx,
-                  nodeIdx, i);
+
+          if (allowLink(currently_dragged_pin.nodeIdx,
+                        currently_dragged_pin.pinIdx, nodeIdx, i))
+            addLink(currently_dragged_pin.nodeIdx, currently_dragged_pin.pinIdx,
+                    nodeIdx, i);
           currently_dragged_pin = {-1, -1};
+          do_move_with_mouse = false;
         }
       }
     }
@@ -507,15 +421,21 @@ void ImNodeEditor::update() {
                                                  ImVec2(node.size.x, 25))))) {
 
       selectNode(nodeIdx, true);
+      node.selected = true; // to reflect change on current copy of the struct
       currently_selected_link[0] = {-1, -1};
       currently_selected_link[1] = {-1, -1};
+      do_move_with_mouse = false;
     }
+
+    has_any_node_been_selected_this_frame |= node.selected;
   }
 
-  if ((ImGui::IsWindowFocused() ||
+  if ((is_focused ||
        ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)) &&
-      !click && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+      !click && ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
+      has_any_node_been_selected_this_frame) {
     moveSelectedNodes(scale_vector(ImGui::GetIO().MouseDelta, 1.0 / zoom));
+    do_move_with_mouse = false;
   }
 
   if (currently_dragged_pin.pinIdx != -1 &&
@@ -538,7 +458,10 @@ void ImNodeEditor::update() {
                              : ImU32(ImColor(100, 100, 100)));
 
     pinpos = world2screen(pinpos);
-    drawlist->AddLine(pinpos, ImGui::GetMousePos(), color, 6 * zoom);
+    drawlist->AddLine(pinpos, ImGui::GetMousePos(), imColorBrighten(color, 0.5),
+                      6 * zoom);
+
+    do_move_with_mouse = false;
   }
 
   // 2nd pass, only for drawing
@@ -568,6 +491,7 @@ void ImNodeEditor::update() {
       drawlist->AddRect(wpos, wpos2, imColor(0xffaa00ff), 4 * zoom, 0, 2);
 
     // draw input pins
+    float lpadding = 0;
     {
       for (int8_t i = 0; i < templ.inputCount; i++) {
         const char *name = templ.inputNames ? templ.inputNames[i] : "";
@@ -582,15 +506,27 @@ void ImNodeEditor::update() {
 
         float mdist = vec_length_squered(ImGui::GetMousePos(), circle_pos);
 
+        if (templ.inputNames) {
+          float padding = ImGui::CalcTextSize(templ.inputNames[i]).x * 1.2;
+          lpadding = padding > lpadding ? padding : lpadding;
+
+          drawlist->AddRectFilled(
+              sub_vector(circle_pos, scale_vector(ImVec2(8, 8), zoom)),
+              add_vector(circle_pos, ImVec2(padding, 8 * zoom)), 0x80000000);
+          drawlist->AddText(
+              add_vector(circle_pos, scale_vector(ImVec2(8, -7), zoom)),
+              0xffaaaaaa, templ.inputNames[i]);
+        }
+
         drawlist->AddCircleFilled(circle_pos, 6 * zoom,
                                   mdist <= 36 * zoom * zoom || dragged
-                                      ? imColorBrighten(color, 0.1)
+                                      ? imColorBrighten(color, 0.5)
                                       : color);
 
         if (node.selected)
           drawlist->AddCircle(circle_pos, 6 * zoom, imColor(0xffaa00ff), 16, 2);
 
-        if (mdist <= 64 && currently_dragged_pin.pinIdx != -1 &&
+        if (mdist <= 64 * zoom * zoom && currently_dragged_pin.pinIdx != -1 &&
             currently_dragged_pin.nodeIdx != -1 && is_it_output_pin) {
           Node node2 = getNode(currently_dragged_pin.nodeIdx);
           Template templ = getTemplate(node2.templateIdx);
@@ -598,12 +534,13 @@ void ImNodeEditor::update() {
                             ? templ.outputColors[currently_dragged_pin.pinIdx]
                             : ImU32(ImColor(100, 100, 100));
 
-          drawlist->AddCircle(circle_pos, 10 * zoom, ImColor(200, 200, 200), 16,
-                              2);
+          drawlist->AddCircle(circle_pos, 10 * zoom,
+                              imColorBrighten(color, 0.5), 16, 2);
         }
       }
     }
     // draw output pins
+    float rpadding = 0;
     {
       float out_frac =
           (wsize.y - (25 * zoom)) / (templ.outputCount ? templ.outputCount : 1);
@@ -623,15 +560,28 @@ void ImNodeEditor::update() {
 
         float mdist = vec_length_squered(ImGui::GetMousePos(), circle_pos);
 
+        if (templ.outputNames) {
+          float padding = ImGui::CalcTextSize(templ.outputNames[i]).x * 1.2;
+          rpadding = padding > rpadding ? padding : rpadding;
+
+          drawlist->AddRectFilled(
+              add_vector(circle_pos, ImVec2(-padding, -8 * zoom)),
+              add_vector(circle_pos, scale_vector(ImVec2(8, 8), zoom)),
+              0x80000000);
+          drawlist->AddText(
+              add_vector(circle_pos, ImVec2(-padding + 3 * zoom, -7 * zoom)),
+              0xffaaaaaa, templ.outputNames[i]);
+        }
+
         drawlist->AddCircleFilled(circle_pos, 6 * zoom,
                                   mdist <= 36 * zoom * zoom || dragged
-                                      ? imColorBrighten(color, 0.1)
+                                      ? imColorBrighten(color, 0.5)
                                       : color);
 
         if (node.selected)
           drawlist->AddCircle(circle_pos, 6 * zoom, imColor(0xffaa00ff), 16, 2);
 
-        if (mdist <= 64 && currently_dragged_pin.pinIdx != -1 &&
+        if (mdist <= 64 * zoom * zoom && currently_dragged_pin.pinIdx != -1 &&
             currently_dragged_pin.nodeIdx != -1 && !is_it_output_pin) {
           Node node2 = getNode(currently_dragged_pin.nodeIdx);
           Template templ = getTemplate(node2.templateIdx);
@@ -639,15 +589,18 @@ void ImNodeEditor::update() {
                             ? templ.inputColors[currently_dragged_pin.pinIdx]
                             : ImU32(ImColor(100, 100, 100));
 
-          drawlist->AddCircle(circle_pos, 10 * zoom, color, 16, 2);
+          drawlist->AddCircle(circle_pos, 10 * zoom,
+                              imColorBrighten(color, 0.5), 16, 2);
         }
       }
     }
 
-    ImGui::SetNextWindowPos(
-        add_vector(wpos, scale_vector(ImVec2(10, 35), zoom)));
-    ImGui::BeginChild(nodeIdx + 1,
-                      add_vector(wsize, ImVec2(-20 * zoom, -45 * zoom)));
+    ImGui::SetNextWindowPos(add_vector(
+        wpos, scale_vector(ImVec2(10 + (lpadding / zoom), 35), zoom)));
+    ImGui::BeginChild(
+        nodeIdx + 1,
+        add_vector(wsize, ImVec2((-20 * zoom) - ((lpadding - rpadding) / zoom),
+                                 -45 * zoom)));
     drawNodeWidgets(nodeIdx, &node, this);
     ImGui::EndChild();
   }
@@ -655,10 +608,10 @@ void ImNodeEditor::update() {
   if (link_is_being_dropped)
     currently_dragged_pin = {-1, -1};
 
+  is_moving_with_mouse = do_move_with_mouse;
   ImGui::GetIO().FontGlobalScale = original_font_scale;
+
+  ImGui::EndChild();
 }
 
-void nodedit_update() {
-  static Nodedit nodedit{};
-  nodedit.update();
-}
+} // namespace ImNodedit

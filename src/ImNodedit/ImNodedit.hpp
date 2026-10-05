@@ -5,12 +5,25 @@
 #include <memory>
 #include <typeinfo>
 #include <vector>
+namespace ImNodedit {
 
 inline constexpr ImU32 imColor(int32_t x) {
   uint8_t *in = (uint8_t *)&x;
   uint8_t out[4] = {in[3], in[2], in[1], in[0]};
   return *(ImU32 *)&out;
 };
+
+inline ImU32 imColorBlendRGBA(ImU32 x, ImU32 y, float factor) {
+  uint8_t *a = (uint8_t *)&x;
+  uint8_t *b = (uint8_t *)&y;
+  uint8_t out[4] = {
+      (uint8_t)(a[0] + ((float)(b[0] - a[0]) * factor)),
+      (uint8_t)(a[1] + ((float)(b[1] - a[1]) * factor)),
+      (uint8_t)(a[2] + ((float)(b[2] - a[2]) * factor)),
+      (uint8_t)(a[3] + ((float)(b[3] - a[3]) * factor)),
+  };
+  return *(ImU32 *)&out;
+}
 
 class ImNodeEditor;
 
@@ -54,12 +67,14 @@ struct Node {
 class ImNodeEditor {
 protected:
   float zoom = 1;
+  bool is_focused = false;
+  bool is_moving_with_mouse = false;
+  bool is_it_output_pin = false;
   ImVec2 offset = ImVec2(0, 0);
   ImVec2 global_wsize = ImVec2(0, 0);
   ImVec2 global_wpos = ImVec2(0, 0);
   Link currently_dragged_pin = {-1, -1};
   Link currently_selected_link[2] = {{-1, -1}, {-1, -1}};
-  bool is_it_output_pin = false;
 
   virtual ~ImNodeEditor() = default;
 
@@ -80,6 +95,8 @@ protected:
   // 0; virtual Link getNodeOutputLink(int32_t nodeIdx, int8_t pinIdx, int32_t
   // outputIdx) = 0;
 
+  virtual bool allowLink(int32_t inputNodeIdx, int8_t inputPinIdx,
+                         int32_t outputNodeIdx, int8_t outputPinIdx) = 0;
   virtual void addLink(int32_t inputNodeIdx, int8_t inputPinIdx,
                        int32_t outputNodeIdx, int8_t outputPinIdx) = 0;
   virtual void delLink(int32_t inputNodeIdx, int8_t inputPinIdx,
@@ -94,9 +111,11 @@ protected:
 public:
   ImVec2 screen2world(ImVec2 vec);
   ImVec2 world2screen(ImVec2 vec);
-  void update();
+  inline void setSize(ImVec2 size) { global_wsize = size; }
+  inline bool isFocused() const { return is_focused; }
+  void update(const char *name = "ImNodedit");
 
   inline float getZoomFactor() const { return zoom; }
 };
 
-void nodedit_update();
+} // namespace ImNodedit

@@ -3,7 +3,7 @@
 #include "Eval.hpp"
 #include "FileUtils.hpp"
 #include "Model.hpp"
-#include "NodeEditor.hpp"
+#include "ImNodedit.hpp"
 #include "ObjectPool.hpp"
 #include "Renderer.hpp"
 #include "ResourceManager.hpp"
@@ -667,14 +667,6 @@ void App::draw_gui() {
         width_accumulator = 0;
     }
     ImGui::EndChild();
-  }
-  ImGui::End();
-
-  if (ImGui::Begin("Nodedit", NULL,
-                   ImGuiWindowFlags_NoScrollbar |
-                       ImGuiWindowFlags_NoScrollWithMouse)) {
-
-    nodedit_update();
   }
   ImGui::End();
 }
