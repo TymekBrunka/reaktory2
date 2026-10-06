@@ -57,7 +57,7 @@ struct Link {
 
 struct Node {
   bool selected = false;
-  bool hovered = false;
+  // bool hovered = false;
   int32_t templateIdx = -1;
   ImVec2 position = ImVec2(0, 0);
   ImVec2 size = ImVec2(100, 20);

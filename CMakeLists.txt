@@ -99,6 +99,14 @@ add_library(pfd OBJECT
 
 target_include_directories(pfd PUBLIC src/Components/pfd PRIVATE deps)
 
+add_library(formulator OBJECT
+  src/Components/Formulator/Formulator.cpp
+  src/Components/Formulator/Formulator.hpp
+  src/Components/Formulator/Any_and_Pool.hpp
+)
+
+target_include_directories(formulator PUBLIC src/Components/Formulator)
+
 add_library(imNodedit STATIC
   src/ImNodedit/ImNodedit.cpp
   src/ImNodedit/ImNodedit.hpp
@@ -106,6 +114,14 @@ add_library(imNodedit STATIC
 
 target_link_libraries(imNodedit PUBLIC imgui)
 target_include_directories(imNodedit PUBLIC src/ImNodedit)
+
+add_library(NodeEditor STATIC
+  src/NodeEditor/NodeEditor.cpp
+  src/NodeEditor/NodeEditor.hpp
+)
+
+target_link_libraries(NodeEditor PUBLIC imNodedit formulator)
+target_include_directories(NodeEditor PUBLIC src/NodeEditor)
 
 add_library(pch_core STATIC
   src/precompiled_headers/core.hpp

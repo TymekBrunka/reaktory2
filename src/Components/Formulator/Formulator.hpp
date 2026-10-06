@@ -1,137 +1,66 @@
 #pragma once
-#include <cstdint>
-#include <functional>
+#include <Any_and_Pool.hpp>
 #include <memory>
-#include <type_traits>
-#include <typeinfo>
-#include <variant>
 #include <vector>
 
-template <typename> struct TypeIdHack {};
+struct Node {
+  bool selected = false;
+  // bool hovered = false;
+  tHandle node_data;
+  int32_t templateIdx = -1;
+  float position[2] = {0};
+  float size[2] = {100, 20};
+  // void *userData = nullptr;
+};
 
-inline void default_destructor(void *) {};
+struct Link {
+  int8_t pinIdx = -1;
+  int16_t nodeIdx = -1;
+};
 
-class Any {
-  union {
-    bool Bool;
-    int Int;
-    float Float;
-    void *Ptr;
-  } data;
-  size_t type_hash = 0; // from typeid().hash_code()
-  std::function<void(void *)> destructor = default_destructor;
-
+class NodePoolBase {
 public:
-  inline Any() { data.Ptr = nullptr; }
-  inline ~Any() {
-    if (data.Ptr)
-      destructor(data.Ptr);
-  }
+  virtual ~NodePoolBase() = default;
+  virtual void *get(tHandle handle) = 0;
+  virtual void remove(tHandle handle) = 0;
+  virtual NodePoolBase *copy() const = 0;
+  virtual Link *inputsOf(void *node_data) = 0;
 
-  Any(const Any &other) = delete;
-  Any &operator=(const Any &other) = delete;
+  template <typename T> T *convertTo() { return (T *)this; }
+};
 
-  inline Any(Any &&other) {
-    data = other.data;
-    type_hash = other.type_hash;
-    destructor = other.destructor;
-    other.data.Ptr = nullptr;
-    other.type_hash = 0;
-    other.destructor(other.data.Ptr);
-    other.destructor = default_destructor;
-  }
-
-  inline Any &operator=(Any &&other) {
-    if (this != &other) {
-      data = other.data;
-      type_hash = other.type_hash;
-      destructor = other.destructor;
-      other.data.Ptr = nullptr;
-      other.type_hash = 0;
-      other.destructor(other.data.Ptr);
-      other.destructor = default_destructor;
-    }
-    return *this;
-  }
-
-  template <typename T> bool is_type() {
-    return type_hash == typeid(TypeIdHack<T>).hash_code();
-  }
-
-  template <typename T> bool is_same_type(const T &other) {
-    return type_hash == typeid(TypeIdHack<T>).hash_code();
-  }
-
-private:
-  template <typename T> void put_base(const T &value) {
-    *((T *)data.Ptr) = value;
-    type_hash = typeid(TypeIdHack<T>);
-    destructor = [](void *ptr) { delete (T *)ptr; };
-  }
-
-  template <> inline void put_base<bool>(bool value) {
-    data.Bool = value;
-    destructor = default_destructor;
-  }
-
-  template <> inline void put_base<int>(int value) {
-    data.Int = value;
-    destructor = default_destructor;
-  }
-
-  template <> inline void put_base<float>(float value) {
-    data.Float = value;
-    destructor = default_destructor;
-  }
-
-  template <typename T> void put_base(T &&value) {
-    *((T *)data.Ptr) = value;
-    type_hash = typeid(TypeIdHack<T>);
-    destructor = [](void *ptr) { delete (T *)ptr; };
-  }
-
-  template <> inline void put_base<bool>(bool &&value) {
-    data.Bool = value;
-    destructor = default_destructor;
-  }
-
-  template <> inline void put_base<int>(int &&value) {
-    data.Int = value;
-    destructor = default_destructor;
-  }
-
-  template <> inline void put_base<float>(float &&value) {
-    data.Float = value;
-    destructor = default_destructor;
-  }
-
-  template <typename T> T *get_base() { return (T *)data.Ptr; }
-  template <> inline bool *get_base() { return &data.Bool; };
-  template <> inline int *get_base() { return &data.Int; }
-  template <> inline float *get_base() { return &data.Float; }
-
+template <typename T> class NodePool : public NodePoolBase {
 public:
-  template <typename T> void put(const T &value) {
-    if (!is_type<T>()) {
-      destructor(data.Ptr);
-      data.Ptr = new T();
-    }
-    put_base<T>(value);
-    type_hash = typeid(TypeIdHack<bool>);
+  Pool<T> pool;
+
+  ~NodePool() override = default;
+
+  void *get(tHandle handle) override { return (void *)pool.get(handle); }
+
+  void remove(tHandle handle) override { pool.remove(handle); }
+
+  NodePoolBase *copy() const override {
+    NodePool<T> *p = new NodePool<T>;
+    *p = *this;
+    return p;
   }
 
-  template <typename T> void put(T &&value) {
-    if (!is_type<T>()) {
-      destructor(data.Ptr);
-      data.Ptr = new T();
-    }
-    put_base<T>(value);
-    type_hash = typeid(TypeIdHack<bool>);
-  }
+  Link *inputsOf(void *node_data) override { return ((T *)node_data)->inputs; }
+};
 
-  template <typename T> T *get() {
-    if (!is_type<T>())
-      return nullptr;
-    return get_base<T>();
-  }
+struct nForwarder {
+  Link inputs[1] = {0};
+};
+
+class NodeGraph {
+public:
+  Pool<Node> nodes;
+  std::vector<std::unique_ptr<NodePoolBase>> nodeData;
+
+  NodeGraph();
+  ~NodeGraph() = default;
+  NodeGraph(const NodeGraph &other);
+  NodeGraph &operator=(const NodeGraph &other);
+  NodeGraph(NodeGraph &&other) = default;
+  NodeGraph &operator=(NodeGraph &&other) = default;
 };
