@@ -1,6 +1,8 @@
 #pragma once
+#include <cstddef> // For std::ptrdiff_t
 #include <cstdint>
 #include <functional>
+#include <iterator> // For std::forward_iterator_tag
 #include <type_traits>
 #include <typeinfo>
 #include <vector>
@@ -162,8 +164,24 @@ public:
 
   int16_t size() { return elements.size(); }
 
+  std::vector<T>::iterator begin() { return elements.begin(); }
+  std::vector<T>::const_iterator begin() const { return elements.begin(); }
+
+  std::vector<T>::iterator end() { return elements.end(); }
+  std::vector<T>::const_iterator end() const { return elements.end(); }
+
+  std::vector<T>::iterator rbegin() { return elements.rbegin(); }
+  std::vector<T>::const_iterator rbegin() const { return elements.rbegin(); }
+
+  std::vector<T>::iterator rend() { return elements.rend(); }
+  std::vector<T>::const_iterator rend() const { return elements.rend(); }
+
+  std::vector<Index> &get_indices() { return indices; }
+
+  std::vector<T> &expose() { return elements; }
+
   T *get(tHandle handle) {
-    if (handle.idx < 0 || handle.idx >= indices.size())
+    if (handle.idx < 0 || handle.idx >= (int16_t)indices.size())
       return nullptr;
 
     Index *idx = &indices[handle.idx];
@@ -182,10 +200,10 @@ public:
       return tHandle{.gen = idx->gen++, .idx = freeidx};
     }
 
-    indices.push_back(Index{.gen = 1, .idx = elements.size()});
+    indices.push_back(Index{.gen = 1, .idx = (int16_t)elements.size()});
     elements.push_back(element);
     element_to_index.push_back(indices.size() - 1);
-    return tHandle{.gen = 1, .idx = indices.size() - 1};
+    return tHandle{.gen = 1, .idx = (int16_t)(indices.size() - 1)};
   }
 
   void remove(tHandle handle) {

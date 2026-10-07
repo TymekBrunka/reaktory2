@@ -1,13 +1,17 @@
+#include "Formulator.hpp"
 #include <App.hpp>
+
+#include <NodeEditor.hpp>
+static NodeGraph ng;
+static NodeEditor ne(&ng);
 
 #include "Eval.hpp"
 #include "FileUtils.hpp"
-#include "Model.hpp"
 #include "ImNodedit.hpp"
+#include "Model.hpp"
 #include "ObjectPool.hpp"
 #include "Renderer.hpp"
 #include "ResourceManager.hpp"
-#include "glm/gtc/type_ptr.hpp"
 #include "imgui.h"
 #include "pfd/pfd.hpp"
 #include <FontsAwesome/IconsFontAwesome6.h>
@@ -667,6 +671,12 @@ void App::draw_gui() {
         width_accumulator = 0;
     }
     ImGui::EndChild();
+  }
+  ImGui::End();
+
+  if (ImGui::Begin("node editor")) {
+    ne.setSize(ImGui::GetContentRegionAvail());
+    ne.update();
   }
   ImGui::End();
 }

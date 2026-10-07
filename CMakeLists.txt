@@ -115,14 +115,6 @@ add_library(imNodedit STATIC
 target_link_libraries(imNodedit PUBLIC imgui)
 target_include_directories(imNodedit PUBLIC src/ImNodedit)
 
-add_library(NodeEditor STATIC
-  src/NodeEditor/NodeEditor.cpp
-  src/NodeEditor/NodeEditor.hpp
-)
-
-target_link_libraries(NodeEditor PUBLIC imNodedit formulator)
-target_include_directories(NodeEditor PUBLIC src/NodeEditor)
-
 add_library(pch_core STATIC
   src/precompiled_headers/core.hpp
   src/precompiled_headers/core.cpp
@@ -199,6 +191,14 @@ target_include_directories(renderer_model PUBLIC
 target_link_libraries(renderer_model PUBLIC glad glm::glm fileutils renderer assimp PRIVATE logging assimp glfw)
 target_precompile_headers(renderer_model REUSE_FROM logging)
 
+add_library(NodeEditor STATIC
+  src/NodeEditor/NodeEditor.cpp
+  src/NodeEditor/NodeEditor.hpp
+)
+
+target_link_libraries(NodeEditor PUBLIC imNodedit formulator)
+target_include_directories(NodeEditor PUBLIC src/NodeEditor)
+
 add_library(Scene_resource_manager STATIC
   src/Scene/ResourceManager.hpp
   src/Scene/ResourceManager.cpp
@@ -236,7 +236,7 @@ add_library(App STATIC
   src/App_popups.cpp
 )
 target_include_directories(App PUBLIC src)
-target_link_libraries(App PUBLIC Scene icon_img logging renderer imgui fileutils images images_bigger imNodedit PRIVATE pfd)
+target_link_libraries(App PUBLIC Scene icon_img logging renderer imgui fileutils images images_bigger imNodedit PRIVATE pfd NodeEditor)
 target_precompile_headers(App REUSE_FROM logging)
 
 add_executable(main src/main.cpp)

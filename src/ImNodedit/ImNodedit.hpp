@@ -34,10 +34,10 @@ struct Template {
   uint8_t inputCount = 0;
   uint8_t outputCount = 0;
   const char **inputNames = nullptr; // can be nullptr. No text displayed.
-  ImU32 *inputColors =
+  const ImU32 *inputColors =
       nullptr; // can be nullptr, default slot color will be used.
   const char **outputNames = nullptr; // can be nullptr. No text displayed.
-  ImU32 *outputColors =
+  const ImU32 *outputColors =
       nullptr; // can be nullptr, default slot color will be used.
 
   const char *name = "example node";
@@ -88,7 +88,7 @@ protected:
   virtual Node getNode(int32_t nodeIdx) = 0;
 
   virtual void drawNodeWidgets(int32_t nodeIdx, Node *node,
-                               ImNodeEditor *nodedit) = 0;
+                               ImNodeEditor *nodedit, ImDrawList *drawlist) = 0;
 
   virtual Link getNodeInputLink(int32_t nodeIdx, int8_t pinIdx) = 0;
   // virtual int32_t getNodeOutputPinLinksNum(int32_t nodeIdx, int8_t pinIdx) =
@@ -97,8 +97,10 @@ protected:
 
   virtual bool allowLink(int32_t inputNodeIdx, int8_t inputPinIdx,
                          int32_t outputNodeIdx, int8_t outputPinIdx) = 0;
+
   virtual void addLink(int32_t inputNodeIdx, int8_t inputPinIdx,
                        int32_t outputNodeIdx, int8_t outputPinIdx) = 0;
+
   virtual void delLink(int32_t inputNodeIdx, int8_t inputPinIdx,
                        int32_t outputNodeIdx, int8_t outputPinIdx) = 0;
 
@@ -117,5 +119,42 @@ public:
 
   inline float getZoomFactor() const { return zoom; }
 };
+
+inline ImVec2 negative_vector(ImVec2 vec) { return ImVec2(-vec.x, -vec.y); }
+
+inline ImVec2 add_vector(ImVec2 a, ImVec2 b) {
+  return ImVec2(a.x + b.x, a.y + b.y);
+}
+
+inline ImVec2 sub_vector(ImVec2 a, ImVec2 b) {
+  return ImVec2(a.x - b.x, a.y - b.y);
+}
+
+inline ImVec2 scale_vector(ImVec2 a, float scale) {
+  return ImVec2(a.x * scale, a.y * scale);
+}
+
+inline bool in_rect(ImVec2 pos, ImVec2 min, ImVec2 max) {
+  return pos.x >= min.x && pos.x <= max.x && pos.y >= min.y && pos.y <= max.y;
+}
+
+inline float vec_length_squered(ImVec2 a, ImVec2 b) {
+  return ((b.x - a.x) * (b.x - a.x)) + ((b.y - a.y) * (b.y - a.y));
+}
+
+inline bool rect_in_rect(ImVec2 a1, ImVec2 a2, ImVec2 b1, ImVec2 b2) {
+  return in_rect(a1, b1, b2) || in_rect(ImVec2(a1.x, a2.y), b1, b2) ||
+         in_rect(ImVec2(a2.x, a2.y), b1, b2) ||
+         in_rect(ImVec2(a2.x, a1.y), b1, b2);
+}
+
+inline float sdf_line_squered(ImVec2 p, ImVec2 a, ImVec2 b) {
+  ImVec2 pa = sub_vector(p, a);
+  ImVec2 ba = sub_vector(b, a);
+  float h =
+      ((pa.x * ba.x) + (pa.y * ba.y)) / vec_length_squered(ImVec2(0, 0), ba);
+  h = h < 0 ? 0 : (h > 1 ? 1 : h);
+  return vec_length_squered(scale_vector(ba, h), pa);
+}
 
 } // namespace ImNodedit

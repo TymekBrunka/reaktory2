@@ -109,7 +109,8 @@ namespace ImNodedit {
 //     return true;
 //   };
 //
-//   void addLink(int32_t inputNodeIdx, int8_t inputPinIdx, int32_t outputNodeIdx,
+//   void addLink(int32_t inputNodeIdx, int8_t inputPinIdx, int32_t
+//   outputNodeIdx,
 //                int8_t outputPinIdx) {
 //
 //     std::cerr << "linking {" << inputNodeIdx << "," << (int)inputPinIdx
@@ -123,14 +124,16 @@ namespace ImNodedit {
 //         Link{.pinIdx = inputPinIdx, .nodeIdx = inputNodeIdx});
 //   }
 //
-//   void delLink(int32_t inputNodeIdx, int8_t inputPinIdx, int32_t outputNodeIdx,
+//   void delLink(int32_t inputNodeIdx, int8_t inputPinIdx, int32_t
+//   outputNodeIdx,
 //                int8_t outputPinIdx) {
 //
 //     std::cerr << "UNlinking {" << inputNodeIdx << "," << (int)inputPinIdx
 //               << "} and {" << outputNodeIdx << "," << (int)outputPinIdx
 //               << "}\n";
 //
-//     nodes[inputNodeIdx].inputs[inputPinIdx] = Link{.pinIdx = -1, .nodeIdx = -1};
+//     nodes[inputNodeIdx].inputs[inputPinIdx] = Link{.pinIdx = -1, .nodeIdx =
+//     -1};
 //
 //     std::vector<Link> &outputs = nodes[outputNodeIdx].outputs[outputPinIdx];
 //     for (int i = 0; i < outputs.size(); i++) {
@@ -151,43 +154,6 @@ namespace ImNodedit {
 //     ImGui::Button((const char *)node->userData);
 //   }
 // };
-
-static ImVec2 negative_vector(ImVec2 vec) { return ImVec2(-vec.x, -vec.y); }
-
-static ImVec2 add_vector(ImVec2 a, ImVec2 b) {
-  return ImVec2(a.x + b.x, a.y + b.y);
-}
-
-static ImVec2 sub_vector(ImVec2 a, ImVec2 b) {
-  return ImVec2(a.x - b.x, a.y - b.y);
-}
-
-static ImVec2 scale_vector(ImVec2 a, float scale) {
-  return ImVec2(a.x * scale, a.y * scale);
-}
-
-static bool in_rect(ImVec2 pos, ImVec2 min, ImVec2 max) {
-  return pos.x >= min.x && pos.x <= max.x && pos.y >= min.y && pos.y <= max.y;
-}
-
-static float vec_length_squered(ImVec2 a, ImVec2 b) {
-  return ((b.x - a.x) * (b.x - a.x)) + ((b.y - a.y) * (b.y - a.y));
-}
-
-static bool rect_in_rect(ImVec2 a1, ImVec2 a2, ImVec2 b1, ImVec2 b2) {
-  return in_rect(a1, b1, b2) || in_rect(ImVec2(a1.x, a2.y), b1, b2) ||
-         in_rect(ImVec2(a2.x, a2.y), b1, b2) ||
-         in_rect(ImVec2(a2.x, a1.y), b1, b2);
-}
-
-static float sdf_line_squered(ImVec2 p, ImVec2 a, ImVec2 b) {
-  ImVec2 pa = sub_vector(p, a);
-  ImVec2 ba = sub_vector(b, a);
-  float h =
-      ((pa.x * ba.x) + (pa.y * ba.y)) / vec_length_squered(ImVec2(0, 0), ba);
-  h = h < 0 ? 0 : (h > 1 ? 1 : h);
-  return vec_length_squered(scale_vector(ba, h), pa);
-}
 
 ImVec2 ImNodeEditor::world2screen(ImVec2 vec) {
   return add_vector(add_vector(scale_vector(add_vector(vec, offset), zoom),
@@ -227,6 +193,11 @@ void ImNodeEditor::update(const char *name) {
   bool has_output_pin_been_clicked = false;
   bool do_move_with_mouse = false;
   bool has_any_node_been_selected_this_frame = false;
+
+  ImGuiStyle style_bk = ImGui::GetStyle();
+  ImGuiStyle style;
+  style.ScaleAllSizes(zoom);
+  ImGui::GetStyle() = style;
 
   global_wpos = ImGui::GetWindowPos();
   // global_wsize = ImGui::GetWindowSize();
@@ -595,13 +566,13 @@ void ImNodeEditor::update(const char *name) {
       }
     }
 
-    ImGui::SetNextWindowPos(add_vector(
-        wpos, scale_vector(ImVec2(10 + (lpadding / zoom), 35), zoom)));
+    ImGui::SetNextWindowPos(add_vector(ImVec2(wpos.x + lpadding, wpos.y),
+                                       scale_vector(ImVec2(8, 33), zoom)));
     ImGui::BeginChild(
         nodeIdx + 1,
-        add_vector(wsize, ImVec2((-20 * zoom) - ((lpadding - rpadding) / zoom),
-                                 -45 * zoom)));
-    drawNodeWidgets(nodeIdx, &node, this);
+        add_vector(wsize,
+                   ImVec2((-16 * zoom) - (lpadding - rpadding), -39 * zoom)));
+    drawNodeWidgets(nodeIdx, &node, this, ImGui::GetWindowDrawList());
     ImGui::EndChild();
   }
 
@@ -610,6 +581,7 @@ void ImNodeEditor::update(const char *name) {
 
   is_moving_with_mouse = do_move_with_mouse;
   ImGui::GetIO().FontGlobalScale = original_font_scale;
+  ImGui::GetStyle() = style_bk;
 
   ImGui::EndChild();
 }
