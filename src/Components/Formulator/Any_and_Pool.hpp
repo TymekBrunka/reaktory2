@@ -163,6 +163,7 @@ public:
   ~Pool() = default;
 
   int16_t size() { return elements.size(); }
+  int16_t idx_size() { return indices.size(); }
 
   std::vector<T>::iterator begin() { return elements.begin(); }
   std::vector<T>::const_iterator begin() const { return elements.begin(); }
@@ -180,13 +181,14 @@ public:
 
   std::vector<T> &expose() { return elements; }
 
-  T *get(tHandle handle) {
+  T *get(tHandle handle, bool unsafe = false) {
     if (handle.idx < 0 || handle.idx >= (int16_t)indices.size())
       return nullptr;
 
     Index *idx = &indices[handle.idx];
-    return idx->idx != -1 && idx->gen == handle.gen ? &elements[idx->idx]
-                                                    : nullptr;
+    return idx->idx != -1 && (unsafe || idx->gen == handle.gen)
+               ? &elements[idx->idx]
+               : nullptr;
   }
 
   tHandle add(const T &element) {
@@ -206,12 +208,12 @@ public:
     return tHandle{.gen = 1, .idx = (int16_t)(indices.size() - 1)};
   }
 
-  void remove(tHandle handle) {
+  void remove(tHandle handle, bool unsafe = false) {
     if (handle.idx < 0 || handle.idx >= indices.size())
       return;
 
     Index *idx = &indices[handle.idx];
-    if (idx->idx == -1 || idx->gen != handle.gen)
+    if (idx->idx == -1 || (!unsafe && idx->gen != handle.gen))
       return;
 
     free_list.push_back(handle.idx);

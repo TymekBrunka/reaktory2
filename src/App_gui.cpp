@@ -1,3 +1,4 @@
+#include "Any_and_Pool.hpp"
 #include "Formulator.hpp"
 #include <App.hpp>
 
@@ -675,8 +676,63 @@ void App::draw_gui() {
   ImGui::End();
 
   if (ImGui::Begin("node editor")) {
+    static bool collapsed = false;
+    if (!collapsed) {
+      ImGui::BeginChild(1, ImVec2(200, ImGui::GetWindowSize().y - 40));
+      if (ImGui::Button("zwiń"))
+        collapsed = true;
+
+      for (int32_t i = 0; i < N_RETURN; i++) {
+        if (ImGui::Button(templates[i].name)) {
+          ng.add_node((NodeGraph_NodeType)i);
+        }
+      }
+
+      ImGui::EndChild();
+      ImGui::SameLine();
+    } else {
+      if (ImGui::Button("rozwiń"))
+        collapsed = false;
+      ImGui::SameLine();
+    }
     ne.setSize(ImGui::GetContentRegionAvail());
     ne.update();
+
+    if (ne.isFocused() && ImGui::IsKeyPressed(ImGuiKey_Delete)) {
+      int16_t size = ng.nodes.idx_size();
+
+      for (int16_t i = 0; i < size; i++) {
+        Node *node = ng.nodes.get(tHandle{.gen = 0, .idx = i}, true);
+
+        if (!node)
+          continue;
+
+        if (node->selected) {
+          std::cerr << "hell yeah\n";
+          ng.nodes.remove(tHandle{.gen = 0, .idx = i}, true);
+          ng.nodeData[node->templateIdx].get()->remove(node->node_data);
+        }
+      }
+
+      for (int16_t i = 0; i < size; i++) {
+        Node *node = ng.nodes.get(tHandle{.gen = 0, .idx = i}, true);
+
+        if (!node)
+          continue;
+
+        if (!node->selected) {
+          std::cerr << "hell fix\n";
+          NodePoolBase *nodeData = ng.nodeData[node->templateIdx].get();
+          Link *inputs = nodeData->inputsOf(nodeData->get(node->node_data));
+          for (int8_t j = 0; j < templates[node->templateIdx].inputCount; j++) {
+            inputs[j] =
+                ng.nodes.get(tHandle{.gen = 0, .idx = inputs[j].nodeIdx})
+                    ? inputs[j]
+                    : Link{-1, -1};
+          }
+        }
+      }
+    }
   }
   ImGui::End();
 }

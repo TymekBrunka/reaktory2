@@ -85,6 +85,7 @@ protected:
   virtual const Template getTemplate(int32_t templateIdx) = 0;
 
   virtual int32_t getNodeCount() = 0;
+  virtual bool canGetNode(int32_t nodeIdx) = 0;
   virtual Node getNode(int32_t nodeIdx) = 0;
 
   virtual void drawNodeWidgets(int32_t nodeIdx, Node *node,

@@ -32,8 +32,9 @@ class NodePoolBase {
 public:
   virtual ~NodePoolBase() = default;
   // virtual void *expose() = 0;
-  virtual void *get(tHandle handle) = 0;
-  virtual void remove(tHandle handle) = 0;
+  virtual void *get(tHandle handle, bool unsafe = false) = 0;
+  virtual tHandle add() = 0;
+  virtual void remove(tHandle handle, bool unsafe = false) = 0;
   virtual NodePoolBase *copy() const = 0;
   virtual Link *inputsOf(void *node_data) = 0;
 
@@ -48,9 +49,15 @@ public:
 
   // void *expose() override { return (void *)pool.expose().data(); }
 
-  void *get(tHandle handle) override { return (void *)pool.get(handle); }
+  void *get(tHandle handle, bool unsafe = false) override {
+    return (void *)pool.get(handle, unsafe);
+  }
 
-  void remove(tHandle handle) override { pool.remove(handle); }
+  tHandle add() override { return pool.add(std::move(T{})); }
+
+  void remove(tHandle handle, bool unsafe = false) override {
+    pool.remove(handle, unsafe);
+  }
 
   NodePoolBase *copy() const override {
     NodePool<T> *p = new NodePool<T>;
@@ -63,6 +70,7 @@ public:
 
 enum NodeGraph_NodeType {
   N_FORWARDER = 0,
+  N_BOOL,
   N_NUMBER,
   N_STRING,
 
@@ -70,6 +78,16 @@ enum NodeGraph_NodeType {
   N_SUB,
   N_MUL,
   N_DIV,
+
+  N_EQUAL,
+  N_LESS,
+  N_MORE,
+  N_LESS_OR_EQUAL,
+  N_MORE_OR_EQUAL,
+
+  N_NOT,
+  N_IF,
+  N_LOOP,
 
   N_RETURN,
   N_COUNT,
@@ -87,6 +105,13 @@ public:
   NodeGraph(NodeGraph &&other) = default;
   NodeGraph &operator=(NodeGraph &&other) = default;
 
+  inline Node *add_node(NodeGraph_NodeType type) {
+    tHandle h = nodeData[(size_t)type].get()->add();
+
+    tHandle n = nodes.add(Node{.node_data = h, .templateIdx = type});
+    return nodes.get(n);
+  }
+
   template <typename T> Node *add_node(NodeGraph_NodeType type, T &&node_data) {
     tHandle h =
         nodeData[(size_t)type].get()->convertTo<NodePool<T>>()->pool.add(
@@ -99,6 +124,11 @@ public:
 
 struct nForwarder {
   Link inputs[1];
+};
+
+struct nBool {
+  bool value;
+  Link inputs[0];
 };
 
 struct nNumber {
@@ -129,6 +159,43 @@ struct nMul {
 struct nDiv {
   float value;
   Link inputs[2];
+};
+
+struct nEqual {
+  float value;
+  Link inputs[2];
+};
+
+struct nLess {
+  float value;
+  Link inputs[2];
+};
+
+struct nMore {
+  float value;
+  Link inputs[2];
+};
+
+struct nLessOrEqual {
+  float value;
+  Link inputs[2];
+};
+
+struct nMoreOrEqual {
+  float value;
+  Link inputs[2];
+};
+
+struct nNot {
+  Link inputs[1];
+};
+
+struct nIf {
+  Link inputs[3];
+};
+
+struct nLoop {
+  Link inputs[4];
 };
 
 struct nReturn {

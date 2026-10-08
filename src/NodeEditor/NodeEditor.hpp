@@ -41,6 +41,7 @@ public:
   const ImNodedit::Template getTemplate(int32_t templateIdx) override;
 
   int32_t getNodeCount() override;
+  bool canGetNode(int32_t nodeIdx) override;
   ImNodedit::Node getNode(int32_t nodeIdx) override;
 
   void drawNodeWidgets(int32_t nodeIdx, ImNodedit::Node *node,

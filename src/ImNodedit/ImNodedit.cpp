@@ -199,8 +199,6 @@ void ImNodeEditor::update(const char *name) {
   style.ScaleAllSizes(zoom);
   ImGui::GetStyle() = style;
 
-  global_wpos = ImGui::GetWindowPos();
-  // global_wsize = ImGui::GetWindowSize();
   ImDrawList *drawlist = ImGui::GetWindowDrawList();
   float original_font_scale = ImGui::GetIO().FontGlobalScale;
   ImGui::GetIO().FontGlobalScale = zoom;
@@ -208,6 +206,11 @@ void ImNodeEditor::update(const char *name) {
   ImGui::BeginChild(name, global_wsize, 0,
                     ImGuiWindowFlags_NoScrollWithMouse |
                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove);
+
+  global_wpos = ImGui::GetWindowPos();
+  ImGui::PushClipRect(global_wpos, add_vector(global_wpos, global_wsize), true);
+  drawlist->PushClipRect(global_wpos, add_vector(global_wpos, global_wsize),
+                         true);
 
   is_focused = ImGui::IsWindowFocused();
   if (is_focused || ImGui::IsWindowHovered()) {
@@ -243,6 +246,9 @@ void ImNodeEditor::update(const char *name) {
 
   // draw 1st layer and handle user input
   for (int32_t nodeIdx = 0; nodeIdx < getNodeCount(); nodeIdx++) {
+    if (!canGetNode(nodeIdx))
+      continue;
+
     Node node = getNode(nodeIdx);
     Template templ = getTemplate(node.templateIdx);
 
@@ -583,6 +589,7 @@ void ImNodeEditor::update(const char *name) {
   ImGui::GetIO().FontGlobalScale = original_font_scale;
   ImGui::GetStyle() = style_bk;
 
+  drawlist->PopClipRect();
   ImGui::EndChild();
 }
 

@@ -1,3 +1,4 @@
+#include "Any_and_Pool.hpp"
 #include "Formulator.hpp"
 #include "ImNodedit.hpp"
 #include "imgui.h"
@@ -37,6 +38,10 @@ const ImNodedit::Template NodeEditor::getTemplate(int32_t templateIdx) {
 }
 
 int32_t NodeEditor::getNodeCount() { return graph->nodes.size(); };
+
+bool NodeEditor::canGetNode(int32_t nodeIdx) {
+  return graph->nodes.get(tHandle{.gen = 0, .idx = nodeIdx}, true);
+}
 
 ImNodedit::Node NodeEditor::getNode(int32_t nodeIdx) {
   auto &idx = graph->nodes.get_indices()[nodeIdx];
@@ -110,27 +115,46 @@ static const char *N_FORWARDER__outNames[] = {"do  "};
 // static const char *N_aritm_op__inNames[] = {"a  ", "b  "};
 // static const char *N_aritm_op__outNames[] = {"wynik  "};
 
+static const char *N_SUB__inNames[] = {"odjemna", "odjemnik"};
+
+static const char *N_DIV__inNames[] = {"dzielna", "dzielnik"};
+
+static const char *N_IF__inNames[] = {"gdy prawda", "warunek", "gdy fałsz"};
+
+static const char *N_LOOP__inNames[] = {"war. pocz.", "gdy prawda", "warunek"};
+static const char *N_LOOP__outNames[] = {"x  ", "wynik "};
+
 static const char *N_RETURN__inNames[] = {"wynik  "};
 
 // <- colors
-
 static const ImU32 COLOR_NUMBER = ImNodedit::imColor(0x7BBC2BFF);
-
+static const ImU32 COLOR_HDR_ARITM_OP = ImNodedit::imColor(0x51A019FF);
+static const ImU32 COLOR_BG_ARITM_OP = ImNodedit::imColor(0x293323FF);
 static const ImU32 N_NUMBER__outColors[] = {COLOR_NUMBER};
-
 static const ImU32 N_aritm_op__inColors[] = {COLOR_NUMBER, COLOR_NUMBER};
 static const ImU32 N_aritm_op__outColors[] = {COLOR_NUMBER};
+
+static const ImU32 COLOR_STRING = ImNodedit::imColor(0xE2461BFF);
+static const ImU32 N_STRING__outColors[] = {COLOR_STRING};
+
+static const ImU32 COLOR_BOOL = ImNodedit::imColor(0x377899FF);
+static const ImU32 COLOR_HDR_BOOL = ImNodedit::imColor(0x377899FF);
+static const ImU32 COLOR_BG_BOOL = ImNodedit::imColor(0x2B3F49FF);
+static const ImU32 N_BOOL__outColors[] = {COLOR_BOOL};
 
 static const ImU32 N_RETURN__inColors[] = {ImNodedit::imColor(0x68002FFF)};
 
 // <- templates
 
-void TextSized(ImDrawList *drawlist, float zoom, const char *text) {
+void TextSized(ImDrawList *drawlist, float zoom, ImVec2 offset, ImU32 color,
+               const char *text) {
   ImVec2 cpos = ImGui::GetCursorScreenPos();
   float fontscale = ImGui::GetIO().FontGlobalScale;
   ImGui::GetIO().FontGlobalScale = fontscale * 3;
   ImGui::BeginChild(1, ImVec2(10 * zoom, 0));
-  drawlist->AddText(ImVec2(cpos.x, cpos.y - (14 * zoom)), 0xffffffff, text);
+  drawlist->AddText(ImVec2(cpos.x + (offset.x * zoom),
+                           cpos.y + (offset.y * zoom) - (14 * zoom)),
+                    color, text);
   ImGui::EndChild();
   ImGui::GetIO().FontGlobalScale = fontscale;
   ImGui::SameLine();
@@ -138,9 +162,29 @@ void TextSized(ImDrawList *drawlist, float zoom, const char *text) {
   ImGui::EndChild();
 }
 
+template <typename T>
+void IconPlusValueDisabledOnLink(ImDrawList *drawlist, ImNodedit::Node *node,
+                                 ImNodedit::ImNodeEditor *nodedit,
+                                 ImVec2 offset, const char *text) {
+  float zoom = nodedit->getZoomFactor();
+  TextSized(drawlist, zoom, offset, 0xffffffff, text);
+  ImGui::SameLine();
+
+  auto *data = (T *)node->userData;
+  if (data->inputs[1] != Link{-1, -1})
+    ImGui::BeginDisabled();
+
+  ImGui::SetNextItemWidth(ImGui::GetWindowSize().x -
+                          (10 * nodedit->getZoomFactor()));
+  ImGui::DragFloat("##number", &data->value, 0.1);
+
+  if (data->inputs[1] != Link{-1, -1})
+    ImGui::EndDisabled();
+}
+
 extern const Template templates[N_COUNT]{
     Template{.headerColor = ImNodedit::imColor(0x333A3DFF),
-             .size = ImVec2(120, 60),
+             .size = ImVec2(80, 50),
              .inputCount = 1,
              .outputCount = 1,
              .inputNames = N_FORWARDER__inNames,
@@ -150,9 +194,24 @@ extern const Template templates[N_COUNT]{
              .draw_function =
                  [](int32_t nodeIdx, ImNodedit::Node *node,
                     ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
-                   ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "%.0f , %.0f",
-                                      node->position.x / 10,
-                                      node->position.y / 10);
+                   // ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "%.0f ,
+                   // %.0f",
+                   //                    node->position.x / 10,
+                   //                    node->position.y / 10);
+                 }},
+
+    Template{.headerColor = ImNodedit::imColor(0x377899FF),
+             .backgroundColor = ImNodedit::imColor(0x70C3FFFF),
+             .size = ImVec2(70, 60),
+             .inputCount = 0,
+             .outputCount = 1,
+             .outputColors = N_BOOL__outColors,
+             .name = "logiczna",
+
+             .draw_function =
+                 [](int32_t nodeIdx, ImNodedit::Node *node,
+                    ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
+                   ImGui::Checkbox("##bool", &((nBool *)node->userData)->value);
                  }},
 
     Template{.headerColor = ImNodedit::imColor(0x416B18FF),
@@ -171,7 +230,8 @@ extern const Template templates[N_COUNT]{
                    ImVec2 img_size = ImVec2(20 * nodedit->getZoomFactor(),
                                             20 * nodedit->getZoomFactor());
 
-                   TextSized(drawlist, nodedit->getZoomFactor(), "#");
+                   TextSized(drawlist, nodedit->getZoomFactor(), ImVec2(0, 0),
+                             ImNodedit::imColor(0x0055AAFF), "#");
                    ImGui::SameLine();
 
                    ImGui::SetNextItemWidth(ImGui::GetWindowSize().x -
@@ -180,14 +240,12 @@ extern const Template templates[N_COUNT]{
                                     &((nNumber *)node->userData)->value, 0.1);
                  }},
 
-    Template{.headerColor = ImNodedit::imColor(0xFF7F00FF),
+    Template{.headerColor = ImNodedit::imColor(0xCC4A00FF),
+             .backgroundColor = ImNodedit::imColor(0xFF7F00FF),
              .size = ImVec2(120, 60),
              .inputCount = 0,
              .outputCount = 1,
-             // // .inputNames = N_FORWARDER__inNames,
-             // .inputColors = N_aritm_op__inColors,
-             // // .outputNames = N_STRING__outNames,
-             // .outputColors = N_aritm_op__outColors,
+             .outputColors = N_STRING__outColors,
              .name = "ciąg znaków",
 
              .draw_function =
@@ -198,7 +256,8 @@ extern const Template templates[N_COUNT]{
                                     &((nString *)node->userData)->value);
                  }},
 
-    Template{.headerColor = ImNodedit::imColor(0x51A019FF),
+    Template{.headerColor = COLOR_HDR_ARITM_OP,
+             .backgroundColor = COLOR_BG_ARITM_OP,
              .size = ImVec2(120, 60),
              .inputCount = 2,
              .outputCount = 1,
@@ -206,55 +265,35 @@ extern const Template templates[N_COUNT]{
              .inputColors = N_aritm_op__inColors,
              // .outputNames = N_STRING__outNames,
              .outputColors = N_aritm_op__outColors,
-             .name = "dodaj",
+             .name = "dodaj (+)",
 
              .draw_function =
                  [](int32_t nodeIdx, ImNodedit::Node *node,
                     ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
-                   TextSized(drawlist, nodedit->getZoomFactor(), "+");
-                   ImGui::SameLine();
-
-                   auto *data = (nAdd *)node->userData;
-                   if (data->inputs[1] != Link{-1, -1})
-                     ImGui::BeginDisabled();
-
-                   ImGui::SetNextItemWidth(ImGui::GetWindowSize().x -
-                                           (10 * nodedit->getZoomFactor()));
-                   ImGui::DragFloat("##number", &data->value, 0.1);
-
-                   if (data->inputs[1] != Link{-1, -1})
-                     ImGui::EndDisabled();
+                   IconPlusValueDisabledOnLink<nAdd>(drawlist, node, nodedit,
+                                                     ImVec2(0, 0), "+");
                  }},
 
-    Template{.headerColor = ImNodedit::imColor(0x51A019FF),
-             .size = ImVec2(120, 60),
+    Template{.headerColor = COLOR_HDR_ARITM_OP,
+             .backgroundColor = COLOR_BG_ARITM_OP,
+             .size = ImVec2(170, 60),
              .inputCount = 2,
              .outputCount = 1,
-             // .inputNames = N_FORWARDER__inNames,
+             .inputNames = N_SUB__inNames,
              .inputColors = N_aritm_op__inColors,
              // .outputNames = N_STRING__outNames,
              .outputColors = N_aritm_op__outColors,
-             .name = "odejmij",
+             .name = "odejmij (-)",
 
              .draw_function =
                  [](int32_t nodeIdx, ImNodedit::Node *node,
                     ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
-                   TextSized(drawlist, nodedit->getZoomFactor(), "-");
-                   ImGui::SameLine();
-
-                   auto *data = (nSub *)node->userData;
-                   if (data->inputs[1] != Link{-1, -1})
-                     ImGui::BeginDisabled();
-
-                   ImGui::SetNextItemWidth(ImGui::GetWindowSize().x -
-                                           (20 * nodedit->getZoomFactor()));
-                   ImGui::DragFloat("##number", &data->value, 0.1);
-
-                   if (data->inputs[1] != Link{-1, -1})
-                     ImGui::EndDisabled();
+                   IconPlusValueDisabledOnLink<nSub>(drawlist, node, nodedit,
+                                                     ImVec2(0, 0), "-");
                  }},
 
-    Template{.headerColor = ImNodedit::imColor(0x51A019FF),
+    Template{.headerColor = COLOR_HDR_ARITM_OP,
+             .backgroundColor = COLOR_BG_ARITM_OP,
              .size = ImVec2(120, 60),
              .inputCount = 2,
              .outputCount = 1,
@@ -262,52 +301,155 @@ extern const Template templates[N_COUNT]{
              .inputColors = N_aritm_op__inColors,
              // .outputNames = N_STRING__outNames,
              .outputColors = N_aritm_op__outColors,
-             .name = "pomnóż",
+             .name = "pomnóż (*)",
 
              .draw_function =
                  [](int32_t nodeIdx, ImNodedit::Node *node,
                     ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
-                   TextSized(drawlist, nodedit->getZoomFactor(), "*");
-                   ImGui::SameLine();
-
-                   auto *data = (nMul *)node->userData;
-                   if (data->inputs[1] != Link{-1, -1})
-                     ImGui::BeginDisabled();
-
-                   ImGui::SetNextItemWidth(ImGui::GetWindowSize().x -
-                                           (20 * nodedit->getZoomFactor()));
-                   ImGui::DragFloat("##number", &data->value, 0.1);
-
-                   if (data->inputs[1] != Link{-1, -1})
-                     ImGui::EndDisabled();
+                   IconPlusValueDisabledOnLink<nMul>(drawlist, node, nodedit,
+                                                     ImVec2(0, 5), "*");
                  }},
 
-    Template{.headerColor = ImNodedit::imColor(0x51A019FF),
-             .size = ImVec2(120, 60),
+    Template{.headerColor = COLOR_HDR_ARITM_OP,
+             .backgroundColor = COLOR_BG_ARITM_OP,
+             .size = ImVec2(170, 60),
              .inputCount = 2,
              .outputCount = 1,
-             // .inputNames = N_FORWARDER__inNames,
+             .inputNames = N_DIV__inNames,
              .inputColors = N_aritm_op__inColors,
              // .outputNames = N_STRING__outNames,
              .outputColors = N_aritm_op__outColors,
-             .name = "podziel",
+             .name = "podziel (/)",
 
              .draw_function =
                  [](int32_t nodeIdx, ImNodedit::Node *node,
                     ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
-                   TextSized(drawlist, nodedit->getZoomFactor(), "/");
-                   ImGui::SameLine();
+                   IconPlusValueDisabledOnLink<nDiv>(drawlist, node, nodedit,
+                                                     ImVec2(0, 0), "/");
+                 }},
 
-                   auto *data = (nDiv *)node->userData;
-                   if (data->inputs[1] != Link{-1, -1})
-                     ImGui::BeginDisabled();
+    Template{.headerColor = COLOR_HDR_BOOL,
+             .backgroundColor = COLOR_BG_BOOL,
+             .size = ImVec2(120, 60),
+             .inputCount = 2,
+             .outputCount = 1,
+             .outputColors = N_BOOL__outColors,
+             .name = "=",
 
-                   ImGui::SetNextItemWidth(ImGui::GetWindowSize().x -
-                                           (20 * nodedit->getZoomFactor()));
-                   ImGui::DragFloat("##number", &data->value, 0.1);
+             .draw_function =
+                 [](int32_t nodeIdx, ImNodedit::Node *node,
+                    ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
+                   IconPlusValueDisabledOnLink<nEqual>(drawlist, node, nodedit,
+                                                       ImVec2(0, 0), "=");
+                 }},
 
-                   if (data->inputs[1] != Link{-1, -1})
-                     ImGui::EndDisabled();
+    Template{.headerColor = COLOR_HDR_BOOL,
+             .backgroundColor = COLOR_BG_BOOL,
+             .size = ImVec2(120, 60),
+             .inputCount = 2,
+             .outputCount = 1,
+             .outputColors = N_BOOL__outColors,
+             .name = "<",
+
+             .draw_function =
+                 [](int32_t nodeIdx, ImNodedit::Node *node,
+                    ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
+                   IconPlusValueDisabledOnLink<nLess>(drawlist, node, nodedit,
+                                                      ImVec2(0, 0), "<");
+                 }},
+
+    Template{.headerColor = COLOR_HDR_BOOL,
+             .backgroundColor = COLOR_BG_BOOL,
+             .size = ImVec2(120, 60),
+             .inputCount = 2,
+             .outputCount = 1,
+             .outputColors = N_BOOL__outColors,
+             .name = ">",
+
+             .draw_function =
+                 [](int32_t nodeIdx, ImNodedit::Node *node,
+                    ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
+                   IconPlusValueDisabledOnLink<nMore>(drawlist, node, nodedit,
+                                                      ImVec2(0, 0), ">");
+                 }},
+
+    Template{.headerColor = COLOR_HDR_BOOL,
+             .backgroundColor = COLOR_BG_BOOL,
+             .size = ImVec2(120, 60),
+             .inputCount = 2,
+             .outputCount = 1,
+             .outputColors = N_BOOL__outColors,
+             .name = "≤",
+
+             .draw_function =
+                 [](int32_t nodeIdx, ImNodedit::Node *node,
+                    ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
+                   IconPlusValueDisabledOnLink<nLessOrEqual>(
+                       drawlist, node, nodedit, ImVec2(0, -2), "≤");
+                 }},
+
+    Template{.headerColor = COLOR_HDR_BOOL,
+             .backgroundColor = COLOR_BG_BOOL,
+             .size = ImVec2(120, 60),
+             .inputCount = 2,
+             .outputCount = 1,
+             .outputColors = N_BOOL__outColors,
+             .name = "≥",
+
+             .draw_function =
+                 [](int32_t nodeIdx, ImNodedit::Node *node,
+                    ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
+                   IconPlusValueDisabledOnLink<nMoreOrEqual>(
+                       drawlist, node, nodedit, ImVec2(0, -2), "≥");
+                 }},
+
+    Template{.headerColor = COLOR_HDR_BOOL,
+             .backgroundColor = COLOR_BG_BOOL,
+             .size = ImVec2(40, 60),
+             .inputCount = 1,
+             .outputCount = 1,
+             .outputColors = N_BOOL__outColors,
+             .name = "nie",
+
+             .draw_function =
+                 [](int32_t nodeIdx, ImNodedit::Node *node,
+                    ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
+                   TextSized(drawlist, nodedit->getZoomFactor(), ImVec2(0, -5),
+                             0xffffffff, "!");
+                 }},
+
+    Template{.headerColor = COLOR_HDR_BOOL,
+             .backgroundColor = COLOR_BG_BOOL,
+             .size = ImVec2(140, 100),
+             .inputCount = 3,
+             .outputCount = 1,
+             .inputNames = N_IF__inNames,
+             // .inputColors = N_aritm_op__inColors,
+             // .outputNames = N_STRING__outNames,
+             // .outputColors = N_aritm_op__outColors,
+             .name = "jeżeli",
+
+             .draw_function =
+                 [](int32_t nodeIdx, ImNodedit::Node *node,
+                    ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
+                   TextSized(drawlist, nodedit->getZoomFactor(), ImVec2(5, 20),
+                             0xffffffff, "?");
+                 }},
+
+    Template{.headerColor = COLOR_HDR_BOOL,
+             .backgroundColor = COLOR_BG_BOOL,
+             .size = ImVec2(180, 100),
+             .inputCount = 3,
+             .outputCount = 2,
+             .inputNames = N_LOOP__inNames,
+             .outputNames = N_LOOP__outNames,
+             .name = "pętla",
+
+             .draw_function =
+                 [](int32_t nodeIdx, ImNodedit::Node *node,
+                    ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
+                   TextSized(drawlist, nodedit->getZoomFactor(), ImVec2(0, 20),
+                             0xffffffff, "→");
                  }},
 
     Template{.headerColor = ImNodedit::imColor(0xFF0043FF),
