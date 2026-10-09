@@ -192,7 +192,9 @@ void ImNodeEditor::update(const char *name) {
   bool link_is_being_dropped = false;
   bool has_output_pin_been_clicked = false;
   bool do_move_with_mouse = false;
-  bool has_any_node_been_selected_this_frame = false;
+  bool has_any_node_been_selected_this_frame =
+      false; // if any for any of nodes: node.selected == true
+  bool has_any_node_become_selected_this_frame = false; // for manual selection
 
   ImGuiStyle style_bk = ImGui::GetStyle();
   ImGuiStyle style;
@@ -248,7 +250,7 @@ void ImNodeEditor::update(const char *name) {
   }
 
   // draw 1st layer and handle user input
-  for (int32_t nodeIdx = 0; nodeIdx < getNodeCount(); nodeIdx++) {
+  for (int32_t nodeIdx = getNodeCount() - 1; nodeIdx >= 0; nodeIdx--) {
     if (!canGetNode(nodeIdx))
       continue;
 
@@ -396,15 +398,17 @@ void ImNodeEditor::update(const char *name) {
     }
 
     // is node clicked (by header bar)
-    if (click && in_rect(ImGui::GetMousePos(), world2screen(node.position),
-                         world2screen(add_vector(node.position,
-                                                 ImVec2(node.size.x, 25))))) {
+    if (click && !has_any_node_become_selected_this_frame &&
+        in_rect(
+            ImGui::GetMousePos(), world2screen(node.position),
+            world2screen(add_vector(node.position, ImVec2(node.size.x, 25))))) {
 
       selectNode(nodeIdx, true);
       node.selected = true; // to reflect change on current copy of the struct
       currently_selected_link[0] = {-1, -1};
       currently_selected_link[1] = {-1, -1};
       do_move_with_mouse = false;
+      has_any_node_become_selected_this_frame = true;
     }
 
     has_any_node_been_selected_this_frame |= node.selected;

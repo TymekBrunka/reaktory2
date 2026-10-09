@@ -678,14 +678,17 @@ void App::draw_gui() {
   if (ImGui::Begin("node editor")) {
     static bool collapsed = false;
     if (!collapsed) {
-      ImGui::BeginChild(1, ImVec2(200, ImGui::GetWindowSize().y - 40));
+      ImGui::BeginChild(1, ImVec2(100, ImGui::GetWindowSize().y - 40));
       if (ImGui::Button("zwiń"))
         collapsed = true;
 
-      for (int32_t i = 0; i < N_COUNT; i++) {
-        if (ImGui::Button(templates[i].name)) {
+      for (int32_t i = 0; i < N_RETURN; i++) {
+        ImGui::PushStyleColor(ImGuiCol_Button, templates[i].headerColor);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, templates[i].headerColor);
+        if (ImGui::Button(templates[i].name, ImVec2(84, 22))) {
           ng.add_node((NodeGraph_NodeType)i);
         }
+        ImGui::PopStyleColor(2);
       }
 
       ImGui::EndChild();
@@ -726,7 +729,7 @@ void App::draw_gui() {
           Link *inputs = nodeData->inputsOf(nodeData->get(node->node_data));
           for (int8_t j = 0; j < templates[node->templateIdx].inputCount; j++) {
             inputs[j] =
-                ng.nodes.get(tHandle{.gen = 0, .idx = inputs[j].nodeIdx})
+                ng.nodes.get(tHandle{.gen = 0, .idx = inputs[j].nodeIdx}, true)
                     ? inputs[j]
                     : Link{-1, -1};
           }
