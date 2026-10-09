@@ -186,12 +186,13 @@ public:
       return nullptr;
 
     Index *idx = &indices[handle.idx];
-    return idx->idx != -1 && (unsafe || idx->gen == handle.gen)
+    return idx->idx != -1 && idx->idx < elements.size() &&
+                   (unsafe || idx->gen == handle.gen)
                ? &elements[idx->idx]
                : nullptr;
   }
 
-  tHandle add(const T &element) {
+  tHandle add(T &&element) {
     if (!free_list.empty()) {
       int16_t freeidx = free_list[free_list.size() - 1];
       free_list.pop_back();
@@ -199,7 +200,7 @@ public:
       idx->idx = elements.size();
       elements.push_back(element);
       element_to_index.push_back(freeidx);
-      return tHandle{.gen = idx->gen++, .idx = freeidx};
+      return tHandle{.gen = ++idx->gen, .idx = freeidx};
     }
 
     indices.push_back(Index{.gen = 1, .idx = (int16_t)elements.size()});
@@ -208,12 +209,18 @@ public:
     return tHandle{.gen = 1, .idx = (int16_t)(indices.size() - 1)};
   }
 
+  tHandle add(const T &element) {
+    T el = element;
+    return add(std::move(el));
+  }
+
   void remove(tHandle handle, bool unsafe = false) {
     if (handle.idx < 0 || handle.idx >= indices.size())
       return;
 
     Index *idx = &indices[handle.idx];
-    if (idx->idx == -1 || (!unsafe && idx->gen != handle.gen))
+    if (idx->idx == -1 || idx->idx >= elements.size() ||
+        (!unsafe && idx->gen != handle.gen))
       return;
 
     free_list.push_back(handle.idx);

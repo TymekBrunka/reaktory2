@@ -7,8 +7,10 @@
 #include <iostream>
 
 void NodeEditor::selectNode(int32_t nodeIdx, bool selected) {
-  auto &idx = graph->nodes.get_indices()[nodeIdx];
-  graph->nodes.expose()[idx.idx].selected = selected;
+  // auto &idx = graph->nodes.get_indices()[nodeIdx];
+  // graph->nodes.expose()[idx.idx].selected = selected;
+  graph->nodes.get(tHandle{.gen = 0, .idx = nodeIdx}, true)->selected =
+      selected;
 }
 
 void NodeEditor::moveSelectedNodes(const ImVec2 delta) {
@@ -37,40 +39,43 @@ const ImNodedit::Template NodeEditor::getTemplate(int32_t templateIdx) {
   };
 }
 
-int32_t NodeEditor::getNodeCount() { return graph->nodes.size(); };
+int32_t NodeEditor::getNodeCount() { return graph->nodes.idx_size(); };
 
 bool NodeEditor::canGetNode(int32_t nodeIdx) {
   return graph->nodes.get(tHandle{.gen = 0, .idx = nodeIdx}, true);
 }
 
 ImNodedit::Node NodeEditor::getNode(int32_t nodeIdx) {
-  auto &idx = graph->nodes.get_indices()[nodeIdx];
-  Node &node = graph->nodes.expose()[idx.idx];
+  // auto &idx = graph->nodes.get_indices()[nodeIdx];
+  // Node &node = graph->nodes.expose()[idx.idx];
+  Node *node = graph->nodes.get(tHandle{.gen = 0, .idx = nodeIdx}, true);
 
   return ImNodedit::Node{
-      .selected = node.selected,
-      .templateIdx = node.templateIdx,
-      .position = ImVec2((int)node.position[0] / 10 * 10,
-                         (int)node.position[1] / 10 * 10),
-      .size = templates[node.templateIdx].size,
-      .userData = graph->nodeData[node.templateIdx].get()->get(node.node_data),
+      .selected = node->selected,
+      .templateIdx = node->templateIdx,
+      .position = ImVec2((int)node->position[0] / 10 * 10,
+                         (int)node->position[1] / 10 * 10),
+      .size = templates[node->templateIdx].size,
+      .userData =
+          graph->nodeData[node->templateIdx].get()->get(node->node_data),
   };
 }
 
 void NodeEditor::drawNodeWidgets(int32_t nodeIdx, ImNodedit::Node *node,
                                  ImNodedit::ImNodeEditor *nodedit,
                                  ImDrawList *drawlist) {
-  auto &idx = graph->nodes.get_indices()[nodeIdx];
-  Node &node_ = graph->nodes.expose()[idx.idx];
-  templates[node_.templateIdx].draw_function(nodeIdx, node, nodedit, drawlist);
+
+  Node *node_ = graph->nodes.get(tHandle{.gen = 0, .idx = nodeIdx}, true);
+  templates[node_->templateIdx].draw_function(nodeIdx, node, nodedit, drawlist);
 }
 
 ImNodedit::Link NodeEditor::getNodeInputLink(int32_t nodeIdx, int8_t pinIdx) {
-  auto &idx = graph->nodes.get_indices()[nodeIdx];
-  Node &node_ = graph->nodes.expose()[idx.idx];
+  // auto &idx = graph->nodes.get_indices()[nodeIdx];
+  // Node &node_ = graph->nodes.expose()[idx.idx];
+  Node *node_ = graph->nodes.get(tHandle{.gen = 0, .idx = nodeIdx}, true);
 
-  NodePoolBase *nodeData = graph->nodeData[node_.templateIdx].get();
-  Link *inputs = nodeData->inputsOf(nodeData->get(node_.node_data));
+  NodePoolBase *nodeData = graph->nodeData[node_->templateIdx].get();
+  Link *inputs = nodeData->inputsOf(nodeData->get(node_->node_data));
   return ImNodedit::Link{
       inputs[pinIdx].pinIdx,
       inputs[pinIdx].nodeIdx,
@@ -84,22 +89,24 @@ bool NodeEditor::allowLink(int32_t inputNodeIdx, int8_t inputPinIdx,
 
 void NodeEditor::addLink(int32_t inputNodeIdx, int8_t inputPinIdx,
                          int32_t outputNodeIdx, int8_t outputPinIdx) {
-  auto &idx = graph->nodes.get_indices()[inputNodeIdx];
-  Node &node_ = graph->nodes.expose()[idx.idx];
+  // auto &idx = graph->nodes.get_indices()[inputNodeIdx];
+  // Node &node_ = graph->nodes.expose()[idx.idx];
+  Node *node_ = graph->nodes.get(tHandle{.gen = 0, .idx = inputNodeIdx}, true);
 
-  NodePoolBase *nodeData = graph->nodeData[node_.templateIdx].get();
-  Link *inputs = nodeData->inputsOf(nodeData->get(node_.node_data));
+  NodePoolBase *nodeData = graph->nodeData[node_->templateIdx].get();
+  Link *inputs = nodeData->inputsOf(nodeData->get(node_->node_data));
 
   inputs[inputPinIdx] = Link{.pinIdx = outputPinIdx, .nodeIdx = outputNodeIdx};
 }
 
 void NodeEditor::delLink(int32_t inputNodeIdx, int8_t inputPinIdx,
                          int32_t outputNodeIdx, int8_t outputPinIdx) {
-  auto &idx = graph->nodes.get_indices()[inputNodeIdx];
-  Node &node_ = graph->nodes.expose()[idx.idx];
+  // auto &idx = graph->nodes.get_indices()[inputNodeIdx];
+  // Node &node_ = graph->nodes.expose()[idx.idx];
+  Node *node_ = graph->nodes.get(tHandle{.gen = 0, .idx = inputNodeIdx}, true);
 
-  NodePoolBase *nodeData = graph->nodeData[node_.templateIdx].get();
-  Link *inputs = nodeData->inputsOf(nodeData->get(node_.node_data));
+  NodePoolBase *nodeData = graph->nodeData[node_->templateIdx].get();
+  Link *inputs = nodeData->inputsOf(nodeData->get(node_->node_data));
 
   inputs[inputPinIdx] = Link{-1, -1};
 }

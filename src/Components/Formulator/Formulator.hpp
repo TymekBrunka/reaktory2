@@ -53,7 +53,10 @@ public:
     return (void *)pool.get(handle, unsafe);
   }
 
-  tHandle add() override { return pool.add(std::move(T{})); }
+  tHandle add() override {
+    tHandle h = pool.add(std::move(T{}));
+    return h;
+  }
 
   void remove(tHandle handle, bool unsafe = false) override {
     pool.remove(handle, unsafe);

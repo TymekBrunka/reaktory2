@@ -237,6 +237,9 @@ void ImNodeEditor::update(const char *name) {
 
     if (click && !ImGui::IsKeyDown(ImGuiKey_LeftShift)) {
       for (int32_t i = 0; i < getNodeCount(); i++) {
+        if (!canGetNode(i))
+          continue;
+
         selectNode(i, false);
       }
       currently_selected_link[0] = {-1, -1};
@@ -443,6 +446,9 @@ void ImNodeEditor::update(const char *name) {
 
   // 2nd pass, only for drawing
   for (int32_t nodeIdx = 0; nodeIdx < getNodeCount(); nodeIdx++) {
+    if (!canGetNode(nodeIdx))
+      continue;
+
     Node node = getNode(nodeIdx);
     Template templ = getTemplate(node.templateIdx);
 
