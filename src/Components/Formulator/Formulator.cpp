@@ -24,10 +24,12 @@ NodeGraph::NodeGraph() {
   nodeData.push_back(std::make_unique<NodePool<nBool>>());
   nodeData.push_back(std::make_unique<NodePool<nNumber>>());
   nodeData.push_back(std::make_unique<NodePool<nString>>());
+  nodeData.push_back(std::make_unique<NodePool<nVariable>>());
   nodeData.push_back(std::make_unique<NodePool<nAdd>>());
   nodeData.push_back(std::make_unique<NodePool<nSub>>());
   nodeData.push_back(std::make_unique<NodePool<nMul>>());
   nodeData.push_back(std::make_unique<NodePool<nDiv>>());
+  nodeData.push_back(std::make_unique<NodePool<nSet>>());
   nodeData.push_back(std::make_unique<NodePool<nEqual>>());
   nodeData.push_back(std::make_unique<NodePool<nLess>>());
   nodeData.push_back(std::make_unique<NodePool<nMore>>());
@@ -39,4 +41,8 @@ NodeGraph::NodeGraph() {
   nodeData.push_back(std::make_unique<NodePool<nReturn>>());
 
   add_node(N_RETURN, nReturn{})->setPos(200, 120);
+}
+
+bool NodeGraph::calculate() {
+
 }

@@ -58,4 +58,6 @@ public:
 
   void delLink(int32_t inputNodeIdx, int8_t inputPinIdx, int32_t outputNodeIdx,
                int8_t outputPinIdx) override;
+
+  void draw();
 };

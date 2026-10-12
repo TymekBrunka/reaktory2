@@ -9,7 +9,7 @@
 void NodeEditor::selectNode(int32_t nodeIdx, bool selected) {
   // auto &idx = graph->nodes.get_indices()[nodeIdx];
   // graph->nodes.expose()[idx.idx].selected = selected;
-  graph->nodes.get(tHandle{.gen = 0, .idx = nodeIdx}, true)->selected =
+  graph->nodes.get(tHandle{.gen = 0, .idx = (int16_t)nodeIdx}, true)->selected =
       selected;
 }
 
@@ -42,13 +42,14 @@ const ImNodedit::Template NodeEditor::getTemplate(int32_t templateIdx) {
 int32_t NodeEditor::getNodeCount() { return graph->nodes.idx_size(); };
 
 bool NodeEditor::canGetNode(int32_t nodeIdx) {
-  return graph->nodes.get(tHandle{.gen = 0, .idx = nodeIdx}, true);
+  return graph->nodes.get(tHandle{.gen = 0, .idx = (int16_t)nodeIdx}, true);
 }
 
 ImNodedit::Node NodeEditor::getNode(int32_t nodeIdx) {
   // auto &idx = graph->nodes.get_indices()[nodeIdx];
   // Node &node = graph->nodes.expose()[idx.idx];
-  Node *node = graph->nodes.get(tHandle{.gen = 0, .idx = nodeIdx}, true);
+  Node *node =
+      graph->nodes.get(tHandle{.gen = 0, .idx = (int16_t)nodeIdx}, true);
 
   return ImNodedit::Node{
       .selected = node->selected,
@@ -65,14 +66,17 @@ void NodeEditor::drawNodeWidgets(int32_t nodeIdx, ImNodedit::Node *node,
                                  ImNodedit::ImNodeEditor *nodedit,
                                  ImDrawList *drawlist) {
 
-  Node *node_ = graph->nodes.get(tHandle{.gen = 0, .idx = nodeIdx}, true);
-  templates[node_->templateIdx].draw_function(nodeIdx, node, nodedit, drawlist);
+  Node *node_ =
+      graph->nodes.get(tHandle{.gen = 0, .idx = (int16_t)nodeIdx}, true);
+  templates[node_->templateIdx].draw_function((int16_t)nodeIdx, node, nodedit,
+                                              drawlist);
 }
 
 ImNodedit::Link NodeEditor::getNodeInputLink(int32_t nodeIdx, int8_t pinIdx) {
   // auto &idx = graph->nodes.get_indices()[nodeIdx];
   // Node &node_ = graph->nodes.expose()[idx.idx];
-  Node *node_ = graph->nodes.get(tHandle{.gen = 0, .idx = nodeIdx}, true);
+  Node *node_ =
+      graph->nodes.get(tHandle{.gen = 0, .idx = (int16_t)nodeIdx}, true);
 
   NodePoolBase *nodeData = graph->nodeData[node_->templateIdx].get();
   Link *inputs = nodeData->inputsOf(nodeData->get(node_->node_data));
@@ -91,7 +95,8 @@ void NodeEditor::addLink(int32_t inputNodeIdx, int8_t inputPinIdx,
                          int32_t outputNodeIdx, int8_t outputPinIdx) {
   // auto &idx = graph->nodes.get_indices()[inputNodeIdx];
   // Node &node_ = graph->nodes.expose()[idx.idx];
-  Node *node_ = graph->nodes.get(tHandle{.gen = 0, .idx = inputNodeIdx}, true);
+  Node *node_ =
+      graph->nodes.get(tHandle{.gen = 0, .idx = (int16_t)inputNodeIdx}, true);
 
   NodePoolBase *nodeData = graph->nodeData[node_->templateIdx].get();
   Link *inputs = nodeData->inputsOf(nodeData->get(node_->node_data));
@@ -103,12 +108,53 @@ void NodeEditor::delLink(int32_t inputNodeIdx, int8_t inputPinIdx,
                          int32_t outputNodeIdx, int8_t outputPinIdx) {
   // auto &idx = graph->nodes.get_indices()[inputNodeIdx];
   // Node &node_ = graph->nodes.expose()[idx.idx];
-  Node *node_ = graph->nodes.get(tHandle{.gen = 0, .idx = inputNodeIdx}, true);
+  Node *node_ =
+      graph->nodes.get(tHandle{.gen = 0, .idx = (int16_t)inputNodeIdx}, true);
 
   NodePoolBase *nodeData = graph->nodeData[node_->templateIdx].get();
   Link *inputs = nodeData->inputsOf(nodeData->get(node_->node_data));
 
   inputs[inputPinIdx] = Link{-1, -1};
+}
+
+void NodeEditor::draw() {
+  update();
+
+  if (isFocused() && ImGui::IsKeyPressed(ImGuiKey_Delete)) {
+    int16_t size = graph->nodes.idx_size();
+
+    for (int16_t i = 0; i < size; i++) {
+      Node *node = graph->nodes.get(tHandle{.gen = 0, .idx = i}, true);
+
+      if (!node)
+        continue;
+
+      if (node->selected && (NodeGraph_NodeType)node->templateIdx != N_RETURN) {
+        graph->nodeData[node->templateIdx].get()->remove(node->node_data);
+        graph->nodes.remove(tHandle{.gen = 0, .idx = i}, true);
+      }
+    }
+
+    for (int16_t i = 0; i < size; i++) {
+      Node *node = graph->nodes.get(tHandle{.gen = 0, .idx = i}, true);
+
+      if (!node)
+        continue;
+
+      // if (!node->selected) {
+      // std::cerr << "hell fix\n";
+      NodePoolBase *nodeData = graph->nodeData[node->templateIdx].get();
+      Link *inputs = nodeData->inputsOf(nodeData->get(node->node_data));
+      for (int8_t j = 0; j < templates[node->templateIdx].inputCount; j++) {
+        inputs[j] =
+            graph->nodes.get(
+                tHandle{.gen = 0, .idx = (int16_t)inputs[j].nodeIdx}, true)
+                ? inputs[j]
+                : Link{-1, -1};
+      }
+      // }
+    }
+  }
 }
 
 // <- names
@@ -125,6 +171,9 @@ static const char *N_FORWARDER__outNames[] = {"do  "};
 static const char *N_SUB__inNames[] = {"odjemna", "odjemnik"};
 
 static const char *N_DIV__inNames[] = {"dzielna", "dzielnik"};
+
+static const char *N_SET__inNames[] = {"zmienna ", "wartość "};
+static const char *N_SET__outNames[] = {"zmienna "};
 
 static const char *N_IF__inNames[] = {"gdy prawda", "warunek", "gdy fałsz"};
 
@@ -148,6 +197,13 @@ static const ImU32 COLOR_BOOL = ImNodedit::imColor(0x377899FF);
 static const ImU32 COLOR_HDR_BOOL = ImNodedit::imColor(0x377899FF);
 static const ImU32 COLOR_BG_BOOL = ImNodedit::imColor(0x2B3F49FF);
 static const ImU32 N_BOOL__outColors[] = {COLOR_BOOL};
+
+static const ImU32 COLOR_VARIABLE = ImNodedit::imColor(0xB200FFFF);
+static const ImU32 COLOR_HDR_VARIABLE = ImNodedit::imColor(0xB200FFFF);
+static const ImU32 COLOR_BG_VARIABLE = ImNodedit::imColor(0x3C2249FF);
+static const ImU32 N_VARIABLE__outColors[] = {COLOR_VARIABLE};
+static const ImU32 N_SET__inColors[] = {COLOR_VARIABLE, 0xFF646464};
+static const ImU32 N_SET__outColors[] = {COLOR_VARIABLE};
 
 static const ImU32 N_RETURN__inColors[] = {ImNodedit::imColor(0x68002FFF)};
 
@@ -263,6 +319,23 @@ extern const Template templates[N_COUNT]{
                                     &((nString *)node->userData)->value);
                  }},
 
+    Template{.headerColor = ImNodedit::imColor(0x7B00B5FF),
+             .backgroundColor = ImNodedit::imColor(0xC342FFFF),
+             .size = ImVec2(170, 60),
+             .inputCount = 0,
+             .outputCount = 1,
+             .outputColors = N_VARIABLE__outColors,
+             .name = "zmienna",
+
+             .draw_function =
+                 [](int32_t nodeIdx, ImNodedit::Node *node,
+                    ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
+                   ImGui::SetNextItemWidth(ImGui::GetWindowSize().x -
+                                           (50 * nodedit->getZoomFactor()));
+                   ImGui::InputText("nazwa",
+                                    &((nVariable *)node->userData)->name);
+                 }},
+
     Template{.headerColor = COLOR_HDR_ARITM_OP,
              .backgroundColor = COLOR_BG_ARITM_OP,
              .size = ImVec2(120, 60),
@@ -333,6 +406,31 @@ extern const Template templates[N_COUNT]{
                     ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
                    IconPlusValueDisabledOnLink<nDiv>(drawlist, node, nodedit,
                                                      ImVec2(0, 0), "/");
+                 }},
+
+    Template{.headerColor = COLOR_HDR_VARIABLE,
+             .backgroundColor = COLOR_BG_VARIABLE,
+             .size = ImVec2(170, 60),
+             .inputCount = 2,
+             .outputCount = 1,
+             .inputNames = N_SET__inNames,
+             .inputColors = N_SET__inColors,
+             // .outputNames = N_SET__outNames,
+             .outputColors = N_SET__outColors,
+             .name = "ustaw",
+
+             .draw_function =
+                 [](int32_t nodeIdx, ImNodedit::Node *node,
+                    ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
+                   auto *data = (nSet *)node->userData;
+                   if (data->inputs[1] != Link{-1, -1})
+                     ImGui::BeginDisabled();
+
+                   ImGui::SetNextItemWidth(ImGui::GetWindowSize().x);
+                   ImGui::DragFloat("##number", &data->value, 0.1);
+
+                   if (data->inputs[1] != Link{-1, -1})
+                     ImGui::EndDisabled();
                  }},
 
     Template{.headerColor = COLOR_HDR_BOOL,
@@ -470,7 +568,10 @@ extern const Template templates[N_COUNT]{
              .draw_function =
                  [](int32_t nodeIdx, ImNodedit::Node *node,
                     ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
-                   ImGui::TextColored(ImVec4(1, 0.625, 0.703125, 1),
-                                      "wartość zwracana");
+                   // ImGui::TextColored(ImVec4(1, 0.625, 0.703125, 1),
+                   //                    "wartość zwracana");
+                   ImGui::Text(
+                       "%.2f",
+                       ((nReturn *)node->userData)->value.get<float>());
                  }},
 };

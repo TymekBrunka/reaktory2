@@ -2,7 +2,9 @@
 #include <cstddef> // For std::ptrdiff_t
 #include <cstdint>
 #include <functional>
+#include <iostream>
 #include <iterator> // For std::forward_iterator_tag
+#include <memory>
 #include <type_traits>
 #include <typeinfo>
 #include <vector>
@@ -161,8 +163,320 @@ template <typename> struct TypeIdHack {};
 // template <> inline int *Any::get_base() { return &data.Int; }
 // template <> inline float *Any::get_base() { return &data.Float; }
 class AnyImplBase {
+  friend class Any;
+
+protected:
+  virtual void copyFrom(AnyImplBase *src) = 0;
+  virtual AnyImplBase *copy() = 0;
+  virtual void moveFrom(AnyImplBase *src) = 0;
+
+public:
   virtual ~AnyImplBase() = default;
+
+  virtual void *get() = 0;
+  virtual size_t data_type() = 0;
+
+  template <typename T> T *convertTo() { return (T *)this; }
 };
+
+template <typename T> class AnyImpl : AnyImplBase {
+protected:
+  T data;
+
+  void copyFrom(AnyImplBase *src) override { data = ((AnyImpl<T> *)src)->data; }
+
+  AnyImplBase *copy() override {
+    AnyImpl a = new AnyImpl{.data = data};
+    return a;
+  };
+
+  void moveFrom(AnyImplBase *src) override {
+    data = std::move(((AnyImpl<T> *)src)->data);
+  }
+
+public:
+  AnyImpl() = default;
+  ~AnyImpl() override = default;
+
+  AnyImpl(const T &that) { data = that; }
+  AnyImpl &operator=(const T &that) { data = that; }
+  AnyImpl(T &&that) { data = that; }
+  AnyImpl &operator=(T &&that) { data = that; }
+
+  T &operator()() const { return data; }
+  T &&operator()() { return std::move(data); }
+
+  void *get() override { return &data; }
+  size_t data_type() override { return typeid(TypeIdHack<T>).hash_code(); }
+};
+
+class Any {
+public:
+  enum class Tag {
+    NONE = 0,
+    BOOL,
+    INT,
+    FLOAT,
+    PTR,
+    UPTR,
+    SPTR,
+  };
+
+  union Primitives {
+    bool Bool;
+    int Int;
+    float Float;
+  };
+
+private:
+  struct Buffer {
+    uint8_t buf[sizeof(std::shared_ptr<AnyImplBase>)] = {0};
+  };
+
+  union {
+    void *Ptr;
+    std::unique_ptr<AnyImplBase> Uptr;
+    std::shared_ptr<AnyImplBase> Sptr;
+    Buffer Buf;
+  };
+
+  inline bool is_little_endian() {
+    static const uint8_t test[2] = {1, 2};
+    if (*(uint16_t *)test == 513) // 2 * 256^1 + 1 * 256^0
+      return true;
+    return false;
+  }
+
+  inline Tag *tag_offset() {
+    return is_little_endian() ? (Tag *)((uint8_t *)&Ptr + 7) : (Tag *)&Ptr;
+  };
+
+  inline Primitives *data_offset() {
+    return is_little_endian() ? (Primitives *)&Ptr
+                              : (Primitives *)((uint8_t *)&Ptr + 2);
+  };
+
+  inline void clear_old() {
+    Tag tag1 = getTag();
+
+    if (tag1 == Tag::UPTR) {
+      clearTag();
+      Uptr.~unique_ptr<AnyImplBase>();
+      setTag(tag1);
+    }
+
+    else if (tag1 == Tag::SPTR) {
+      clearTag();
+      Sptr.~shared_ptr<AnyImplBase>();
+      setTag(tag1);
+    }
+  }
+
+public:
+  inline Any() { Buf = Buffer{}; }
+
+  inline Any(bool x) {
+    data_offset()->Bool = x;
+    setTag(Tag::BOOL);
+  }
+
+  inline Any(int x) {
+    data_offset()->Int = x;
+    setTag(Tag::INT);
+  }
+
+  inline Any(float x) {
+    data_offset()->Float = x;
+    setTag(Tag::FLOAT);
+  }
+
+  inline Any(void *x) {
+    Ptr = x;
+    setTag(Tag::PTR);
+  }
+
+  inline Any(std::shared_ptr<AnyImplBase> x) {
+    Sptr = std::move(x);
+    setTag(Tag::SPTR);
+  }
+
+  inline ~Any() { clear_old(); }
+
+  inline Tag getTag() { return *tag_offset(); }
+  inline void clearTag() { *tag_offset() = Tag::NONE; }
+  inline void setTag(Tag tag) { *tag_offset() = tag; }
+
+  inline Any &operator=(Any &&other) {
+    if (this != &other) {
+      clear_old();
+      Buf = other.Buf;
+      other.Buf = Buffer{};
+    }
+    return *this;
+  }
+
+  inline Any(Any &&other) { *this = std::move(other); }
+
+  inline Any &operator=(const Any &other_) {
+    Buffer buf = other_.Buf;
+    Any &other = *(Any *)&buf;
+    if (this != &other) {
+      Tag tag1 = getTag();
+      Tag tag2 = other.getTag();
+
+      if (tag1 == Tag::UPTR) {
+        clearTag();
+        other.clearTag();
+        if (Uptr.get()->data_type() == other.Uptr.get()->data_type())
+          Uptr.get()->copyFrom(other.Uptr.get());
+        else {
+          // Uptr.~unique_ptr<AnyImplBase>();
+          Uptr.release();
+          Uptr.reset(other.Uptr.get()->copy());
+        }
+        setTag(tag1);
+        other.setTag(tag2);
+      }
+
+      else if (tag1 == Tag::SPTR) {
+        clearTag();
+        other.clearTag();
+        Sptr = other.Sptr;
+        setTag(tag1);
+        other.setTag(tag2);
+      }
+
+      else
+        Buf = other.Buf;
+    }
+    return *this;
+  }
+
+  inline Any(const Any &other) { *this = other; }
+
+  template <typename T> Any &set_as_uptr(const T &element) {
+    clear_old();
+    Uptr = std::make_unique<AnyImpl<T>>();
+    Sptr.get()->convertTo<AnyImpl<T>>()->data = element;
+    *tag_offset() = Tag::UPTR;
+    return *this;
+  }
+
+  template <typename T> Any &set_as_uptr(T &&element) {
+    clear_old();
+    Uptr = std::make_unique<AnyImpl<T>>();
+    Sptr.get()->convertTo<AnyImpl<T>>()->data = std::move(element);
+    *tag_offset() = Tag::UPTR;
+    return *this;
+  }
+
+  template <typename T> Any &set_as_shared(const T &element) {
+    clear_old();
+    Sptr = std::make_shared<AnyImpl<T>>();
+    Sptr.get()->convertTo<AnyImpl<T>>()->data = element;
+    *tag_offset() = Tag::SPTR;
+    return *this;
+  }
+
+  template <typename T> Any &set_as_shared(T &&element) {
+    clear_old();
+    Sptr = std::make_shared<AnyImpl<T>>();
+    Sptr.get()->convertTo<AnyImpl<T>>()->data = std::move(element);
+    *tag_offset() = Tag::SPTR;
+    return *this;
+  }
+
+  template <typename T> bool holds_ptr_of_type() {
+    Tag tag1 = getTag();
+    bool ret = false;
+
+    if (tag1 == Tag::UPTR) {
+      clearTag();
+      ret = Uptr.get()->data_type() == typeid(TypeIdHack<T>).hash_code();
+      setTag(tag1);
+    }
+
+    else if (tag1 == Tag::SPTR) {
+      clearTag();
+      ret = Sptr.get()->data_type() == typeid(TypeIdHack<T>).hash_code();
+      setTag(tag1);
+    }
+
+    return ret;
+  }
+
+  template <typename T> T *get() {
+    Tag tag1 = getTag();
+    T *ret = nullptr;
+
+    if (tag1 == Tag::UPTR) {
+      clearTag();
+      ret = Uptr.get()->data_type() == typeid(TypeIdHack<T>).hash_code()
+                ? Uptr.get()
+                : nullptr;
+      setTag(tag1);
+    }
+
+    else if (tag1 == Tag::SPTR) {
+      clearTag();
+      ret = Sptr.get()->data_type() == typeid(TypeIdHack<T>).hash_code()
+                ? Sptr.get()
+                : nullptr;
+      setTag(tag1);
+    }
+
+    return ret;
+  }
+
+  inline void setPrimitive(bool x) {
+    clear_old();
+    setTag(Tag::BOOL);
+    data_offset()->Bool = x;
+  }
+
+  inline void setPrimitive(int x) {
+    clear_old();
+    setTag(Tag::INT);
+    data_offset()->Int = x;
+  }
+
+  inline void setPrimitive(float x) {
+    clear_old();
+    setTag(Tag::FLOAT);
+    data_offset()->Float = x;
+  }
+
+  inline void setPrimitive(void *x) {
+    clear_old();
+    setTag(Tag::PTR);
+    Ptr = x;
+  }
+};
+
+template <> inline bool *Any::get() {
+  return getTag() == Tag::BOOL ? &data_offset()->Bool : nullptr;
+}
+
+template <> inline int *Any::get() {
+  return getTag() == Tag::INT ? &data_offset()->Int : nullptr;
+}
+
+template <> inline float *Any::get() {
+  return getTag() == Tag::FLOAT ? &data_offset()->Float : nullptr;
+}
+
+template <> inline void *Any::get() {
+  Tag tag1 = getTag();
+  void *ret = nullptr;
+
+  if (tag1 == Tag::PTR) {
+    clearTag();
+    ret = Ptr;
+    setTag(tag1);
+  }
+
+  return ret;
+}
 
 struct tHandle {
   uint8_t gen = 0;
@@ -228,7 +542,7 @@ public:
                                              // pool's structure gets corrupted
 
       idx->idx = elements.size();
-      elements.push_back(element);
+      elements.push_back(std::move(element));
       element_to_index.push_back(freeidx);
       return tHandle{.gen = ++idx->gen, .idx = freeidx};
     }

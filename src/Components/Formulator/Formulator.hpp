@@ -11,7 +11,7 @@ struct Node {
   int32_t templateIdx = -1;
   float position[2] = {0};
   // float size[2] = {300, 100};
-  // void *userData = nullptr;
+  void *userData = nullptr;
 
   inline void setPos(float x, float y) {
     position[0] = x;
@@ -76,11 +76,13 @@ enum NodeGraph_NodeType {
   N_BOOL,
   N_NUMBER,
   N_STRING,
+  N_VARIABLE,
 
   N_ADD,
   N_SUB,
   N_MUL,
   N_DIV,
+  N_SET,
 
   N_EQUAL,
   N_LESS,
@@ -97,6 +99,9 @@ enum NodeGraph_NodeType {
 };
 
 class NodeGraph {
+private:
+  Any recursiveDescend();
+
 public:
   Pool<Node> nodes;
   std::vector<std::unique_ptr<NodePoolBase>> nodeData;
@@ -123,6 +128,8 @@ public:
     tHandle n = nodes.add(Node{.node_data = h, .templateIdx = type});
     return nodes.get(n);
   }
+
+  bool calculate();
 };
 
 struct nForwarder {
@@ -144,6 +151,12 @@ struct nString {
   Link inputs[0];
 };
 
+struct nVariable {
+  Any value;
+  std::string name;
+  Link inputs[0];
+};
+
 struct nAdd {
   float value;
   Link inputs[2];
@@ -160,6 +173,11 @@ struct nMul {
 };
 
 struct nDiv {
+  float value;
+  Link inputs[2];
+};
+
+struct nSet {
   float value;
   Link inputs[2];
 };
@@ -202,5 +220,6 @@ struct nLoop {
 };
 
 struct nReturn {
+  Any value{1.0f};
   Link inputs[1];
 };
