@@ -1,6 +1,7 @@
 #pragma once
 #include <cstddef> // For std::ptrdiff_t
 #include <cstdint>
+#include <cstring>
 #include <functional>
 #include <iostream>
 #include <iterator> // For std::forward_iterator_tag
@@ -179,14 +180,20 @@ public:
   template <typename T> T *convertTo() { return (T *)this; }
 };
 
-template <typename T> class AnyImpl : AnyImplBase {
+template <typename T>
+class AnyImpl
+    : public AnyImplBase { // public kw is not only required for method
+                           // visibility for user but also smart pointers
+  friend class Any;
+
 protected:
   T data;
 
   void copyFrom(AnyImplBase *src) override { data = ((AnyImpl<T> *)src)->data; }
 
   AnyImplBase *copy() override {
-    AnyImpl a = new AnyImpl{.data = data};
+    AnyImpl *a = new AnyImpl;
+    a->data = data;
     return a;
   };
 
@@ -212,7 +219,7 @@ public:
 
 class Any {
 public:
-  enum class Tag {
+  enum class Tag : uint8_t {
     NONE = 0,
     BOOL,
     INT,
@@ -220,6 +227,7 @@ public:
     PTR,
     UPTR,
     SPTR,
+    COUNT,
   };
 
   union Primitives {
@@ -230,7 +238,9 @@ public:
 
 private:
   struct Buffer {
-    uint8_t buf[sizeof(std::shared_ptr<AnyImplBase>)] = {0};
+    uint8_t buf[sizeof(std::shared_ptr<AnyImplBase>)];
+
+    inline Buffer() { memset(buf, 0, sizeof(std::shared_ptr<AnyImplBase>)); }
   };
 
   union {
@@ -256,19 +266,36 @@ private:
                               : (Primitives *)((uint8_t *)&Ptr + 2);
   };
 
+  inline Tag getTag() { return *tag_offset(); }
+  inline void clearTag() { *tag_offset() = Tag::NONE; }
+  inline void setTag(Tag tag) {
+    *tag_offset() = tag;
+    // if (tag == Tag::SPTR) {
+    //   std::cerr << "here\n";
+    // }
+  }
+
   inline void clear_old() {
     Tag tag1 = getTag();
-
-    if (tag1 == Tag::UPTR) {
-      clearTag();
-      Uptr.~unique_ptr<AnyImplBase>();
-      setTag(tag1);
+    std::cerr << "odl tag: " << (int)tag1 << "\n";
+    if (tag1 == Tag::SPTR) {
+      std::cerr << "used to be around here\n";
     }
 
-    else if (tag1 == Tag::SPTR) {
-      clearTag();
+    if ((int)tag1 >= (int)Tag::COUNT) {
+      std::cerr << "oh noes\n";
+      Buf = Buffer{};
+    }
+
+    clearTag();
+    if (tag1 == Tag::UPTR) {
+      Uptr.~unique_ptr<AnyImplBase>();
+      Buf = Buffer{};
+      std::cerr << "cleared unique ptr\n";
+    } else if (tag1 == Tag::SPTR) {
       Sptr.~shared_ptr<AnyImplBase>();
-      setTag(tag1);
+      Buf = Buffer{};
+      std::cerr << "cleared smart ptr\n";
     }
   }
 
@@ -302,10 +329,6 @@ public:
 
   inline ~Any() { clear_old(); }
 
-  inline Tag getTag() { return *tag_offset(); }
-  inline void clearTag() { *tag_offset() = Tag::NONE; }
-  inline void setTag(Tag tag) { *tag_offset() = tag; }
-
   inline Any &operator=(Any &&other) {
     if (this != &other) {
       clear_old();
@@ -317,56 +340,19 @@ public:
 
   inline Any(Any &&other) { *this = std::move(other); }
 
-  inline Any &operator=(const Any &other_) {
-    Buffer buf = other_.Buf;
-    Any &other = *(Any *)&buf;
-    if (this != &other) {
-      Tag tag1 = getTag();
-      Tag tag2 = other.getTag();
-
-      if (tag1 == Tag::UPTR) {
-        clearTag();
-        other.clearTag();
-        if (Uptr.get()->data_type() == other.Uptr.get()->data_type())
-          Uptr.get()->copyFrom(other.Uptr.get());
-        else {
-          // Uptr.~unique_ptr<AnyImplBase>();
-          Uptr.release();
-          Uptr.reset(other.Uptr.get()->copy());
-        }
-        setTag(tag1);
-        other.setTag(tag2);
-      }
-
-      else if (tag1 == Tag::SPTR) {
-        clearTag();
-        other.clearTag();
-        Sptr = other.Sptr;
-        setTag(tag1);
-        other.setTag(tag2);
-      }
-
-      else
-        Buf = other.Buf;
-    }
-    return *this;
-  }
-
-  inline Any(const Any &other) { *this = other; }
-
   template <typename T> Any &set_as_uptr(const T &element) {
     clear_old();
     Uptr = std::make_unique<AnyImpl<T>>();
-    Sptr.get()->convertTo<AnyImpl<T>>()->data = element;
-    *tag_offset() = Tag::UPTR;
+    Uptr.get()->convertTo<AnyImpl<T>>()->data = element;
+    setTag(Tag::UPTR);
     return *this;
   }
 
   template <typename T> Any &set_as_uptr(T &&element) {
     clear_old();
     Uptr = std::make_unique<AnyImpl<T>>();
-    Sptr.get()->convertTo<AnyImpl<T>>()->data = std::move(element);
-    *tag_offset() = Tag::UPTR;
+    Uptr.get()->convertTo<AnyImpl<T>>()->data = std::move(element);
+    setTag(Tag::UPTR);
     return *this;
   }
 
@@ -374,7 +360,7 @@ public:
     clear_old();
     Sptr = std::make_shared<AnyImpl<T>>();
     Sptr.get()->convertTo<AnyImpl<T>>()->data = element;
-    *tag_offset() = Tag::SPTR;
+    setTag(Tag::SPTR);
     return *this;
   }
 
@@ -382,9 +368,65 @@ public:
     clear_old();
     Sptr = std::make_shared<AnyImpl<T>>();
     Sptr.get()->convertTo<AnyImpl<T>>()->data = std::move(element);
-    *tag_offset() = Tag::SPTR;
+    setTag(Tag::SPTR);
     return *this;
   }
+
+  inline Any &operator=(const Any &other_) {
+    Buffer *buf = (Buffer *)&other_.Buf;
+    Any &other = *(Any *)buf;
+    if (this != &other_) {
+      Tag tag1 = getTag();
+      Tag tag2 = other.getTag();
+
+      if (tag1 == Tag::UPTR && tag2 == Tag::UPTR) {
+        clearTag();
+        other.clearTag();
+        if (Uptr.get()->data_type() == other.Uptr.get()->data_type())
+          Uptr.get()->copyFrom(other.Uptr.get());
+        else {
+          Uptr.~unique_ptr();
+          Uptr.reset(other.Uptr.get()->copy());
+        }
+        setTag(tag1);
+        other.setTag(tag2);
+      }
+
+      else if (tag1 == Tag::SPTR && tag2 == Tag::SPTR) {
+        clearTag();
+        other.clearTag();
+        Sptr.~shared_ptr();
+        Sptr = other.Sptr;
+        // Sptr.release();
+        // Sptr.reset(other.Sptr.get()->copy());
+        setTag(tag1);
+        other.setTag(tag2);
+      }
+
+      else {
+        clear_old();
+        if (tag2 == Tag::UPTR) {
+          other.clearTag();
+          Uptr.~unique_ptr();
+          Uptr.reset(other.Uptr.get()->copy());
+          setTag(Tag::UPTR);
+          other.setTag(tag2);
+        } else if (tag2 == Tag::SPTR) {
+          other.clearTag();
+          Sptr.~shared_ptr();
+          Sptr = other.Sptr;
+          setTag(Tag::SPTR);
+          other.setTag(tag2);
+        } else
+          Buf = other.Buf;
+      }
+    }
+    return *this;
+  }
+
+  inline Any(const Any &other) { *this = other; }
+
+  template <typename T> Any(const T &element) { set_as_shared(element); }
 
   template <typename T> bool holds_ptr_of_type() {
     Tag tag1 = getTag();
@@ -412,7 +454,7 @@ public:
     if (tag1 == Tag::UPTR) {
       clearTag();
       ret = Uptr.get()->data_type() == typeid(TypeIdHack<T>).hash_code()
-                ? Uptr.get()
+                ? (T *)Uptr.get()->get()
                 : nullptr;
       setTag(tag1);
     }
@@ -420,7 +462,7 @@ public:
     else if (tag1 == Tag::SPTR) {
       clearTag();
       ret = Sptr.get()->data_type() == typeid(TypeIdHack<T>).hash_code()
-                ? Sptr.get()
+                ? (T *)Sptr.get()->get()
                 : nullptr;
       setTag(tag1);
     }
@@ -548,7 +590,7 @@ public:
     }
 
     indices.push_back(Index{.gen = 1, .idx = (int16_t)elements.size()});
-    elements.push_back(element);
+    elements.push_back(std::move(element));
     element_to_index.push_back(indices.size() - 1);
     return tHandle{.gen = 1, .idx = (int16_t)(indices.size() - 1)};
   }

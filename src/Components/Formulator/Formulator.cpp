@@ -40,7 +40,7 @@ NodeGraph::NodeGraph() {
   nodeData.push_back(std::make_unique<NodePool<nLoop>>());
   nodeData.push_back(std::make_unique<NodePool<nReturn>>());
 
-  add_node(N_RETURN, nReturn{})->setPos(200, 120);
+  add_node(N_RETURN, nReturn{})->setPos(0, 0);
 }
 
 bool NodeGraph::calculate() {

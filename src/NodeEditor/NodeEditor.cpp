@@ -239,7 +239,7 @@ void IconPlusValueDisabledOnLink(ImDrawList *drawlist, ImNodedit::Node *node,
 
   ImGui::SetNextItemWidth(ImGui::GetWindowSize().x -
                           (10 * nodedit->getZoomFactor()));
-  ImGui::DragFloat("##number", &data->value, 0.1);
+  ImGui::DragFloat("##number", data->value.template get<float>(), 0.1);
 
   if (data->inputs[1] != Link{-1, -1})
     ImGui::EndDisabled();
@@ -274,34 +274,36 @@ extern const Template templates[N_COUNT]{
              .draw_function =
                  [](int32_t nodeIdx, ImNodedit::Node *node,
                     ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
-                   ImGui::Checkbox("##bool", &((nBool *)node->userData)->value);
+                   ImGui::Checkbox(
+                       "##bool", ((nBool *)node->userData)->value.get<bool>());
                  }},
 
-    Template{.headerColor = ImNodedit::imColor(0x416B18FF),
-             .backgroundColor = ImNodedit::imColor(0x51A019FF),
-             .size = ImVec2(120, 60),
-             .inputCount = 0,
-             .outputCount = 1,
-             // .inputNames = N_FORWARDER__inNames,
-             // .outputNames = N_NUMBER__outNames,
-             .outputColors = N_NUMBER__outColors,
-             .name = "liczba",
+    Template{
+        .headerColor = ImNodedit::imColor(0x416B18FF),
+        .backgroundColor = ImNodedit::imColor(0x51A019FF),
+        .size = ImVec2(120, 60),
+        .inputCount = 0,
+        .outputCount = 1,
+        // .inputNames = N_FORWARDER__inNames,
+        // .outputNames = N_NUMBER__outNames,
+        .outputColors = N_NUMBER__outColors,
+        .name = "liczba",
 
-             .draw_function =
-                 [](int32_t nodeIdx, ImNodedit::Node *node,
-                    ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
-                   ImVec2 img_size = ImVec2(20 * nodedit->getZoomFactor(),
-                                            20 * nodedit->getZoomFactor());
+        .draw_function =
+            [](int32_t nodeIdx, ImNodedit::Node *node,
+               ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
+              ImVec2 img_size = ImVec2(20 * nodedit->getZoomFactor(),
+                                       20 * nodedit->getZoomFactor());
 
-                   TextSized(drawlist, nodedit->getZoomFactor(), ImVec2(0, 0),
-                             ImNodedit::imColor(0x0055AAFF), "#");
-                   ImGui::SameLine();
+              TextSized(drawlist, nodedit->getZoomFactor(), ImVec2(0, 0),
+                        ImNodedit::imColor(0x0055AAFF), "#");
+              ImGui::SameLine();
 
-                   ImGui::SetNextItemWidth(ImGui::GetWindowSize().x -
-                                           img_size.x);
-                   ImGui::DragFloat("##number",
-                                    &((nNumber *)node->userData)->value, 0.1);
-                 }},
+              ImGui::SetNextItemWidth(ImGui::GetWindowSize().x - img_size.x);
+              ImGui::DragFloat("##number",
+                               ((nNumber *)node->userData)->value.get<float>(),
+                               0.1);
+            }},
 
     Template{.headerColor = ImNodedit::imColor(0xCC4A00FF),
              .backgroundColor = ImNodedit::imColor(0xFF7F00FF),
@@ -315,8 +317,9 @@ extern const Template templates[N_COUNT]{
                  [](int32_t nodeIdx, ImNodedit::Node *node,
                     ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
                    ImGui::SetNextItemWidth(ImGui::GetWindowSize().x);
-                   ImGui::InputText("##string",
-                                    &((nString *)node->userData)->value);
+                   ImGui::InputText(
+                       "##string",
+                       ((nString *)node->userData)->value.get<std::string>());
                  }},
 
     Template{.headerColor = ImNodedit::imColor(0x7B00B5FF),
@@ -427,7 +430,7 @@ extern const Template templates[N_COUNT]{
                      ImGui::BeginDisabled();
 
                    ImGui::SetNextItemWidth(ImGui::GetWindowSize().x);
-                   ImGui::DragFloat("##number", &data->value, 0.1);
+                   ImGui::DragFloat("##number", data->value.get<float>(), 0.1);
 
                    if (data->inputs[1] != Link{-1, -1})
                      ImGui::EndDisabled();
@@ -570,8 +573,7 @@ extern const Template templates[N_COUNT]{
                     ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
                    // ImGui::TextColored(ImVec4(1, 0.625, 0.703125, 1),
                    //                    "wartość zwracana");
-                   ImGui::Text(
-                       "%.2f",
-                       ((nReturn *)node->userData)->value.get<float>());
+                   ImGui::Text("%.2f",
+                               ((nReturn *)node->userData)->value.get<float>());
                  }},
 };
