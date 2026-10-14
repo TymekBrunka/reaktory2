@@ -101,7 +101,8 @@ void NodeEditor::addLink(int32_t inputNodeIdx, int8_t inputPinIdx,
   NodePoolBase *nodeData = graph->nodeData[node_->templateIdx].get();
   Link *inputs = nodeData->inputsOf(nodeData->get(node_->node_data));
 
-  inputs[inputPinIdx] = Link{.pinIdx = outputPinIdx, .nodeIdx = outputNodeIdx};
+  inputs[inputPinIdx] =
+      Link{.pinIdx = outputPinIdx, .nodeIdx = (int16_t)outputNodeIdx};
 }
 
 void NodeEditor::delLink(int32_t inputNodeIdx, int8_t inputPinIdx,
@@ -573,7 +574,8 @@ extern const Template templates[N_COUNT]{
                     ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
                    // ImGui::TextColored(ImVec4(1, 0.625, 0.703125, 1),
                    //                    "wartość zwracana");
-                   ImGui::Text("%.2f",
-                               ((nReturn *)node->userData)->value.get<float>());
+                   ImGui::Text(
+                       "%.2f",
+                       *((nReturn *)node->userData)->value.get<float>());
                  }},
 };

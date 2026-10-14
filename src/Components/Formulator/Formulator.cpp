@@ -1,3 +1,4 @@
+#include "Any_and_Pool.hpp"
 #include <Formulator.hpp>
 
 NodeGraph::NodeGraph(const NodeGraph &other) {
@@ -44,5 +45,28 @@ NodeGraph::NodeGraph() {
 }
 
 bool NodeGraph::calculate() {
+  // for (auto &node : nodes)
+  //   node.computed = false;
 
+  nReturn *rn = nodeData[(size_t)N_RETURN]
+                    .get()
+                    ->convertTo<NodePool<nReturn>>()
+                    ->pool.get(tHandle{.gen = 1, .idx = 0});
+
+  if (rn->inputs[0] != Link{-1, -1})
+    rn->value = recursiveDescend(rn->inputs[0]);
+
+  return false;
+}
+
+Any NodeGraph::recursiveDescend(Link olink) {
+  Node *node = nodes.get(tHandle{.gen = 0, .idx = olink.nodeIdx}, true);
+  void *data = nodeData[node->templateIdx].get()->get(node->node_data);
+
+  NodeGraph_NodeType nt = (NodeGraph_NodeType)node->templateIdx;
+  if (nt == N_NUMBER) {
+    return Any{((nNumber *)data)->value};
+  } else {
+    return Any{0.0f};
+  }
 }

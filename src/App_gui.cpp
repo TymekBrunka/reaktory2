@@ -698,6 +698,7 @@ void App::draw_gui() {
         collapsed = false;
       ImGui::SameLine();
     }
+    ng.calculate();
     ne.setSize(ImGui::GetContentRegionAvail());
     ne.draw();
   }

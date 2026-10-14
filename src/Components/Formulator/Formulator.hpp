@@ -7,6 +7,7 @@
 struct Node {
   bool selected = false;
   // bool hovered = false;
+  uint8_t loop_counter = 128; // 128 - invariant (used )
   tHandle node_data;
   int32_t templateIdx = -1;
   float position[2] = {0};
@@ -21,7 +22,7 @@ struct Node {
 
 struct Link {
   int8_t pinIdx = -1;
-  int32_t nodeIdx = -1;
+  int16_t nodeIdx = -1;
 
   inline bool operator==(Link other) {
     return pinIdx == other.pinIdx && nodeIdx == other.nodeIdx;
@@ -100,7 +101,7 @@ enum NodeGraph_NodeType {
 
 class NodeGraph {
 private:
-  Any recursiveDescend();
+  Any recursiveDescend(Link olink);
 
 public:
   Pool<Node> nodes;
@@ -133,116 +134,96 @@ public:
 };
 
 struct nForwarder {
-  bool computed = false;
-  Any value;
   Link inputs[1];
 };
 
 struct nBool {
-  bool computed = false;
   Any value{true};
   Link inputs[0];
 };
 
 struct nNumber {
-  bool computed = false;
   Any value{1.0f};
   Link inputs[0];
 };
 
 struct nString {
-  bool computed = false;
   Any value{std::string("")};
   Link inputs[0];
 };
 
 struct nVariable {
-  bool computed = false;
   Any value;
   std::string name;
   Link inputs[0];
 };
 
 struct nAdd {
-  bool computed = false;
   Any value{1.0f};
   Link inputs[2];
 };
 
 struct nSub {
-  bool computed = false;
   Any value{1.0f};
   Link inputs[2];
 };
 
 struct nMul {
-  bool computed = false;
   Any value{2.0f};
   Link inputs[2];
 };
 
 struct nDiv {
-  bool computed = false;
   Any value{2.0f};
   Link inputs[2];
 };
 
 struct nSet {
-  bool computed = false;
   Any value{2.0f};
   Link inputs[2];
 };
 
 struct nEqual {
-  bool computed = false;
   Any value{0.0f};
   Link inputs[2];
 };
 
 struct nLess {
-  bool computed = false;
   Any value{0.0f};
   Link inputs[2];
 };
 
 struct nMore {
-  bool computed = false;
   Any value{0.0f};
   Link inputs[2];
 };
 
 struct nLessOrEqual {
-  bool computed = false;
   Any value{0.0f};
   Link inputs[2];
 };
 
 struct nMoreOrEqual {
-  bool computed = false;
   Any value{0.0f};
   Link inputs[2];
 };
 
 struct nNot {
-  bool computed = false;
   Any value;
   Link inputs[1];
 };
 
 struct nIf {
-  bool computed = false;
   Any value;
   Link inputs[3];
 };
 
 struct nLoop {
-  bool computed = false;
   Any value;
-  Link inputs[4];
+  Link inputs[3];
 };
 
 struct nReturn {
-  bool computed = false;
-  Any value{1.0f};
+  Any value{2137.0f};
   Link inputs[1];
 };
