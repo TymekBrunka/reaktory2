@@ -675,6 +675,8 @@ void App::draw_gui() {
   }
   ImGui::End();
 
+  // std::cerr << sizeof(Node) << "\n";
+
   if (ImGui::Begin("node editor")) {
     static bool collapsed = false;
     if (!collapsed) {
@@ -682,7 +684,7 @@ void App::draw_gui() {
       if (ImGui::Button("zwiń"))
         collapsed = true;
 
-      for (int32_t i = 0; i < N_RETURN; i++) {
+      for (int32_t i = 0; i < N_START; i++) {
         ImGui::PushStyleColor(ImGuiCol_Button, templates[i].headerColor);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, templates[i].headerColor);
         if (ImGui::Button(templates[i].name, ImVec2(84, 22))) {

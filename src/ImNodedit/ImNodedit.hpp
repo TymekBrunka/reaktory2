@@ -68,8 +68,13 @@ class ImNodeEditor {
 protected:
   float zoom = 1;
   bool is_focused = false;
-  bool is_moving_with_mouse = false;
+  bool is_rect_selecting = false;
   bool is_it_output_pin = false;
+  bool has_any_node_been_selected_this_frame =
+      false; // if any for any of nodes: node.selected == true
+  bool has_any_node_become_selected_this_frame = false; // for manual selection
+  bool should_drag_nodes_by_header = true;
+  ImVec2 last_cpos = ImVec2(0, 0);
   ImVec2 offset = ImVec2(0, 0);
   ImVec2 global_wsize = ImVec2(0, 0);
   ImVec2 global_wpos = ImVec2(0, 0);
@@ -120,6 +125,14 @@ public:
 
   inline float getZoomFactor() const { return zoom; }
 };
+
+inline ImVec2 min_vector(ImVec2 a, ImVec2 b) {
+  return ImVec2(a.x < b.x ? a.x : b.x, a.y < b.y ? a.y : b.y);
+}
+
+inline ImVec2 max_vector(ImVec2 a, ImVec2 b) {
+  return ImVec2(a.x > b.x ? a.x : b.x, a.y > b.y ? a.y : b.y);
+}
 
 inline ImVec2 negative_vector(ImVec2 vec) { return ImVec2(-vec.x, -vec.y); }
 

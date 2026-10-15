@@ -162,9 +162,9 @@ ImVec2 ImNodeEditor::world2screen(ImVec2 vec) {
 }
 
 ImVec2 ImNodeEditor::screen2world(ImVec2 vec) {
-  return sub_vector(sub_vector(sub_vector(scale_vector(vec, 1.0 / zoom),
-                                          scale_vector(global_wsize, 0.5)),
-                               global_wpos),
+  return sub_vector(scale_vector(sub_vector(sub_vector(vec, global_wpos),
+                                            scale_vector(global_wsize, 0.5)),
+                                 1.0 / zoom),
                     offset);
 }
 
@@ -191,10 +191,10 @@ inline ImU32 imColorBrighten(ImU32 x, float factor) {
 void ImNodeEditor::update(const char *name) {
   bool link_is_being_dropped = false;
   bool has_output_pin_been_clicked = false;
-  bool do_move_with_mouse = false;
-  bool has_any_node_been_selected_this_frame =
+  bool allow_rect_selection = false;
+  has_any_node_been_selected_this_frame =
       false; // if any for any of nodes: node.selected == true
-  bool has_any_node_become_selected_this_frame = false; // for manual selection
+  has_any_node_become_selected_this_frame = false; // for manual selection
 
   ImGuiStyle style_bk = ImGui::GetStyle();
   ImGuiStyle style;
@@ -220,16 +220,14 @@ void ImNodeEditor::update(const char *name) {
     zoom += ImGui::GetIO().MouseWheel * 0.1;
     zoom = zoom <= 0.1 ? 0.1 : zoom;
 
-    if (ImGui::IsMouseDown(ImGuiMouseButton_Middle) || is_moving_with_mouse) {
+    if (ImGui::IsMouseDown(ImGuiMouseButton_Middle)) {
       ImVec2 delta = ImGui::GetIO().MouseDelta;
-      // offset = ImVec2(offset.x + (delta.x / zoom), offset.y + (delta.y /
-      // zoom));
       offset = add_vector(offset, scale_vector(delta, 1.0 / zoom));
     }
   }
 
   bool click = ImGui::IsMouseClicked(ImGuiMouseButton_Left);
-  do_move_with_mouse = ImGui::IsMouseDown(ImGuiMouseButton_Left);
+  allow_rect_selection = ImGui::IsMouseDown(ImGuiMouseButton_Left);
   if (is_focused ||
       ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)) {
 
@@ -270,7 +268,7 @@ void ImNodeEditor::update(const char *name) {
           delLink(nodeIdx, i, link.nodeIdx, link.pinIdx);
           currently_selected_link[0] = {-1, -1};
           currently_selected_link[1] = {-1, -1};
-          do_move_with_mouse = false;
+          allow_rect_selection = false;
           continue;
         }
         Node node2 = getNode(link.nodeIdx);
@@ -296,11 +294,11 @@ void ImNodeEditor::update(const char *name) {
           delLink(nodeIdx, i, link.nodeIdx, link.pinIdx);
           currently_selected_link[0] = {-1, -1};
           currently_selected_link[1] = {-1, -1};
-          do_move_with_mouse = false;
+          allow_rect_selection = false;
         } else if (hovered && click && !has_output_pin_been_clicked) {
           currently_selected_link[0] = {.pinIdx = i, .nodeIdx = nodeIdx};
           currently_selected_link[1] = link;
-          do_move_with_mouse = false;
+          allow_rect_selection = false;
         }
 
         drawlist->AddLine(circle_pos, output_pin_pos,
@@ -326,7 +324,7 @@ void ImNodeEditor::update(const char *name) {
           currently_selected_link[0] = {-1, -1};
           currently_selected_link[1] = {-1, -1};
           is_it_output_pin = false;
-          do_move_with_mouse = false;
+          allow_rect_selection = false;
         }
 
         // when input pin is getting linked
@@ -347,7 +345,7 @@ void ImNodeEditor::update(const char *name) {
                     currently_dragged_pin.pinIdx);
 
           currently_dragged_pin = {-1, -1};
-          do_move_with_mouse = false;
+          allow_rect_selection = false;
         }
       }
     }
@@ -371,7 +369,7 @@ void ImNodeEditor::update(const char *name) {
           has_output_pin_been_clicked =
               true; // only in this specific scenario, link migh be still
                     // selected when dragging new one
-          do_move_with_mouse = false;
+          allow_rect_selection = false;
         }
 
         // when output pin is getting linked
@@ -392,23 +390,34 @@ void ImNodeEditor::update(const char *name) {
             addLink(currently_dragged_pin.nodeIdx, currently_dragged_pin.pinIdx,
                     nodeIdx, i);
           currently_dragged_pin = {-1, -1};
-          do_move_with_mouse = false;
+          allow_rect_selection = false;
         }
       }
     }
 
-    // is node clicked (by header bar)
-    if (click && !has_any_node_become_selected_this_frame &&
-        in_rect(
-            ImGui::GetMousePos(), world2screen(node.position),
-            world2screen(add_vector(node.position, ImVec2(node.size.x, 25))))) {
+    bool rect_selected = false;
+    if (is_rect_selecting) {
+      ImVec2 a = world2screen(last_cpos), b = ImGui::GetMousePos();
+      ImVec2 c = min_vector(a, b);
+      ImVec2 d = max_vector(a, b);
+      rect_selected = rect_in_rect(
+          world2screen(node.position),
+          world2screen(add_vector(node.position, node.size)), c, d);
+    }
 
+    // is node clicked (by header bar)
+    if ((!has_any_node_become_selected_this_frame && click &&
+         in_rect(ImGui::GetMousePos(), world2screen(node.position),
+                 world2screen(
+                     add_vector(node.position, ImVec2(node.size.x, 25))))) ||
+        (ImGui::IsMouseReleased(ImGuiMouseButton_Left) && rect_selected)) {
       selectNode(nodeIdx, true);
       node.selected = true; // to reflect change on current copy of the struct
       currently_selected_link[0] = {-1, -1};
       currently_selected_link[1] = {-1, -1};
-      do_move_with_mouse = false;
+      allow_rect_selection = false;
       has_any_node_become_selected_this_frame = true;
+      should_drag_nodes_by_header = true;
     }
 
     has_any_node_been_selected_this_frame |= node.selected;
@@ -416,12 +425,30 @@ void ImNodeEditor::update(const char *name) {
 
   if ((is_focused ||
        ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)) &&
-      !click && ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
-      has_any_node_been_selected_this_frame) {
+      should_drag_nodes_by_header) {
     moveSelectedNodes(scale_vector(ImGui::GetIO().MouseDelta, 1.0 / zoom));
-    do_move_with_mouse = false;
   }
 
+  if ((is_focused ||
+       ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)) &&
+      allow_rect_selection && click) {
+    last_cpos = screen2world(ImGui::GetMousePos());
+    is_rect_selecting = true;
+  }
+
+  bool do_rect_select_nodes = false;
+  if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+    bool do_rect_select_nodes = is_rect_selecting;
+    is_rect_selecting = false;
+    should_drag_nodes_by_header = false;
+  }
+
+  if (is_rect_selecting) {
+    drawlist->AddRectFilled(world2screen(last_cpos), ImGui::GetMousePos(),
+                            imColor(0x327ca232));
+  }
+
+  // draw dragged link
   if (currently_dragged_pin.pinIdx != -1 &&
       currently_dragged_pin.nodeIdx != -1) {
 
@@ -445,7 +472,7 @@ void ImNodeEditor::update(const char *name) {
     drawlist->AddLine(pinpos, ImGui::GetMousePos(), imColorBrighten(color, 0.5),
                       6 * zoom);
 
-    do_move_with_mouse = false;
+    allow_rect_selection = false;
   }
 
   // 2nd pass, only for drawing
@@ -460,6 +487,16 @@ void ImNodeEditor::update(const char *name) {
     ImVec2 wsize = scale_vector(node.size, zoom);
     ImVec2 wpos2 = add_vector(wpos, wsize);
     bool hovered = in_rect(ImGui::GetMousePos(), wpos, wpos2);
+    bool rect_selected = false;
+    if (is_rect_selecting) {
+      ImVec2 a = world2screen(last_cpos), b = ImGui::GetMousePos();
+      ImVec2 c = min_vector(a, b);
+      ImVec2 d = max_vector(a, b);
+      rect_selected = rect_in_rect(
+          world2screen(node.position),
+          world2screen(add_vector(node.position, node.size)), c, d);
+    }
+
     drawlist->AddRectFilled(wpos, wpos2,
                             hovered
                                 ? imColorBrighten(templ.backgroundColor, 0.1)
@@ -474,7 +511,7 @@ void ImNodeEditor::update(const char *name) {
     drawlist->AddText(add_vector(wpos, scale_vector(ImVec2(10, 4), zoom)),
                       imColor(0xffffffff), templ.name);
 
-    if (node.selected)
+    if (node.selected || rect_selected)
       drawlist->AddRect(wpos, wpos2, imColor(0xffaa00ff), 4 * zoom, 0, 2);
 
     // draw input pins
@@ -510,7 +547,7 @@ void ImNodeEditor::update(const char *name) {
                                       ? imColorBrighten(color, 0.5)
                                       : color);
 
-        if (node.selected)
+        if (node.selected || rect_selected)
           drawlist->AddCircle(circle_pos, 6 * zoom, imColor(0xffaa00ff), 16, 2);
 
         if (mdist <= 64 * zoom * zoom && currently_dragged_pin.pinIdx != -1 &&
@@ -565,7 +602,7 @@ void ImNodeEditor::update(const char *name) {
                                       ? imColorBrighten(color, 0.5)
                                       : color);
 
-        if (node.selected)
+        if (node.selected || rect_selected)
           drawlist->AddCircle(circle_pos, 6 * zoom, imColor(0xffaa00ff), 16, 2);
 
         if (mdist <= 64 * zoom * zoom && currently_dragged_pin.pinIdx != -1 &&
@@ -595,7 +632,6 @@ void ImNodeEditor::update(const char *name) {
   if (link_is_being_dropped)
     currently_dragged_pin = {-1, -1};
 
-  is_moving_with_mouse = do_move_with_mouse;
   ImGui::GetIO().FontGlobalScale = original_font_scale;
   ImGui::GetStyle() = style_bk;
 

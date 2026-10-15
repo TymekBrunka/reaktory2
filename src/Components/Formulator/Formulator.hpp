@@ -6,12 +6,9 @@
 
 struct Node {
   bool selected = false;
-  // bool hovered = false;
-  uint8_t loop_counter = 128; // 128 - invariant (used )
   tHandle node_data;
   int32_t templateIdx = -1;
   float position[2] = {0};
-  // float size[2] = {300, 100};
   void *userData = nullptr;
 
   inline void setPos(float x, float y) {
@@ -38,6 +35,7 @@ public:
   virtual void remove(tHandle handle, bool unsafe = false) = 0;
   virtual NodePoolBase *copy() const = 0;
   virtual Link *inputsOf(void *node_data) = 0;
+  virtual std::vector<Link> *outputsOf(void *node_data) = 0;
 
   template <typename T> T *convertTo() { return (T *)this; }
 };
@@ -70,6 +68,9 @@ public:
   }
 
   Link *inputsOf(void *node_data) override { return ((T *)node_data)->inputs; }
+  std::vector<Link> *outputsOf(void *node_data) override {
+    return ((T *)node_data)->outputs;
+  }
 };
 
 enum NodeGraph_NodeType {
@@ -96,6 +97,7 @@ enum NodeGraph_NodeType {
   N_LOOP,
 
   N_RETURN,
+  N_START,
   N_COUNT,
 };
 
@@ -135,95 +137,119 @@ public:
 
 struct nForwarder {
   Link inputs[1];
+  std::vector<Link> outputs[1];
 };
 
 struct nBool {
   Any value{true};
+  std::vector<Link> outputs[1];
   Link inputs[0];
 };
 
 struct nNumber {
   Any value{1.0f};
+  std::vector<Link> outputs[1];
   Link inputs[0];
 };
 
 struct nString {
   Any value{std::string("")};
+  std::vector<Link> outputs[1];
   Link inputs[0];
 };
 
 struct nVariable {
   Any value;
   std::string name;
+  std::vector<Link> outputs[1];
   Link inputs[0];
 };
 
 struct nAdd {
   Any value{1.0f};
   Link inputs[2];
+  std::vector<Link> outputs[1];
 };
 
 struct nSub {
   Any value{1.0f};
   Link inputs[2];
+  std::vector<Link> outputs[1];
 };
 
 struct nMul {
   Any value{2.0f};
   Link inputs[2];
+  std::vector<Link> outputs[1];
 };
 
 struct nDiv {
   Any value{2.0f};
   Link inputs[2];
+  std::vector<Link> outputs[1];
 };
 
 struct nSet {
   Any value{2.0f};
-  Link inputs[2];
+  Link inputs[3];
+  std::vector<Link> outputs[2];
 };
 
 struct nEqual {
   Any value{0.0f};
   Link inputs[2];
+  std::vector<Link> outputs[1];
 };
 
 struct nLess {
   Any value{0.0f};
   Link inputs[2];
+  std::vector<Link> outputs[1];
 };
 
 struct nMore {
   Any value{0.0f};
   Link inputs[2];
+  std::vector<Link> outputs[1];
 };
 
 struct nLessOrEqual {
   Any value{0.0f};
   Link inputs[2];
+  std::vector<Link> outputs[1];
 };
 
 struct nMoreOrEqual {
   Any value{0.0f};
   Link inputs[2];
+  std::vector<Link> outputs[1];
 };
 
 struct nNot {
   Any value;
   Link inputs[1];
+  std::vector<Link> outputs[1];
 };
 
 struct nIf {
   Any value;
-  Link inputs[3];
+  Link inputs[2];
+  std::vector<Link> outputs[3];
 };
 
 struct nLoop {
   Any value;
-  Link inputs[3];
+  Link inputs[4];
+  std::vector<Link> outputs[3];
 };
 
 struct nReturn {
   Any value{2137.0f};
-  Link inputs[1];
+  Link inputs[2];
+  std::vector<Link> outputs[0];
+};
+
+struct nStart {
+  std::vector<Link> outputs[1];
+  Link inputs[0];
 };

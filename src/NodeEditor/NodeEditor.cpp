@@ -101,6 +101,16 @@ void NodeEditor::addLink(int32_t inputNodeIdx, int8_t inputPinIdx,
   NodePoolBase *nodeData = graph->nodeData[node_->templateIdx].get();
   Link *inputs = nodeData->inputsOf(nodeData->get(node_->node_data));
 
+  Node *onode_ =
+      graph->nodes.get(tHandle{.gen = 0, .idx = (int16_t)outputNodeIdx}, true);
+
+  NodePoolBase *onodeData = graph->nodeData[onode_->templateIdx].get();
+  std::vector<Link> *outputs =
+      onodeData->outputsOf(onodeData->get(onode_->node_data));
+
+  outputs[outputPinIdx].push_back(
+      Link{.pinIdx = inputPinIdx, .nodeIdx = (int16_t)inputNodeIdx});
+
   inputs[inputPinIdx] =
       Link{.pinIdx = outputPinIdx, .nodeIdx = (int16_t)outputNodeIdx};
 }
@@ -115,13 +125,37 @@ void NodeEditor::delLink(int32_t inputNodeIdx, int8_t inputPinIdx,
   NodePoolBase *nodeData = graph->nodeData[node_->templateIdx].get();
   Link *inputs = nodeData->inputsOf(nodeData->get(node_->node_data));
 
+  Node *onode_ =
+      graph->nodes.get(tHandle{.gen = 0, .idx = (int16_t)outputNodeIdx}, true);
+
+  NodePoolBase *onodeData = graph->nodeData[onode_->templateIdx].get();
+  std::vector<Link> &outputs =
+      onodeData->outputsOf(onodeData->get(onode_->node_data))[outputPinIdx];
+
   inputs[inputPinIdx] = Link{-1, -1};
+
+  for (int i = 0; i < outputs.size(); i++) {
+    if (outputs[i].pinIdx == inputPinIdx &&
+        outputs[i].nodeIdx == inputNodeIdx) {
+      outputs.erase(outputs.begin() + i);
+      return;
+    }
+  }
 }
 
 void NodeEditor::draw() {
   update();
 
-  if (isFocused() && ImGui::IsKeyPressed(ImGuiKey_Delete)) {
+  if (is_focused && has_any_node_been_selected_this_frame &&
+      ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+    for (auto &node : graph->nodes)
+      if (node.selected) {
+        node.position[0] = (int)node.position[0] / 10 * 10;
+        node.position[1] = (int)node.position[1] / 10 * 10;
+      }
+  }
+
+  if (is_focused && ImGui::IsKeyPressed(ImGuiKey_Delete)) {
     int16_t size = graph->nodes.idx_size();
 
     for (int16_t i = 0; i < size; i++) {
@@ -130,7 +164,7 @@ void NodeEditor::draw() {
       if (!node)
         continue;
 
-      if (node->selected && (NodeGraph_NodeType)node->templateIdx != N_RETURN) {
+      if (node->selected && (NodeGraph_NodeType)node->templateIdx != N_START) {
         graph->nodeData[node->templateIdx].get()->remove(node->node_data);
         graph->nodes.remove(tHandle{.gen = 0, .idx = i}, true);
       }
@@ -173,10 +207,12 @@ static const char *N_SUB__inNames[] = {"odjemna", "odjemnik"};
 
 static const char *N_DIV__inNames[] = {"dzielna", "dzielnik"};
 
-static const char *N_SET__inNames[] = {"zmienna ", "wartość "};
-static const char *N_SET__outNames[] = {"zmienna "};
+static const char *N_SET__inNames[] = {"zmienna ", "wartość ", "-> "};
+static const char *N_SET__outNames[] = {"zmienna ", "-> "};
 
-static const char *N_IF__inNames[] = {"gdy prawda", "warunek", "gdy fałsz"};
+static const char *N_IF__inNames[] = {"warunek", "-> "};
+
+static const char *N_IF__outNames[] = {"gdy prawda", "gdy fałsz", "-> "};
 
 static const char *N_LOOP__inNames[] = {"war. pocz.", "gdy prawda", "warunek"};
 static const char *N_LOOP__outNames[] = {"x  ", "wynik "};
@@ -199,14 +235,18 @@ static const ImU32 COLOR_HDR_BOOL = ImNodedit::imColor(0x377899FF);
 static const ImU32 COLOR_BG_BOOL = ImNodedit::imColor(0x2B3F49FF);
 static const ImU32 N_BOOL__outColors[] = {COLOR_BOOL};
 
+static const ImU32 N_IF__inColors[] = {0xFF646464, 0xFFFFFFFF};
+static const ImU32 N_IF__outColors[] = {0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF};
+
 static const ImU32 COLOR_VARIABLE = ImNodedit::imColor(0xB200FFFF);
 static const ImU32 COLOR_HDR_VARIABLE = ImNodedit::imColor(0xB200FFFF);
 static const ImU32 COLOR_BG_VARIABLE = ImNodedit::imColor(0x3C2249FF);
 static const ImU32 N_VARIABLE__outColors[] = {COLOR_VARIABLE};
-static const ImU32 N_SET__inColors[] = {COLOR_VARIABLE, 0xFF646464};
-static const ImU32 N_SET__outColors[] = {COLOR_VARIABLE};
+static const ImU32 N_SET__inColors[] = {COLOR_VARIABLE, 0xFF646464, 0xFFFFFFFF};
+static const ImU32 N_SET__outColors[] = {COLOR_VARIABLE, 0xFFFFFFFF};
 
-static const ImU32 N_RETURN__inColors[] = {ImNodedit::imColor(0x68002FFF)};
+static const ImU32 N_RETURN__inColors[] = {ImNodedit::imColor(0x68002FFF),
+                                           0xFFFFFFFF};
 
 // <- templates
 
@@ -414,9 +454,9 @@ extern const Template templates[N_COUNT]{
 
     Template{.headerColor = COLOR_HDR_VARIABLE,
              .backgroundColor = COLOR_BG_VARIABLE,
-             .size = ImVec2(170, 60),
-             .inputCount = 2,
-             .outputCount = 1,
+             .size = ImVec2(170, 70),
+             .inputCount = 3,
+             .outputCount = 2,
              .inputNames = N_SET__inNames,
              .inputColors = N_SET__inColors,
              // .outputNames = N_SET__outNames,
@@ -530,12 +570,12 @@ extern const Template templates[N_COUNT]{
     Template{.headerColor = COLOR_HDR_BOOL,
              .backgroundColor = COLOR_BG_BOOL,
              .size = ImVec2(140, 100),
-             .inputCount = 3,
-             .outputCount = 1,
+             .inputCount = 2,
+             .outputCount = 3,
              .inputNames = N_IF__inNames,
-             // .inputColors = N_aritm_op__inColors,
-             // .outputNames = N_STRING__outNames,
-             // .outputColors = N_aritm_op__outColors,
+             .inputColors = N_IF__inColors,
+             .outputNames = N_IF__outNames,
+             .outputColors = N_IF__outColors,
              .name = "jeżeli",
 
              .draw_function =
@@ -564,7 +604,7 @@ extern const Template templates[N_COUNT]{
     Template{.headerColor = ImNodedit::imColor(0xFF0043FF),
              .backgroundColor = ImNodedit::imColor(0xAD002EFF),
              .size = ImVec2(120, 60),
-             .inputCount = 1,
+             .inputCount = 2,
              .outputCount = 0,
              .inputColors = N_RETURN__inColors,
              .name = "wynik",
@@ -577,5 +617,16 @@ extern const Template templates[N_COUNT]{
                    ImGui::Text(
                        "%.2f",
                        *((nReturn *)node->userData)->value.get<float>());
+                 }},
+
+    Template{.size = ImVec2(120, 60),
+             .inputCount = 0,
+             .outputCount = 1,
+             .name = "start",
+
+             .draw_function =
+                 [](int32_t nodeIdx, ImNodedit::Node *node,
+                    ImNodedit::ImNodeEditor *nodedit, ImDrawList *drawlist) {
+                   ImGui::TextUnformatted("START ->");
                  }},
 };
