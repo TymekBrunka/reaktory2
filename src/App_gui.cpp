@@ -1,14 +1,6 @@
-#include "Any_and_Pool.hpp"
-#include "Formulator.hpp"
 #include <App.hpp>
 
-#include <NodeEditor.hpp>
-static NodeGraph ng;
-static NodeEditor ne(&ng);
-
-#include "Eval.hpp"
 #include "FileUtils.hpp"
-#include "ImNodedit.hpp"
 #include "Model.hpp"
 #include "ObjectPool.hpp"
 #include "Renderer.hpp"
@@ -22,7 +14,6 @@ static NodeEditor ne(&ng);
 #include <iostream>
 
 #include <ImGuizmo.h>
-// #include <ImNodeFlow.h>
 
 #define ICONS_MODULO 4
 #define ICONS_IDX_HEIGHT 4
@@ -672,37 +663,6 @@ void App::draw_gui() {
         width_accumulator = 0;
     }
     ImGui::EndChild();
-  }
-  ImGui::End();
-
-  // std::cerr << sizeof(Node) << "\n";
-
-  if (ImGui::Begin("node editor")) {
-    static bool collapsed = false;
-    if (!collapsed) {
-      ImGui::BeginChild(1, ImVec2(100, ImGui::GetWindowSize().y - 40));
-      if (ImGui::Button("zwiń"))
-        collapsed = true;
-
-      for (int32_t i = 0; i < N_START; i++) {
-        ImGui::PushStyleColor(ImGuiCol_Button, templates[i].headerColor);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, templates[i].headerColor);
-        if (ImGui::Button(templates[i].name, ImVec2(84, 22))) {
-          ng.add_node((NodeGraph_NodeType)i);
-        }
-        ImGui::PopStyleColor(2);
-      }
-
-      ImGui::EndChild();
-      ImGui::SameLine();
-    } else {
-      if (ImGui::Button("rozwiń"))
-        collapsed = false;
-      ImGui::SameLine();
-    }
-    ng.calculate();
-    ne.setSize(ImGui::GetContentRegionAvail());
-    ne.draw();
   }
   ImGui::End();
 }

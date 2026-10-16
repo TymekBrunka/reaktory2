@@ -1,4 +1,3 @@
-#include "Eval.hpp"
 #include "Model.hpp"
 #include "ObjectPool.hpp"
 #include "ResourceManager.hpp"
@@ -533,6 +532,7 @@ bool Scene::init(Renderer::Render &render) {
   skybox_loc = glGetUniformLocation(skybox_program, "skybox");
   glUniform1i(skybox_loc, 0);
   initialised = true;
+  atomic_store(&is_busy, false);
 
   // // ---------------------- model test
   // auto e1 = resMan.ImportModel(FileUtils::RealFs{},

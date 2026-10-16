@@ -1,6 +1,6 @@
 #pragma once
-#include <expected>
 #include <cstddef>
+#include <expected>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -43,7 +43,7 @@ ReadFile(const std::filesystem::path &filepath,
 }
 
 std::expected<bool, int> WriteFile(const std::filesystem::path &filepath,
-                                       const void *data, size_t size);
+                                   const void *data, size_t size);
 
 std::expected<bool, int>
 WriteFileIfNotExists(const std::filesystem::path &filepath, const void *data,
@@ -99,9 +99,14 @@ public:
       return path((*paf) / (*paf_));
     else if (spaf && spaf_)
       return path(*spaf + "/" + *spaf_);
-    else if (paf && spaf_)
+    else if (paf && spaf_) {
+      if (spaf_->size() >= 2 && spaf_->c_str()[0] >= 'A' &&
+          spaf_->c_str()[0] <= 'Z' && spaf_->c_str()[1] == ':')
+        return path(*paf / &spaf_->c_str()[2]);
+      else if (spaf_->size() >= 1 && spaf_->c_str()[0] == '/')
+        return path(*paf / &spaf_->c_str()[1]);
       return path(*paf / *spaf_);
-    else
+    } else
       std::unreachable();
   }
 
@@ -117,8 +122,14 @@ public:
       *((std::filesystem::path *)paf) /= *paf_;
     else if (spaf && spaf_)
       *((std::string *)spaf) += "/" + *spaf_;
-    else if (paf && spaf_)
+    else if (paf && spaf_) {
+      if (spaf_->size() >= 2 && spaf_->c_str()[0] >= 'A' &&
+          spaf_->c_str()[0] <= 'Z' && spaf_->c_str()[1] == ':')
+        *((std::filesystem::path *)paf) /= &spaf_->c_str()[2];
+      else if (spaf_->size() >= 1 && spaf_->c_str()[0] == '/')
+        *((std::filesystem::path *)paf) /= &spaf_->c_str()[1];
       *((std::filesystem::path *)paf) /= *spaf_;
+    }
 
     return *this;
   }

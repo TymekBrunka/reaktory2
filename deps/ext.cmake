@@ -14,6 +14,9 @@ if (CCACHE_PROGRAM)
   set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM} base_dir=${PROJECT_SOURCE_DIR} hash_dir=false)
 endif()
 
+message(lua)
+add_subdirectory(deps/lua_cmake)
+
 message(bzip2)
 CPMAddPackage(
   NAME bzip2
@@ -36,7 +39,7 @@ CPMAddPackage(
   GIT_TAG 5c7b7bad26808e6b40ac3b3d0075466e27738a9d
   OPTIONS
     "ZSTD_BUILD_STATIC ON"
-    "ZSTD_BUILD_SHARED ON"
+    "ZSTD_BUILD_SHARED OFF"
     "ZSTD_BUILD_PROGRAMS OFF"
     "BUILD_TESTING OFF"
 )
@@ -100,15 +103,15 @@ CPMAddPackage(
   GIT_TAG v1.0.5
 )
 
-message(asio)
-CPMAddPackage(
-  NAME asio
-  VERSION 1.38.2
-  GITHUB_REPOSITORY chriskohlhoff/asio
-  GIT_TAG asio-1-38-2
-  DOWNLOAD_ONLY
-)
-
+# message(asio)
+# CPMAddPackage(
+#   NAME asio
+#   VERSION 1.38.2
+#   GITHUB_REPOSITORY chriskohlhoff/asio
+#   GIT_TAG asio-1-38-2
+#   DOWNLOAD_ONLY
+# )
+# 
 # add_library(asio STATIC ${asio_SOURCE_DIR}/src/asio.cpp)
 # target_include_directories(asio PUBLIC ${asio_SOURCE_DIR}/include)
 # target_compile_definitions(asio PRIVATE -DASIO_SEPARATE_COMPILATION -D_WIN32_WINNT=0x0A00)
