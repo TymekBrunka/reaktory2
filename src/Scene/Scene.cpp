@@ -1,3 +1,4 @@
+#include "LuaBindings.hpp"
 #include "Model.hpp"
 #include "ObjectPool.hpp"
 #include "ResourceManager.hpp"
@@ -130,6 +131,7 @@ Scene::Scene(Scene &&other) {
   atomic_store_explicit(&is_busy, b, memory_order_seq_cst);
 
   name = std::move(other.name);
+  current_folder = std::move(other.current_folder);
   size = other.size;
   mpos = other.mpos;
   skybox_texture = other.skybox_texture;
@@ -156,6 +158,7 @@ Scene &Scene::operator=(Scene &&other) {
     atomic_store_explicit(&is_busy, b, memory_order_seq_cst);
 
     name = std::move(other.name);
+    current_folder = std::move(other.current_folder);
     size = other.size;
     mpos = other.mpos;
     skybox_texture = other.skybox_texture;
@@ -210,6 +213,7 @@ bool Scene::create_folder_structure(const std::string &name,
     std::filesystem::create_directory(path / "models");
     std::filesystem::create_directory(path / "textures");
     std::filesystem::create_directory(path / "excel_sheets");
+    std::filesystem::create_directory(path / "scripts");
   } catch (std::filesystem::filesystem_error &err) {
     std::string path1 = err.path1().string();
     Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
@@ -531,6 +535,46 @@ bool Scene::init(Renderer::Render &render) {
   skybox_texture = res_txt.value();
   skybox_loc = glGetUniformLocation(skybox_program, "skybox");
   glUniform1i(skybox_loc, 0);
+
+  for (auto &ent :
+       std::filesystem::directory_iterator(current_folder / "scripts")) {
+    if (std::filesystem::is_directory(ent.path())) {
+      auto script_path = ent.path() / "init.lua";
+      if (FileUtils::FileExists(script_path)) {
+        auto res_fs = FileUtils::ReadFile(script_path);
+        if (res_fs.has_value()) {
+          lua_State *L;
+          init_lua(&L);
+          luaL_loadstring(L, res_fs.value().data);
+          call_lua(L);
+          close_lua(L);
+        } else {
+          std::string path = filepath.string();
+          switch (res_img_read.error()) {
+          case -2:
+            Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+                     TL(MSG_GENERIC_FILE_NOT_FOUND),
+                     std::make_format_args(path));
+            break;
+
+          case -1:
+            Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+                     TL(MSG_GENERIC_OPEN_ERROR), std::make_format_args(path));
+            break;
+
+          case 1:
+            Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+                     TL(MSG_GENERIC_READ_ERROR), std::make_format_args(path));
+            break;
+
+          default:
+            break;
+          }
+        }
+      }
+    }
+  }
+
   initialised = true;
   atomic_store(&is_busy, false);
 
@@ -546,8 +590,10 @@ bool Scene::init(Renderer::Render &render) {
 
 void Scene::cleanup() {
   if (initialised) {
+    glDeleteTextures(1, &skybox_texture);
     glDeleteFramebuffers(1, &framebuffer);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     initialised = false;
   }
 }

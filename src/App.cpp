@@ -264,7 +264,6 @@ bool App::init() {
   keybinds_tex = render.LoadTexture(keybind_icons, true).value();
 
   render.SetWindowIcon(icon);
-
   return true;
 }
 

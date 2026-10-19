@@ -91,6 +91,23 @@ imgpack_(
     assets/images/placeholder2.png
 )
 
+bytepack_(
+  OUTPUT lua_cpml
+  SOURCES
+    assets/scripts/cpml/init.lua
+    assets/scripts/cpml/modules/color.lua
+    assets/scripts/cpml/modules/constants.lua
+    assets/scripts/cpml/modules/intersect.lua
+    assets/scripts/cpml/modules/mat4.lua
+    assets/scripts/cpml/modules/mesh.lua
+    assets/scripts/cpml/modules/octree.lua
+    assets/scripts/cpml/modules/quat.lua
+    assets/scripts/cpml/modules/simplex.lua
+    assets/scripts/cpml/modules/utils.lua
+    assets/scripts/cpml/modules/vec2.lua
+    assets/scripts/cpml/modules/vec3.lua
+)
+
 add_library(pfd OBJECT
   src/Components/pfd/pfd.cpp
   src/Components/pfd/pfd.hpp
@@ -224,9 +241,16 @@ target_include_directories(Scene_object_pool PUBLIC src/Scene/)
 target_link_libraries(Scene_object_pool PUBLIC logging eval Scene_resource_manager)
 target_precompile_headers(Scene_object_pool REUSE_FROM logging)
 
+add_library(LuaBindings STATIC
+  src/Components/LuaBindings/LuaBindings.cpp
+  src/Components/LuaBindings/LuaBindings.hpp
+)
+target_include_directories(LuaBindings PUBLIC src/Components/LuaBindings)
+target_link_libraries(LuaBindings PUBLIC lua lua_cpml)
+
 add_library(Scene STATIC src/Scene/Scene.hpp src/Scene/Scene.cpp)
 target_include_directories(Scene PUBLIC src/Scene/)
-target_link_libraries(Scene PUBLIC logging renderer renderer_model fileutils glm::glm Scene_resource_manager Scene_object_pool PRIVATE imgui imguizmo staticassets_scene shaders glad imgui)
+target_link_libraries(Scene PUBLIC logging renderer renderer_model fileutils glm::glm Scene_resource_manager Scene_object_pool LuaBindings PRIVATE imgui imguizmo staticassets_scene shaders glad imgui)
 target_precompile_headers(Scene REUSE_FROM logging)
 
 add_library(App STATIC

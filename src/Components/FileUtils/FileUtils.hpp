@@ -49,6 +49,11 @@ std::expected<bool, int>
 WriteFileIfNotExists(const std::filesystem::path &filepath, const void *data,
                      size_t size);
 
+inline bool FileExists(const std::filesystem::path &filepath) {
+  return std::filesystem::exists(filepath) &&
+         std::filesystem::is_regular_file(filepath);
+};
+
 // [ unified io ]
 // ------------------------------------------------------------------
 
