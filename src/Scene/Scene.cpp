@@ -132,6 +132,11 @@ Scene::Scene(Scene &&other) {
 
   name = std::move(other.name);
   current_folder = std::move(other.current_folder);
+  auto *tmp = self;
+  self = other.self;
+  if (self)
+    *self = this;
+  other.self = tmp;
   size = other.size;
   mpos = other.mpos;
   skybox_texture = other.skybox_texture;
@@ -141,8 +146,11 @@ Scene::Scene(Scene &&other) {
   screen_canvas = other.screen_canvas;
   color_canvas = other.color_canvas;
   initialised = other.initialised;
+  script_classes = std::move(other.script_classes);
+  luas = std::move(other.luas);
   resMan = std::move(other.resMan);
   objPool = std::move(other.objPool);
+  // other.self = nullptr;
   other.size = {640, 480};
   other.skybox_texture = 0;
   other.framebuffer = 0;
@@ -159,6 +167,11 @@ Scene &Scene::operator=(Scene &&other) {
 
     name = std::move(other.name);
     current_folder = std::move(other.current_folder);
+    auto *tmp = self;
+    self = other.self;
+    if (self)
+      *self = this;
+    other.self = tmp;
     size = other.size;
     mpos = other.mpos;
     skybox_texture = other.skybox_texture;
@@ -168,8 +181,11 @@ Scene &Scene::operator=(Scene &&other) {
     screen_canvas = other.screen_canvas;
     color_canvas = other.color_canvas;
     initialised = other.initialised;
+    script_classes = std::move(other.script_classes);
+    luas = std::move(other.luas);
     resMan = std::move(other.resMan);
     objPool = std::move(other.objPool);
+    // other.self = nullptr;
     other.size = {640, 480};
     other.skybox_texture = 0;
     other.framebuffer = 0;
@@ -241,11 +257,14 @@ bool Scene::create_folder_structure(const std::string &name,
 }
 
 Scene::Scene(const std::string &name) {
+  self = new Scene *;
+  *self = this;
   this->name = name;
   current_folder = FileUtils::APP_ROOT / "scenes" / std::filesystem::path(name);
   if (!create_folder_structure(name, current_folder)) {
     Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene", TL(MSG_SCENE_CREATE_ERROR),
              std::make_format_args(name));
+    delete self;
     throw std::runtime_error("");
   }
 
@@ -253,6 +272,60 @@ Scene::Scene(const std::string &name) {
            std::make_format_args(name));
 
   resMan = std::move(ResourceManager{current_folder / "models"});
+
+  for (auto &ent :
+       std::filesystem::directory_iterator(current_folder / "scripts")) {
+    if (std::filesystem::is_directory(ent.path())) {
+      auto script_path = ent.path() / "init.lua";
+      if (FileUtils::FileExists(script_path)) {
+        auto res_fs = FileUtils::ReadFile(script_path);
+        if (res_fs.has_value()) {
+          lua_State *L;
+          init_lua(&L);
+          add_lua(L);
+          std::string path = script_path.string();
+          auto rr = res_fs.value();
+          lua_load(
+              L,
+              [](lua_State *L, void *data, size_t *size) {
+                auto *rr = (FileUtils::ReadResult *)data;
+                if (rr->length <= 0)
+                  return (const char *)nullptr;
+                *size = rr->length;
+                rr->length -= *size;
+                return (const char *)rr->data;
+              },
+              &rr, path.c_str(), "bt");
+          call_lua(L);
+          delete[] res_fs.value().data;
+        } else {
+          std::string path = script_path.string();
+          switch (res_fs.error()) {
+          case -2:
+            Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+                     TL(MSG_GENERIC_FILE_NOT_FOUND),
+                     std::make_format_args(path));
+            break;
+
+          case -1:
+            Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+                     TL(MSG_GENERIC_OPEN_ERROR), std::make_format_args(path));
+            break;
+
+          case 1:
+            Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+                     TL(MSG_GENERIC_READ_ERROR), std::make_format_args(path));
+            break;
+
+          default:
+            break;
+          }
+          delete self;
+          throw std::runtime_error("");
+        }
+      }
+    }
+  }
 }
 
 bool Scene::create_framebuffer() {
@@ -536,45 +609,6 @@ bool Scene::init(Renderer::Render &render) {
   skybox_loc = glGetUniformLocation(skybox_program, "skybox");
   glUniform1i(skybox_loc, 0);
 
-  for (auto &ent :
-       std::filesystem::directory_iterator(current_folder / "scripts")) {
-    if (std::filesystem::is_directory(ent.path())) {
-      auto script_path = ent.path() / "init.lua";
-      if (FileUtils::FileExists(script_path)) {
-        auto res_fs = FileUtils::ReadFile(script_path);
-        if (res_fs.has_value()) {
-          lua_State *L;
-          init_lua(&L);
-          luaL_loadstring(L, res_fs.value().data);
-          call_lua(L);
-          close_lua(L);
-        } else {
-          std::string path = filepath.string();
-          switch (res_img_read.error()) {
-          case -2:
-            Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
-                     TL(MSG_GENERIC_FILE_NOT_FOUND),
-                     std::make_format_args(path));
-            break;
-
-          case -1:
-            Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
-                     TL(MSG_GENERIC_OPEN_ERROR), std::make_format_args(path));
-            break;
-
-          case 1:
-            Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
-                     TL(MSG_GENERIC_READ_ERROR), std::make_format_args(path));
-            break;
-
-          default:
-            break;
-          }
-        }
-      }
-    }
-  }
-
   initialised = true;
   atomic_store(&is_busy, false);
 
@@ -589,6 +623,12 @@ bool Scene::init(Renderer::Render &render) {
 }
 
 void Scene::cleanup() {
+  for (auto L : luas)
+    close_lua(L);
+
+  if (self)
+    delete self;
+
   if (initialised) {
     glDeleteTextures(1, &skybox_texture);
     glDeleteFramebuffers(1, &framebuffer);
@@ -752,37 +792,32 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
                   : parentObj;
 
   if (oModel *omodel = (oModel *)std::get_if<oModel>(&node->variant)) {
-    std::string *model_name = omodel->model->get_model();
-    std::vector<Eval::Value> *materials = omodel->materials->get_vector();
-    int *animation_idx = omodel->animation_idx->get<int>();
-    float *animation_speed = omodel->animation_speed->get<float>();
-
-    if (model_name && !model_name->empty()) {
-      ManagedModel *mmodel = resMan.GetModel(*model_name);
+    if (!omodel->model.empty()) {
+      ManagedModel *mmodel = resMan.GetModel(omodel->model);
       if (mmodel) {
         Renderer::Model &model = mmodel->model;
 
-        if (animation_idx && *animation_idx != -1 &&
-            model.GetAnimations().size() != 0 &&
+        if (omodel->animation_idx != -1 && model.GetAnimations().size() != 0 &&
             model.GetCurrentAnimation() - &model.GetAnimations()[0] !=
-                *animation_idx) {
-          model.SetAnimation(&model.GetAnimations()[*animation_idx]);
-        } else if (!animation_idx || *animation_idx == -1) {
+                omodel->animation_idx) {
+          model.SetAnimation(&model.GetAnimations()[omodel->animation_idx]);
+        } else if (omodel->animation_idx == -1) {
           model.SetAnimation(nullptr);
         }
 
         // if (animation_idx && *animation_idx != -1) {
         model.SetAnimationTime(omodel->animation_time);
-        model.Advance(delta * (animation_speed ? *animation_speed : 1));
+        model.Advance(delta *
+                      (omodel->animation_speed ? omodel->animation_speed : 1));
         omodel->animation_time = model.GetAnimationTime();
         // }
 
+        Material *material = &omodel->materials[0];
         for (int i = 0; i < model.GetMaterials().size(); i++) {
-          if (Eval::Material *material = (*materials)[i].get_material()) {
-            int diffuse1 = resMan.GetTexture(material->diffuse1);
-            model.GetMaterials()[i] = Renderer::Material{
-                .diffuse1 = diffuse1, .color_diffuse = material->color};
-          }
+          int diffuse1 = resMan.GetTexture(material->diffuse1);
+          model.GetMaterials()[i] = Renderer::Material{
+              .diffuse1 = diffuse1, .color_diffuse = material->color_diffuse};
+          material++;
         }
 
         if (node->toHandle(idx) == selected_object) {

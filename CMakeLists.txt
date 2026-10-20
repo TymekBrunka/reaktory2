@@ -224,21 +224,12 @@ target_include_directories(Scene_resource_manager PUBLIC src/Scene/)
 target_link_libraries(Scene_resource_manager PUBLIC logging renderer renderer_model fileutils)
 target_precompile_headers(Scene_resource_manager REUSE_FROM logging)
 
-add_library(eval STATIC
-  src/Scene/FormulaEvaluator/Eval.cpp
-  src/Scene/FormulaEvaluator/Eval.hpp
-)
-target_include_directories(eval PUBLIC src/Scene/FormulaEvaluator/)
-target_link_libraries(eval PUBLIC logging Scene_resource_manager)
-target_precompile_headers(eval REUSE_FROM logging)
-
 add_library(Scene_object_pool STATIC
-  src/Scene/DataBinding.hpp
   src/Scene/ObjectPool.hpp
   src/Scene/ObjectPool.cpp
 )
 target_include_directories(Scene_object_pool PUBLIC src/Scene/)
-target_link_libraries(Scene_object_pool PUBLIC logging eval Scene_resource_manager)
+target_link_libraries(Scene_object_pool PUBLIC logging Scene_resource_manager)
 target_precompile_headers(Scene_object_pool REUSE_FROM logging)
 
 add_library(LuaBindings STATIC
@@ -248,7 +239,12 @@ add_library(LuaBindings STATIC
 target_include_directories(LuaBindings PUBLIC src/Components/LuaBindings)
 target_link_libraries(LuaBindings PUBLIC lua lua_cpml)
 
-add_library(Scene STATIC src/Scene/Scene.hpp src/Scene/Scene.cpp)
+add_library(Scene STATIC
+  src/Scene/Scene.hpp
+  src/Scene/Scene.cpp
+  src/Scene/LuaAccess.cpp
+  # src/Scene/LuaAccess.hpp
+)
 target_include_directories(Scene PUBLIC src/Scene/)
 target_link_libraries(Scene PUBLIC logging renderer renderer_model fileutils glm::glm Scene_resource_manager Scene_object_pool LuaBindings PRIVATE imgui imguizmo staticassets_scene shaders glad imgui)
 target_precompile_headers(Scene REUSE_FROM logging)

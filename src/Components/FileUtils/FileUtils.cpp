@@ -23,7 +23,7 @@ std::expected<ReadResult, int> ReadFilex(const std::filesystem::path &filepath,
 
   char *outbuffer;
   if (alloc)
-    outbuffer = alloc(allocator, fsize);
+    outbuffer = alloc(allocator, fsize + 1);
   else
     outbuffer = new char[fsize];
 
@@ -36,6 +36,7 @@ std::expected<ReadResult, int> ReadFilex(const std::filesystem::path &filepath,
     return std::unexpected(1);
   }
 
+  outbuffer[fsize] = '\0';
   return ReadResult{.data = outbuffer, .length = fsize};
 }
 

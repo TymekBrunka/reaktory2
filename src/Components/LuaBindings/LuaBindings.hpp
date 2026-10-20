@@ -3,11 +3,11 @@
 #include <string>
 #include <unordered_map>
 
-void init_lua(lua_State** L);
+void init_lua(lua_State **L);
 
-bool call_lua(lua_State *L);
+bool call_lua(lua_State *L, int argc = 0);
 
-void close_lua(lua_State* L);
+void close_lua(lua_State *L);
 
 struct string_hash {
   using is_transparent = void;
@@ -22,7 +22,8 @@ struct string_hash {
   }
 };
 
-extern std::unordered_map<std::string, std::string, string_hash, std::equal_to<>>
+extern std::unordered_map<std::string, std::string, string_hash,
+                          std::equal_to<>>
     lua_script_modules_;
 
 decltype(lua_script_modules_) &lua_script_modules();

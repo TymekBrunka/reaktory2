@@ -1,6 +1,4 @@
 #pragma once
-#include <DataBinding.hpp>
-#include <Eval.hpp>
 #include <ResourceManager.hpp>
 #include <cstdint>
 #include <string>
@@ -16,15 +14,22 @@ struct objH {
   }
 };
 
-struct oModel {
-  DataBinding<std::shared_ptr<Eval::Model>> model;
-  DataBinding<std::shared_ptr<std::vector<Eval::Value>>> materials;
-  DataBinding<int> animation_idx;
-  float animation_time;
-  DataBinding<float> animation_speed;
+struct Material {
+  glm::vec4 color_diffuse{};
+  std::string diffuse1;
 };
 
-typedef DataBinding<Eval::objHFormula> oFormula;
+struct oModel {
+  std::string model;
+  std::vector<Material> materials;
+  int animation_idx;
+  float animation_time;
+  float animation_speed;
+};
+
+struct oFormula {
+  bool dummy = false;
+};
 
 struct oEmptySlot {
   bool dummy = false;

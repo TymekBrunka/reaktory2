@@ -1,4 +1,5 @@
 #include <LuaBindings.hpp>
+#include <cstring>
 #include <iostream>
 #include <lua_cpml.h>
 
@@ -46,12 +47,12 @@ void init_lua(lua_State **L_) {
   lua_getfield(L, -1, "traceback");
   lua_remove(L, -2);
 
-  lua_insert(L, 1);
+  lua_insert(L, 1); // traceback function at index 1
 }
 
-bool call_lua(lua_State *L) {
-  if (lua_pcall(L, 0, LUA_MULTRET, 1) != LUA_OK) {
-    std::cerr << "luerror: " << lua_tostring(L, -1) << "\n";
+bool call_lua(lua_State *L, int argc) {
+  if (lua_pcall(L, argc, LUA_MULTRET, 1) != LUA_OK) {
+    std::cerr << "\x1b[31m" << lua_tostring(L, -1) << "\x1b[0m\n";
     lua_pop(L, 1);
     return false;
   }
@@ -116,7 +117,14 @@ static int embeded_scripts_loader(lua_State *L) {
     script = lua_script_modules_.find(s);
   }
 
-  luaL_loadstring(L, script->second.c_str());
+  // luaL_loadstring(L, script->second.c_str());
+  lua_load(
+      L,
+      [](lua_State *L, void *data, size_t *size) {
+        *size = strlen((const char *)data);
+        return (const char *)data;
+      },
+      (char *)script->second.c_str(), path, "bt");
   lua_pushstring(L, path);
 
   if (lua_pcall(L, 1, LUA_MULTRET, 1) != LUA_OK) {

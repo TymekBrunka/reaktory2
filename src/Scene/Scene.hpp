@@ -7,10 +7,27 @@
 #include <stdatomic.h>
 #include <string>
 
+#include <LuaBindings.hpp>
 #include <ObjectPool.hpp>
 #include <ResourceManager.hpp>
 
+class ScriptClass {
+public:
+  std::string name;
+  lua_State *L;
+  int tableRef = -1;
+
+  ~ScriptClass();
+  ScriptClass(lua_State *L_, int tableRef_, const char *name_)
+      : L(L_), tableRef(tableRef_), name(name_) {}
+  ScriptClass(const ScriptClass &other);
+  ScriptClass &operator=(const ScriptClass &other);
+  ScriptClass(ScriptClass &&other);
+  ScriptClass &operator=(ScriptClass &&other);
+};
+
 class Scene {
+  friend class SceneLuaBindings;
   static bool render_selection_bb;
   static Renderer::rProgram skybox_program;
   static Renderer::rFBO skybox_fbo;
@@ -59,6 +76,8 @@ public:
   objH selected_object = {.gen = 1, .idx = 0}; // scene node
 
 private:
+  Scene **self; // pointer to blob of memory that stays in place and points at
+                // scene that migh get moved in memory;
   glm::vec3 input{};
   // struct {
   //   Renderer::rUnifomIdx camera_idx;
@@ -75,6 +94,9 @@ private:
   std::string name;
   std::filesystem::path current_folder{};
 
+  std::vector<lua_State *> luas; // to close them later
+  std::vector<ScriptClass> script_classes;
+
   bool create_framebuffer();
   void resize_framebuffer(Renderer::rect_size size);
 
@@ -86,6 +108,8 @@ private:
 
   void draw_models_recursive(int16_t idx, float delta,
                              glm::mat4 parentTransform, objH parentObj);
+
+  void add_lua(lua_State *L);
 
 public:
   ResourceManager resMan{};

@@ -1,5 +1,3 @@
-#include "DataBinding.hpp"
-#include "Eval.hpp"
 #include "Model.hpp"
 #include "ResourceManager.hpp"
 #include <ObjectPool.hpp>
@@ -91,21 +89,26 @@ objH ObjectPool::add_model_node(ResourceManager &resMan, objH obj,
   if (model == nullptr)
     return objH{.gen = 0, .idx = -1};
 
-  auto model_name_ = std::make_shared<Eval::Model>();
-  model_name_.get()->name = name;
+  // auto model_name_ = std::make_shared<Eval::Model>();
+  // model_name_.get()->name = name;
 
-  auto materials = std::make_shared<std::vector<Eval::Value>>();
-  for (const auto &material : model->materials) {
-    auto mat = std::make_shared<Eval::Material>();
-    *mat.get() = Eval::Material{.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
-                                .diffuse1 = material.diffuse1};
-
-    materials.get()->push_back(Eval::Value{.data = mat});
-  }
+  // auto materials = std::make_shared<std::vector<Eval::Value>>();
+  // for (const auto &material : model->materials) {
+  //   auto mat = std::make_shared<Eval::Material>();
+  //   *mat.get() = Eval::Material{.color = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f),
+  //                               .diffuse1 = material.diffuse1};
+  //
+  //   materials.get()->push_back(Eval::Value{.data = mat});
+  // }
 
   oModel omodel{};
-  omodel.model = model_name_;
-  omodel.materials = materials;
+  for (const auto &material : model->materials) {
+    omodel.materials.push_back(Material{.color_diffuse = glm::vec4(1.0f),
+                                        .diffuse1 = material.diffuse1});
+  }
+
+  omodel.model = name;
+  // omodel.materials = materials;
   omodel.animation_idx = -1;
   omodel.animation_time = 0;
   omodel.animation_speed = 1.0f;

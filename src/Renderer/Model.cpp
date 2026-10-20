@@ -853,6 +853,8 @@ void Model::Advance(float delta) {
   if (current_animation) {
     animationTime += current_animation->TicksPerSecond * delta;
     animationTime = fmod(animationTime, current_animation->Duration);
+    if (animationTime < 0)
+      animationTime = current_animation->Duration - animationTime;
     calculateBoneTransform(&nodes[0], glm::mat4(1.0));
   }
 }
