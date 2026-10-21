@@ -9,6 +9,29 @@ std::unordered_map<std::string, std::string, string_hash, std::equal_to<>>
 static int embeded_scripts_searcher(lua_State *L);
 static int embeded_scripts_loader(lua_State *L);
 
+const char *get_lua_typename(lua_State *L, int idx) {
+  const char *typearg; /* name for the type of the actual argument */
+  if (luaL_getmetafield(L, idx, "__name") == LUA_TSTRING)
+    typearg = lua_tostring(L, -1); /* use the given type name */
+  else if (lua_type(L, idx) == LUA_TLIGHTUSERDATA)
+    typearg = "light userdata"; /* special name for messages */
+  else
+    typearg = luaL_typename(L, idx); /* standard name */
+
+  return typearg;
+}
+
+int push_lua_error(lua_State *L, const char *fmt, ...) {
+  lua_pushnil(L);
+  va_list argp;
+  va_start(argp, fmt);
+  luaL_where(L, 1);
+  lua_pushvfstring(L, fmt, argp);
+  va_end(argp);
+  lua_concat(L, 2);
+  return 0;
+}
+
 void init_lua(lua_State **L_) {
   lua_State *&L = *L_;
   L = luaL_newstate();
@@ -47,20 +70,27 @@ void init_lua(lua_State **L_) {
   lua_getfield(L, -1, "traceback");
   lua_remove(L, -2);
 
-  lua_insert(L, 1); // traceback function at index 1
+  int tracelogidx = luaL_ref(L, LUA_REGISTRYINDEX); // not the global constexpr
+  std::cerr << "tracelogidx is " << tracelogidx << "\n";
+
+  // lua_insert(L, 1); // traceback function at index 1
 }
 
 bool call_lua(lua_State *L, int argc) {
-  if (lua_pcall(L, argc, LUA_MULTRET, 1) != LUA_OK) {
+  lua_rawgeti(L, LUA_REGISTRYINDEX, tracelogIdx);
+  lua_insert(L, -2);
+  int tracelog_idx = lua_gettop(L) -1;
+  if (lua_pcall(L, argc, LUA_MULTRET, tracelog_idx) != LUA_OK) {
     std::cerr << "\x1b[31m" << lua_tostring(L, -1) << "\x1b[0m\n";
     lua_pop(L, 1);
     return false;
   }
+  lua_remove(L, tracelog_idx);
   return true;
 }
 
 void close_lua(lua_State *L) {
-  lua_remove(L, 1);
+  luaL_unref(L, LUA_REGISTRYINDEX, /*tracelogidx*/ tracelogIdx);
   lua_close(L);
 }
 

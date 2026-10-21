@@ -1,3 +1,4 @@
+#include "ObjectPool.hpp"
 #include <LuaBindings.hpp>
 #include <Scene.hpp>
 #include <iostream>
@@ -47,8 +48,8 @@ public:
     lua_rawgeti(L, LUA_REGISTRYINDEX, tableRef);
     if (lua_getfield(L, -1, "name") != LUA_TSTRING) {
       luaL_typeerror(L, -1, "string");
-      lua_pop(L, -1);
-      lua_pop(L, -1);
+      // lua_pop(L, -1);
+      // lua_pop(L, -1);
       return 0;
     }
 
@@ -65,9 +66,18 @@ public:
     return 0;
   }
 
-  // static int object_get_name(lua_State *L) {
-  //   return 0;
-  // }
+  static int pool_get_root(lua_State *L) {
+    Scene **ud = (Scene **)luaL_testudata(L, 1, "Object pool");
+    if (!ud) {
+      push_lua_error(L,
+                     "calling 'root' on bad self (ObjectPool expected got %s)",
+                     get_lua_typename(L, 1));
+      return 2;
+    }
+    objH *obj = (objH *)lua_newuserdata(L, sizeof(objH));
+    *obj = (*ud)->objPool.rootH();
+    return 1;
+  }
 };
 
 void Scene::add_lua(lua_State *L) {
@@ -78,16 +88,26 @@ void Scene::add_lua(lua_State *L) {
   lua_pushlightuserdata(L, self);
   lua_pushcclosure(L, SceneLuaBindings::add_script_class, 1);
   lua_setfield(L, -2, "register_class");
+  lua_pushvalue(L, -1);
   lua_setglobal(L, "reaktory");
+  // stack 1-function 2-table
 
-  luaL_newmetatable(L, "Object pool");
+  for (int i = 1; i < 15; i++)
+    std::cerr << "lua type: " << (int)(lua_type(L, i) - LUA_TNIL) << "\n";
 
   Scene **ud = (Scene **)lua_newuserdata(L, sizeof(void *));
   *ud = *self;
 
-  std::cerr << "lua type: " << (int)(lua_type(L, -3) - LUA_TNIL) << "\n";
-  lua_getfield(L, -3, "register_class");
-  std::cerr << "lua type: " << (int)(lua_type(L, -1) - LUA_TNIL) << "\n";
-  // lua_setfield(L, -3, "pool");
-  lua_setfield(L, -4, "pool");
+  luaL_newmetatable(L, "ObjectPool");
+  lua_pushvalue(L, -1);           /* pushes the metatable */
+  lua_setfield(L, -2, "__index"); /* metatable.__index = metatable */
+
+  lua_pushcfunction(L, SceneLuaBindings::pool_get_root);
+  lua_setfield(L, -2, "root");
+
+  lua_setmetatable(L, -2); // 1st - udata, 2nd - (meta)table
+  lua_setfield(L, -2, "pool");
+
+  for (int i = 1; i < 15; i++)
+    std::cerr << "lua type: " << (int)(lua_type(L, i) - LUA_TNIL) << "\n";
 }

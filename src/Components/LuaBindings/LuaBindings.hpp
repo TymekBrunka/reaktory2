@@ -3,6 +3,12 @@
 #include <string>
 #include <unordered_map>
 
+static constexpr int tracelogIdx = 4;
+
+const char * get_lua_typename(lua_State *L, int idx);
+
+int push_lua_error(lua_State *L, const char *fmt, ...);
+
 void init_lua(lua_State **L);
 
 bool call_lua(lua_State *L, int argc = 0);
