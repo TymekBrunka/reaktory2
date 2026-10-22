@@ -21,17 +21,6 @@ const char *get_lua_typename(lua_State *L, int idx) {
   return typearg;
 }
 
-int push_lua_error(lua_State *L, const char *fmt, ...) {
-  lua_pushnil(L);
-  va_list argp;
-  va_start(argp, fmt);
-  luaL_where(L, 1);
-  lua_pushvfstring(L, fmt, argp);
-  va_end(argp);
-  lua_concat(L, 2);
-  return 0;
-}
-
 void init_lua(lua_State **L_) {
   lua_State *&L = *L_;
   L = luaL_newstate();
@@ -70,16 +59,21 @@ void init_lua(lua_State **L_) {
   lua_getfield(L, -1, "traceback");
   lua_remove(L, -2);
 
-  int tracelogidx = luaL_ref(L, LUA_REGISTRYINDEX); // not the global constexpr
-  std::cerr << "tracelogidx is " << tracelogidx << "\n";
-
   // lua_insert(L, 1); // traceback function at index 1
+
+  int tracelogidx = luaL_ref(L, LUA_REGISTRYINDEX); // not the global constexpr
+  lua_remove(L, -1); // there's one element left on stack after that
+  std::cerr << "tracelogidx is " << tracelogidx << "\n";
 }
 
 bool call_lua(lua_State *L, int argc) {
-  lua_rawgeti(L, LUA_REGISTRYINDEX, tracelogIdx);
-  lua_insert(L, -2);
-  int tracelog_idx = lua_gettop(L) -1;
+  lua_rawgeti(L, LUA_REGISTRYINDEX, TRACELOG_IDX);
+  lua_insert(L, -3 - argc);
+  int tracelog_idx = lua_gettop(L) - 2 - argc;
+  // std::cerr << "\n";
+  // for (int i = -7; i <= -1; i++)
+  //   std::cerr << "lua type: " << (int)(lua_type(L, i) - LUA_TNIL) << "\n";
+  // std::cerr << "current top: " << lua_gettop(L) << "\n";
   if (lua_pcall(L, argc, LUA_MULTRET, tracelog_idx) != LUA_OK) {
     std::cerr << "\x1b[31m" << lua_tostring(L, -1) << "\x1b[0m\n";
     lua_pop(L, 1);
@@ -90,7 +84,7 @@ bool call_lua(lua_State *L, int argc) {
 }
 
 void close_lua(lua_State *L) {
-  luaL_unref(L, LUA_REGISTRYINDEX, /*tracelogidx*/ tracelogIdx);
+  luaL_unref(L, LUA_REGISTRYINDEX, /*tracelogidx*/ TRACELOG_IDX);
   lua_close(L);
 }
 

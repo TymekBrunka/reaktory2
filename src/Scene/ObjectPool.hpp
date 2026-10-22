@@ -27,10 +27,6 @@ struct oModel {
   float animation_speed;
 };
 
-struct oFormula {
-  bool dummy = false;
-};
-
 struct oEmptySlot {
   bool dummy = false;
 };
@@ -42,11 +38,12 @@ struct oNode {
 struct Object {
   uint8_t gen = 1;
   bool collapsed = false;
+  int script_class_idx = -1;
   objH parent = objH{.gen = 1, .idx = 0};
   glm::mat4 transform = glm::mat4(1.0f);
   std::string name;
   std::vector<int16_t> children;
-  std::variant<oEmptySlot, oNode, oFormula, oModel> variant;
+  std::variant<oEmptySlot, oNode, oModel> variant;
 
   objH toHandle(int16_t idx) const { return objH{.gen = gen, .idx = idx}; }
 };
@@ -58,12 +55,7 @@ private:
   void remove_impl(int16_t idx);
 
 public:
-  ObjectPool()
-      : objects({Object{.gen = 1,
-                        .transform = glm::mat4(1.0f),
-                        .name = "Scena",
-                        .children = {},
-                        .variant = oNode{}}}) {};
+  ObjectPool();
 
   ~ObjectPool() = default;
   ObjectPool(const ObjectPool &other) = delete;

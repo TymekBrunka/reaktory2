@@ -132,10 +132,12 @@ Scene::Scene(Scene &&other) {
 
   name = std::move(other.name);
   current_folder = std::move(other.current_folder);
-  auto *tmp = self;
-  self = other.self;
   if (self)
-    *self = this;
+    *self = &other;
+  if (other.self)
+    *other.self = this;
+  auto tmp = self;
+  self = other.self;
   other.self = tmp;
   size = other.size;
   mpos = other.mpos;
@@ -167,10 +169,12 @@ Scene &Scene::operator=(Scene &&other) {
 
     name = std::move(other.name);
     current_folder = std::move(other.current_folder);
-    auto *tmp = self;
-    self = other.self;
     if (self)
-      *self = this;
+      *self = &other;
+    if (other.self)
+      *other.self = this;
+    auto tmp = self;
+    self = other.self;
     other.self = tmp;
     size = other.size;
     mpos = other.mpos;
@@ -285,17 +289,20 @@ Scene::Scene(const std::string &name) {
           add_lua(L);
           std::string path = script_path.string();
           auto rr = res_fs.value();
-          lua_load(
-              L,
-              [](lua_State *L, void *data, size_t *size) {
-                auto *rr = (FileUtils::ReadResult *)data;
-                if (rr->length <= 0)
-                  return (const char *)nullptr;
-                *size = rr->length;
-                rr->length -= *size;
-                return (const char *)rr->data;
-              },
-              &rr, path.c_str(), "bt");
+          if (LUA_OK != lua_load(
+                            L,
+                            [](lua_State *L, void *data, size_t *size) {
+                              auto *rr = (FileUtils::ReadResult *)data;
+                              if (rr->length <= 0)
+                                return (const char *)nullptr;
+                              *size = rr->length;
+                              rr->length -= *size;
+                              return (const char *)rr->data;
+                            },
+                            &rr, path.c_str(), "bt")) {
+            std::cerr << "\x1b[31m" << lua_tostring(L, -1) << "\x1b[0m\n";
+            lua_pop(L, 1);
+          }
           call_lua(L);
           delete[] res_fs.value().data;
         } else {
@@ -790,6 +797,20 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
   parentObj = node->toHandle(idx) == selected_object || parentObj.idx == 0
                   ? node->toHandle(idx)
                   : parentObj;
+
+  if (node->script_class_idx != -1) {
+    ScriptClass &sc = script_classes[node->script_class_idx];
+    lua_rawgeti(sc.L, LUA_REGISTRYINDEX, SCENE_SCRIPT_CLASSES_IDX);
+    lua_rawgeti(sc.L, -1, node->script_class_idx + 1);
+    lua_remove(sc.L, -2);
+    lua_getfield(sc.L, -1, "on_frame");
+    lua_remove(sc.L, -2);
+    Object **obj = (Object **)lua_newuserdata(sc.L, sizeof(Object *));
+    *obj = node;
+    luaL_getmetatable(sc.L, "ObjectRef");
+    lua_setmetatable(sc.L, -2);
+    call_lua(sc.L, 1);
+  }
 
   if (oModel *omodel = (oModel *)std::get_if<oModel>(&node->variant)) {
     if (!omodel->model.empty()) {

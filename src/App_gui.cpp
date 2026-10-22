@@ -156,10 +156,6 @@ void App::draw_object_tree(Object *node, int idx, bool is_descendant) {
     float char_vis_width = ImGui::CalcTextSize(ICON_FA_DRAW_POLYGON).x;
     drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y + 1),
                       ImColor(200, 50, 25), ICON_FA_DRAW_POLYGON);
-  } else if (const oFormula *oformula = std::get_if<oFormula>(&node->variant)) {
-    float char_vis_width = ImGui::CalcTextSize(ICON_FA_SQUARE_ROOT_VARIABLE).x;
-    drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y + 1),
-                      ImColor(25, 200, 50), ICON_FA_SQUARE_ROOT_VARIABLE);
   }
   drawlist->AddText(ImVec2(bpos2.x + 22 + 3, bpos2.y + 1),
                     ImColor(220, 220, 220), node->name.c_str());
@@ -382,40 +378,66 @@ void App::draw_gui() {
 
   if (ImGui::Begin(ICON_FA_WRENCH " Właściwości") && selected_scene) {
     Object *node = selected_scene->objPool.get(selected_scene->selected_object);
+    ImGui::InputText("nazwa", &node->name);
+
+    if (ImGui::BeginCombo(
+            "skrypt",
+            node->script_class_idx == -1
+                ? "(brak)"
+                : selected_scene->get_script_classes()[node->script_class_idx]
+                      .name.c_str())) {
+
+      static ImGuiTextFilter sc_filter;
+      if (ImGui::IsWindowAppearing()) {
+        ImGui::SetKeyboardFocusHere();
+        sc_filter.Clear();
+      }
+      sc_filter.Draw("skrypt");
+
+      int sc_idx = 0;
+      for (const auto &sc : selected_scene->get_script_classes()) {
+
+        if (!sc_filter.PassFilter(sc.name.c_str()))
+          continue;
+
+        if (ImGui::Selectable("h",
+                              sc_idx == node->script_class_idx)) {
+          node->script_class_idx = sc_idx;
+        }
+        sc_idx++;
+      }
+      ImGui::EndCombo();
+    }
+
     if (node) {
       if (oModel *omodel = (oModel *)std::get_if<oModel>(&node->variant)) {
-        ImGui::InputText("nazwa", &node->name);
 
-        if (!omodel->model.empty()) {
-          if (ImGui::BeginCombo("model", omodel->model.c_str())) {
+        if (ImGui::BeginCombo("model", omodel->model.c_str())) {
 
-            static ImGuiTextFilter filter;
-            if (ImGui::IsWindowAppearing()) {
-              ImGui::SetKeyboardFocusHere();
-              filter.Clear();
-            }
-            filter.Draw("model");
+          static ImGuiTextFilter filter;
+          if (ImGui::IsWindowAppearing()) {
+            ImGui::SetKeyboardFocusHere();
+            filter.Clear();
+          }
+          filter.Draw("model");
 
-            for (const auto &[name, model] :
-                 selected_scene->resMan.GetModelsMap()) {
+          for (const auto &[name, model] :
+               selected_scene->resMan.GetModelsMap()) {
 
-              if (!filter.PassFilter(name.c_str()))
-                continue;
+            if (!filter.PassFilter(name.c_str()))
+              continue;
 
-              if (ImGui::Selectable(name.c_str(), omodel->model == name)) {
-                omodel->model = name;
-                omodel->animation_idx = -1;
-                size_t old_size = omodel->materials.size();
-                omodel->materials.resize(model.materials.size());
-                for (int i = old_size; i < omodel->materials.size(); i++) {
-                  omodel->materials[i] = Material{};
-                }
+            if (ImGui::Selectable(name.c_str(), omodel->model == name)) {
+              omodel->model = name;
+              omodel->animation_idx = -1;
+              size_t old_size = omodel->materials.size();
+              omodel->materials.resize(model.materials.size());
+              for (int i = old_size; i < omodel->materials.size(); i++) {
+                omodel->materials[i] = Material{};
               }
             }
-            ImGui::EndCombo();
           }
-        } else {
-          ImGui::TextWrapped("model: (zły typ parametru)");
+          ImGui::EndCombo();
         }
 
         ImGui::TextUnformatted("Materiały");
@@ -527,7 +549,8 @@ void App::draw_gui() {
         ImGui::DragFloat("prędkość animacji", &omodel->animation_speed, 0.1,
                          -FLT_MAX, FLT_MAX);
 
-        // ManagedModel *model = selected_scene->resMan.GetModel(omodel->model);
+        // ManagedModel *model =
+        // selected_scene->resMan.GetModel(omodel->model);
         Renderer::Animation *animation =
             model ? model->model.GetCurrentAnimation() : nullptr;
         ImGui::SliderFloat("czas animacji", &omodel->animation_time, 0,

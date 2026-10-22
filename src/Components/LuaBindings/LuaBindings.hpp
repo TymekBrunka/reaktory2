@@ -3,11 +3,23 @@
 #include <string>
 #include <unordered_map>
 
-static constexpr int tracelogIdx = 4;
+static constexpr int TRACELOG_IDX = 4;
 
-const char * get_lua_typename(lua_State *L, int idx);
+#define LUAB_METHODCHECK(type, typename_)                                      \
+  (type *)luaL_testudata(L, 1, typename_);                                     \
+  if (!ud) {                                                                   \
+    luaL_typeerror(L, 1, typename_);                                           \
+    return 0;                                                                  \
+  }
 
-int push_lua_error(lua_State *L, const char *fmt, ...);
+#define LUAB_ARGCHECK(arg, type, name, typename_)                              \
+  type *name = (type *)luaL_testudata(L, (arg), typename_);                    \
+  if (!name) {                                                                 \
+    luaL_typeerror(L, (arg), typename_);                                       \
+    return 0;                                                                  \
+  }
+
+const char *get_lua_typename(lua_State *L, int idx);
 
 void init_lua(lua_State **L);
 

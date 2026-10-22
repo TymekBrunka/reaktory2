@@ -3,6 +3,14 @@
 #include <ObjectPool.hpp>
 #include <cstdint>
 
+ObjectPool::ObjectPool() {
+  objects.push_back(Object{.gen = 1,
+                           .transform = glm::mat4(1.0f),
+                           .name = "Scena",
+                           .children = {},
+                           .variant = oNode{}});
+}
+
 Object *ObjectPool::get(objH obj) {
   if (obj.idx < 0 || obj.idx >= objects.size()) {
     // Log::log(Log::ERROR | Log::SEV_MED, 0, "Object pool",
