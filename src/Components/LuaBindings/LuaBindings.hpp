@@ -5,17 +5,30 @@
 
 static constexpr int TRACELOG_IDX = 4;
 
+#define LUAB_CARGCHECK(argc)                                                   \
+  if (lua_gettop(L) != (argc)) {                                               \
+    luaL_error(L, "invalid number of arguments (%d expected, got %d)", (argc), \
+               lua_gettop(L));                                                 \
+    return 0;                                                                  \
+  }
+
+#define LUAB_MCARGCHECK(argc)                                                  \
+  if (lua_gettop(L) != (argc) + 1) {                                           \
+    luaL_error(L, "invalid number of arguments (%d expected, got %d)", (argc), \
+               lua_gettop(L) - 1);                                             \
+  }
+
 #define LUAB_METHODCHECK(type, typename_)                                      \
   (type *)luaL_testudata(L, 1, typename_);                                     \
   if (!ud) {                                                                   \
-    luaL_typeerror(L, 1, typename_);                                           \
+    luaL_argerror(L, 1, typename_);                                            \
     return 0;                                                                  \
   }
 
 #define LUAB_ARGCHECK(arg, type, name, typename_)                              \
   type *name = (type *)luaL_testudata(L, (arg), typename_);                    \
   if (!name) {                                                                 \
-    luaL_typeerror(L, (arg), typename_);                                       \
+    luaL_argerror(L, (arg), typename_);                                        \
     return 0;                                                                  \
   }
 

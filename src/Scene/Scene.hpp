@@ -30,6 +30,8 @@ public:
   ScriptClass(ScriptClass &&other);
   ScriptClass &operator=(ScriptClass &&other);
 
+  lua_State *get_lua() const { return L; }
+
   void destroy();
 };
 

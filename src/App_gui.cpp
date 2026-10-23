@@ -378,7 +378,16 @@ void App::draw_gui() {
 
   if (ImGui::Begin(ICON_FA_WRENCH " Właściwości") && selected_scene) {
     Object *node = selected_scene->objPool.get(selected_scene->selected_object);
-    ImGui::InputText("nazwa", &node->name);
+    // ImGui::InputText("nazwa", &node->name);
+    int textw = ImGui::CalcTextSize("nazwa").x;
+    ImGui::Dummy(ImVec2(textw, 22));
+    ImGui::GetWindowDrawList()->AddText(
+        ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y + 2),
+        ImColor(255, 255, 255), "nazwa");
+    // ImGui::TextUnformatted("nazwa");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+    ImGui::InputText("##nazwa", &node->name);
 
     if (ImGui::BeginCombo(
             "skrypt",
@@ -394,16 +403,24 @@ void App::draw_gui() {
       }
       sc_filter.Draw("skrypt");
 
+      if (ImGui::Selectable("(brak)", node->script_class_idx == -1)) {
+        node->change_script_class(selected_scene, -1);
+      }
+
       int sc_idx = 0;
       for (const auto &sc : selected_scene->get_script_classes()) {
 
         if (!sc_filter.PassFilter(sc.name.c_str()))
           continue;
 
-        if (ImGui::Selectable("h",
+        ImGui::PushID(sc_idx);
+        if (ImGui::Selectable(sc.name.empty() ? "##script_class"
+                                              : sc.name.c_str(),
                               sc_idx == node->script_class_idx)) {
-          node->script_class_idx = sc_idx;
+
+          node->change_script_class(selected_scene, sc_idx);
         }
+        ImGui::PopID();
         sc_idx++;
       }
       ImGui::EndCombo();

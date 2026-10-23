@@ -229,7 +229,7 @@ add_library(Scene_object_pool STATIC
   src/Scene/ObjectPool.cpp
 )
 target_include_directories(Scene_object_pool PUBLIC src/Scene/)
-target_link_libraries(Scene_object_pool PUBLIC logging Scene_resource_manager)
+target_link_libraries(Scene_object_pool PUBLIC logging Scene_resource_manager LuaBindings)
 target_precompile_headers(Scene_object_pool REUSE_FROM logging)
 
 add_library(LuaBindings STATIC

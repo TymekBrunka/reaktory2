@@ -1,7 +1,41 @@
 #include "Model.hpp"
 #include "ResourceManager.hpp"
+#include <LuaBindings.hpp>
 #include <ObjectPool.hpp>
+#include <Scene.hpp>
 #include <cstdint>
+
+void Object::change_script_class(Scene *scene, int new_script_class_idx) {
+  if (script_class_idx != -1) {
+    auto L = scene->get_script_classes()[script_class_idx].get_lua();
+    lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_SCRIPT_CLASSES_IDX);
+    lua_rawgeti(L, -1, script_class_idx + 1);
+    lua_remove(L, -2);
+    lua_getfield(L, -1, "on_detach");
+    lua_remove(L, -2);
+    Object **obj = (Object **)lua_newuserdata(L, sizeof(Object *));
+    *obj = this;
+    luaL_getmetatable(L, "ObjectRef");
+    lua_setmetatable(L, -2);
+    call_lua(L, 1);
+  }
+
+  script_class_idx = new_script_class_idx;
+
+  if (script_class_idx != -1) {
+    auto L = scene->get_script_classes()[script_class_idx].get_lua();
+    lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_SCRIPT_CLASSES_IDX);
+    lua_rawgeti(L, -1, script_class_idx + 1);
+    lua_remove(L, -2);
+    lua_getfield(L, -1, "on_attach");
+    lua_remove(L, -2);
+    Object **obj = (Object **)lua_newuserdata(L, sizeof(Object *));
+    *obj = this;
+    luaL_getmetatable(L, "ObjectRef");
+    lua_setmetatable(L, -2);
+    call_lua(L, 1);
+  }
+}
 
 ObjectPool::ObjectPool() {
   objects.push_back(Object{.gen = 1,

@@ -35,6 +35,8 @@ struct oNode {
   bool dummy = false;
 };
 
+class Scene;
+
 struct Object {
   uint8_t gen = 1;
   bool collapsed = false;
@@ -45,7 +47,9 @@ struct Object {
   std::vector<int16_t> children;
   std::variant<oEmptySlot, oNode, oModel> variant;
 
-  objH toHandle(int16_t idx) const { return objH{.gen = gen, .idx = idx}; }
+  inline objH toHandle(int16_t idx) const { return objH{.gen = gen, .idx = idx}; }
+
+  void change_script_class(Scene *scene, int new_script_class_idx);
 };
 
 class ObjectPool {
