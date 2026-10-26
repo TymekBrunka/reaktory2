@@ -118,37 +118,40 @@ public:
 
     int ftype = lua_getfield(L, 2, "on_attach");
     if (ftype != LUA_TNIL && ftype != LUA_TFUNCTION) {
-      luaL_error(L,
-                 "bad 'on_attach' field type in argument #1 to 'register_class' "
-                 "(function or nil"
-                 " expected, got %s)",
-                 get_lua_typename(L, -1));
+      luaL_error(
+          L,
+          "bad 'on_attach' field type in argument #1 to 'register_class' "
+          "(function or nil"
+          " expected, got %s)",
+          get_lua_typename(L, -1));
       return 0;
     }
     lua_remove(L, -1); // remove name copy from stack
 
     ftype = lua_getfield(L, 2, "on_detach");
     if (ftype != LUA_TNIL && ftype != LUA_TFUNCTION) {
-      luaL_error(L,
-                 "bad 'on_detach' field type in argument #1 to 'register_class' "
-                 "(function or nil"
-                 " expected, got %s)",
-                 get_lua_typename(L, -1));
+      luaL_error(
+          L,
+          "bad 'on_detach' field type in argument #1 to 'register_class' "
+          "(function or nil"
+          " expected, got %s)",
+          get_lua_typename(L, -1));
       return 0;
     }
     lua_remove(L, -1); // remove name copy from stack
-    
+
     ftype = lua_getfield(L, 2, "on_update");
     if (ftype != LUA_TNIL && ftype != LUA_TFUNCTION) {
-      luaL_error(L,
-                 "bad 'on_update' field type in argument #1 to 'register_class' "
-                 "(function or nil"
-                 " expected, got %s)",
-                 get_lua_typename(L, -1));
+      luaL_error(
+          L,
+          "bad 'on_update' field type in argument #1 to 'register_class' "
+          "(function or nil"
+          " expected, got %s)",
+          get_lua_typename(L, -1));
       return 0;
     }
     lua_remove(L, -1); // remove name copy from stack
-                      
+
     ftype = lua_getfield(L, 2, "on_frame");
     if (ftype != LUA_TNIL && ftype != LUA_TFUNCTION) {
       luaL_error(L,

@@ -41,10 +41,12 @@ struct Object {
   uint8_t gen = 1;
   bool collapsed = false;
   int script_class_idx = -1;
+  int ref_to_self = -1;
   objH parent = objH{.gen = 1, .idx = 0};
   glm::mat4 transform = glm::mat4(1.0f);
   std::string name;
   std::vector<int16_t> children;
+  std::vector<int> lua_params;
   std::variant<oEmptySlot, oNode, oModel> variant;
 
   inline objH toHandle(int16_t idx) const { return objH{.gen = gen, .idx = idx}; }

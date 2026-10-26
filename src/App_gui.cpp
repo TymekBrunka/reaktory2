@@ -23,7 +23,7 @@ struct imrect2 {
   ImVec2 e;
 };
 
-imrect2 icon_cords(int idx) {
+static imrect2 icon_cords(int idx) {
   ImVec2 start =
       ImVec2((idx % ICONS_MODULO) * (1.0f / ICONS_MODULO),
              1.0f - ((idx / ICONS_MODULO) * (1.0f / ICONS_IDX_HEIGHT)));
@@ -51,10 +51,111 @@ bool App::IconMenuItem(int idx, const char *label, Renderer::rTexture2D tex) {
   return ret;
 }
 
-bool CenteredButton(const char *label) {
+static bool CenteredButton(const char *label) {
   ImGui::SetCursorPosX(
       (ImGui::GetWindowSize().x - ImGui::CalcTextSize(label).x) / 2);
   return ImGui::Button(label);
+}
+
+void InputAllignedText(const char *text, float height = 22) {
+  int textw = ImGui::CalcTextSize(text).x;
+  ImGui::Dummy(ImVec2(textw, height));
+  ImVec2 pmin = ImGui::GetItemRectMin();
+  ImGui::GetWindowDrawList()->AddText(
+      ImVec2(pmin.x, pmin.y - 11 + (height / 2) + 2), ImColor(255, 255, 255),
+      text);
+}
+
+void OpenCustomCombo(const char *name) { ImGui::OpenPopup(name); }
+
+bool BeginCustomCombo(const char *label, ImVec2 *wpos, ImVec2 *wpos2) {
+  *wpos = ImGui::GetItemRectMax();
+  *wpos2 = ImGui::GetItemRectMin();
+  return ImGui::BeginPopup(label, ImGuiWindowFlags_NoMove);
+}
+
+void EndCustomCombo(ImVec2 wpos, ImVec2 wpos2) {
+  ImVec2 wsize = ImGui::GetWindowSize();
+  ImVec2 final;
+  if (wpos.x - wpos2.x < wsize.x)
+    final = ImVec2(wpos.x - wsize.x, wpos.y);
+  else
+    final = ImVec2(wpos2.x, wpos.y);
+
+  if (final.x < 0)
+    final.x = wpos2.x;
+
+  if (final.x < 0)
+    final.x = 0;
+  else if (final.x + wsize.x > ImGui::GetIO().DisplaySize.x)
+    final.x = ImGui::GetIO().DisplaySize.x - wsize.x;
+
+  if (final.y + wsize.y > ImGui::GetIO().DisplaySize.y)
+    final.y = ImGui::GetIO().DisplaySize.y - wsize.y;
+
+  ImGui::SetWindowPos(final);
+  ImGui::EndPopup();
+}
+
+bool BeginCustomCombo2(ImVec2 *wpos, ImVec2 *wpos2, const char *label,
+                       const char *icon, const char *preview, int idx = 1) {
+
+  ImDrawList *drawlist = ImGui::GetWindowDrawList();
+  ImGui::PushID(idx);
+  bool ret = ImGui::Button("##skrypt",
+                           ImVec2(ImGui::GetContentRegionAvail().x - 8, 26));
+  ImGui::PopID();
+  ImVec2 bpos = ImGui::GetItemRectMin();
+  ImVec2 bpos2 = ImGui::GetItemRectMax();
+  drawlist->AddRectFilled(bpos, ImVec2(bpos.x + 16, bpos2.y), 0xFF54371E);
+  drawlist->AddTriangleFilled(
+      ImVec2(bpos.x + 4, bpos.y + 8), ImVec2(bpos.x + 12, bpos.y + 8),
+      ImVec2(bpos.x + 8, bpos.y + 16), ImColor(255, 255, 255));
+
+  // float textw = ImGui::CalcTextSize(text).x;
+  drawlist->AddText(ImVec2(bpos.x + 20, bpos.y + 6), ImColor(255, 255, 255),
+                    icon);
+
+  drawlist->AddText(ImVec2(bpos.x + 40, bpos.y + 5), ImColor(255, 255, 255),
+                    preview);
+
+  if (ret)
+    OpenCustomCombo(label);
+  return BeginCustomCombo(label, wpos, wpos2);
+}
+
+bool BeginSection(int idx, bool *collapse, const char *label, ImU32 hdrColor,
+                  ImU32 bgColor) {
+  ImDrawList *drawlist = ImGui::GetWindowDrawList();
+
+  int textw = ImGui::CalcTextSize(label).x;
+  ImGui::PushID(idx);
+  if (ImGui::Button("##właściwości_btn", ImVec2(22, 22)))
+    *collapse = !*collapse;
+  ImGui::PopID();
+  ImVec2 pmin = ImGui::GetItemRectMin();
+
+  drawlist->AddRectFilled(
+      pmin, ImVec2(pmin.x + ImGui::GetContentRegionMax().x - 8, pmin.y + 22),
+      hdrColor);
+
+  if (*collapse)
+    drawlist->AddTriangleFilled(
+        ImVec2(pmin.x + 4, pmin.y + 4), ImVec2(pmin.x + 18, pmin.y + 11),
+        ImVec2(pmin.x + 4, pmin.y + 18), ImColor(255, 255, 255));
+  else
+    drawlist->AddTriangleFilled(
+        ImVec2(pmin.x + 4, pmin.y + 4), ImVec2(pmin.x + 18, pmin.y + 4),
+        ImVec2(pmin.x + 11, pmin.y + 18), ImColor(255, 255, 255));
+
+  drawlist->AddText(ImVec2(pmin.x + 30, pmin.y + 2), ImColor(255, 255, 255),
+                    label);
+
+  ImGui::PushStyleColor(ImGuiCol_ChildBg, bgColor);
+  return !*collapse &&
+         ImGui::BeginChild(idx, ImVec2(ImGui::GetContentRegionAvail().x, 0),
+                           ImGuiChildFlags_AlwaysAutoResize |
+                               ImGuiChildFlags_AutoResizeY);
 }
 
 // -------------------------------------------------------------------------------------------------------------------
@@ -378,200 +479,294 @@ void App::draw_gui() {
 
   if (ImGui::Begin(ICON_FA_WRENCH " Właściwości") && selected_scene) {
     Object *node = selected_scene->objPool.get(selected_scene->selected_object);
-    // ImGui::InputText("nazwa", &node->name);
-    int textw = ImGui::CalcTextSize("nazwa").x;
-    ImGui::Dummy(ImVec2(textw, 22));
-    ImGui::GetWindowDrawList()->AddText(
-        ImVec2(ImGui::GetItemRectMin().x, ImGui::GetItemRectMin().y + 2),
-        ImColor(255, 255, 255), "nazwa");
-    // ImGui::TextUnformatted("nazwa");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-    ImGui::InputText("##nazwa", &node->name);
-
-    if (ImGui::BeginCombo(
-            "skrypt",
-            node->script_class_idx == -1
-                ? "(brak)"
-                : selected_scene->get_script_classes()[node->script_class_idx]
-                      .name.c_str())) {
-
-      static ImGuiTextFilter sc_filter;
-      if (ImGui::IsWindowAppearing()) {
-        ImGui::SetKeyboardFocusHere();
-        sc_filter.Clear();
-      }
-      sc_filter.Draw("skrypt");
-
-      if (ImGui::Selectable("(brak)", node->script_class_idx == -1)) {
-        node->change_script_class(selected_scene, -1);
-      }
-
-      int sc_idx = 0;
-      for (const auto &sc : selected_scene->get_script_classes()) {
-
-        if (!sc_filter.PassFilter(sc.name.c_str()))
-          continue;
-
-        ImGui::PushID(sc_idx);
-        if (ImGui::Selectable(sc.name.empty() ? "##script_class"
-                                              : sc.name.c_str(),
-                              sc_idx == node->script_class_idx)) {
-
-          node->change_script_class(selected_scene, sc_idx);
-        }
-        ImGui::PopID();
-        sc_idx++;
-      }
-      ImGui::EndCombo();
-    }
 
     if (node) {
-      if (oModel *omodel = (oModel *)std::get_if<oModel>(&node->variant)) {
+      static bool hideobjprop = false;
 
-        if (ImGui::BeginCombo("model", omodel->model.c_str())) {
+      if (BeginSection(1, &hideobjprop, ICON_FA_CUBE " objekt",
+                       ImColor(50, 50, 50), ImColor(25, 25, 25))) {
+        ImDrawList *drawlist = ImGui::GetWindowDrawList();
+        ImGui::Dummy(ImVec2(2, 2));
 
-          static ImGuiTextFilter filter;
+        ImGui::SetCursorPosX(8);
+        InputAllignedText("Nazwa");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+        ImGui::InputText("##nazwa", &node->name);
+
+        ImGui::SetCursorPosX(8);
+        InputAllignedText("Skrypt", 26);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+
+        ImVec2 wpos;
+        ImVec2 wpos2;
+        if (BeginCustomCombo2(
+                &wpos, &wpos2, "skrypt", ICON_FA_MICROCHIP,
+                node->script_class_idx == -1
+                    ? "(brak)"
+                    : selected_scene
+                          ->get_script_classes()[node->script_class_idx]
+                          .name.c_str())) {
+          ImDrawList *drawlist = ImGui::GetWindowDrawList();
+          ImVec2 ra = ImGui::GetContentRegionAvail();
+
+          static ImGuiTextFilter sc_filter;
           if (ImGui::IsWindowAppearing()) {
             ImGui::SetKeyboardFocusHere();
-            filter.Clear();
+            sc_filter.Clear();
           }
-          filter.Draw("model");
+          sc_filter.Draw("skrypt");
+          ImGui::Dummy(ImVec2(0, 3));
 
-          for (const auto &[name, model] :
-               selected_scene->resMan.GetModelsMap()) {
+          bool ret = ImGui::Selectable(
+              "##sc_button", -1 == node->script_class_idx, 0, ImVec2(ra.x, 16));
+          ImVec2 bpos = ImGui::GetItemRectMin();
+          drawlist->AddText(ImVec2(bpos.x + 1, bpos.y + 2),
+                            ImColor(255, 255, 255), "(brak)");
+          if (ret)
+            node->change_script_class(selected_scene, -1);
 
-            if (!filter.PassFilter(name.c_str()))
+          int sc_idx = 0;
+          for (const auto &sc : selected_scene->get_script_classes()) {
+
+            if (!sc_filter.PassFilter(sc.name.c_str()))
               continue;
 
-            if (ImGui::Selectable(name.c_str(), omodel->model == name)) {
-              omodel->model = name;
-              omodel->animation_idx = -1;
-              size_t old_size = omodel->materials.size();
-              omodel->materials.resize(model.materials.size());
-              for (int i = old_size; i < omodel->materials.size(); i++) {
-                omodel->materials[i] = Material{};
-              }
-            }
+            ImGui::PushID(sc_idx);
+            ret = ImGui::Selectable("##sc_button",
+                                    sc_idx == node->script_class_idx, 0,
+                                    ImVec2(ra.x, 16));
+
+            bpos = ImGui::GetItemRectMin();
+            drawlist->AddText(ImVec2(bpos.x + 2, bpos.y + 3),
+                              ImColor(255, 255, 255), ICON_FA_MICROCHIP);
+            drawlist->AddText(ImVec2(bpos.x + 22, bpos.y + 2),
+                              ImColor(255, 255, 255), sc.name.c_str());
+            if (ret)
+              node->change_script_class(selected_scene, sc_idx);
+
+            ImGui::PopID();
+            sc_idx++;
           }
-          ImGui::EndCombo();
+          EndCustomCombo(wpos, wpos2);
+        }
+        ImGui::Dummy(ImVec2(2, 2));
+      }
+      if (!hideobjprop)
+        ImGui::EndChild();
+      ImGui::PopStyleColor(1);
+
+      static bool hidescriptprop = false;
+
+      if (BeginSection(2, &hidescriptprop, ICON_FA_MICROCHIP " skrypt",
+                       ImColor(25, 150, 25), ImColor(0, 75, 25))) {
+        ImGui::Dummy(ImVec2(2, 2));
+        ImVec2 wpos;
+        ImVec2 wpos2;
+
+        ImGui::SetCursorPosX(8);
+        InputAllignedText("Test", 26);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+
+        if (BeginCustomCombo2(&wpos, &wpos2, "skrypt", ICON_FA_MICROCHIP, "")) {
+          EndCustomCombo(wpos, wpos2);
         }
 
-        ImGui::TextUnformatted("Materiały");
-        int i = 0;
-        for (auto &material : omodel->materials) {
-          ImGui::PushID(i);
-          // ImGui::BeginChild("materials_child");
+        ImGui::Dummy(ImVec2(2, 2));
+      }
+      if (!hidescriptprop)
+        ImGui::EndChild();
+      ImGui::PopStyleColor(1);
 
-          ImGui::ColorEdit4("kolor", &material.color_diffuse.x,
-                            ImGuiColorEditFlags_NoInputs |
-                                ImGuiColorEditFlags_NoLabel);
+      if (oModel *omodel = (oModel *)std::get_if<oModel>(&node->variant)) {
+        static bool hidemodelprop = false;
+        if (BeginSection(3, &hidemodelprop, ICON_FA_DRAW_POLYGON " model",
+                         0xFF0054DB, 0xFF0C1F3D)) {
+
+          ImGui::Dummy(ImVec2(2, 2));
+          ImVec2 wpos;
+          ImVec2 wpos2;
+
+          ImGui::SetCursorPosX(8);
+          InputAllignedText("Model", 26);
           ImGui::SameLine();
+          ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
 
-          int diffuse1 = selected_scene->resMan.GetTexture(material.diffuse1);
+          if (BeginCustomCombo2(&wpos, &wpos2, "model", ICON_FA_DRAW_POLYGON,
+                                omodel->model.c_str())) {
 
-          if (diffuse1 != -1) {
-            ImGui::Image((ImTextureRef)diffuse1, ImVec2(22, 22), ImVec2(0, 1),
-                         ImVec2(1, 0));
-          } else {
-            ImGui::Button("X", ImVec2(22, 22));
-          }
-          ImGui::SameLine();
-
-          ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-          if (ImGui::BeginCombo("##obraz", material.diffuse1.c_str())) {
             static ImGuiTextFilter filter;
             if (ImGui::IsWindowAppearing()) {
               ImGui::SetKeyboardFocusHere();
               filter.Clear();
             }
-            filter.Draw("obrazy");
+            filter.Draw("model");
 
-            float w_width = ImGui::GetWindowSize().x;
-            ImVec2 image_size = ImVec2(50, 50);
-            float width_accumulator = image_size.x + 10;
-
-            {
-              if (ImGui::Button("(brak)",
-                                ImVec2(image_size.x + 6, image_size.y + 6))) {
-                material.diffuse1 = "";
-              }
-
-              if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNone))
-                ImGui::SetTooltip("(brak)");
-
-              ImGui::SameLine();
-            }
-
-            for (const auto &[name, texture] :
-                 selected_scene->resMan.GetTexturesMap()) {
+            for (const auto &[name, model] :
+                 selected_scene->resMan.GetModelsMap()) {
 
               if (!filter.PassFilter(name.c_str()))
                 continue;
 
-              if (ImGui::ImageButton(name.c_str(), (ImTextureRef)texture,
-                                     image_size, ImVec2(0, 1), ImVec2(1, 0))) {
+              if (ImGui::Selectable(name.c_str(), omodel->model == name)) {
+                omodel->model = name;
+                omodel->animation_idx = -1;
+                size_t old_size = omodel->materials.size();
+                omodel->materials.resize(model.materials.size());
+                for (int i = old_size; i < omodel->materials.size(); i++) {
+                  omodel->materials[i] = Material{};
+                }
+              }
+            }
+            EndCustomCombo(wpos, wpos2);
+          }
 
-                material.diffuse1 = name;
+          int i = 0;
+          ImGui::SetCursorPosX(8);
+          for (auto &material : omodel->materials) {
+            ImGui::PushID(i);
+            // ImGui::BeginChild("materials_child");
+
+            ImGui::SetCursorPosX(8);
+            InputAllignedText("Kolor", 26);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+
+            ImGui::ColorEdit4("##kolor", &material.color_diffuse.x,
+                              ImGuiColorEditFlags_NoInputs |
+                                  ImGuiColorEditFlags_NoLabel);
+            ImGui::SameLine();
+
+            int diffuse1 = selected_scene->resMan.GetTexture(material.diffuse1);
+
+            if (diffuse1 != -1) {
+              ImGui::Image((ImTextureRef)diffuse1, ImVec2(22, 22), ImVec2(0, 1),
+                           ImVec2(1, 0));
+            } else {
+              ImGui::Button("X", ImVec2(22, 22));
+            }
+            ImGui::SameLine();
+
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            if (BeginCustomCombo2(&wpos, &wpos2, "##obraz", ICON_FA_IMAGES,
+                                  material.diffuse1.c_str())) {
+              static ImGuiTextFilter filter;
+              if (ImGui::IsWindowAppearing()) {
+                ImGui::SetKeyboardFocusHere();
+                filter.Clear();
+              }
+              filter.Draw("obrazy");
+
+              float w_width = ImGui::GetWindowSize().x;
+              ImVec2 image_size = ImVec2(50, 50);
+              float width_accumulator = image_size.x + 10;
+
+              {
+                if (ImGui::Button("(brak)",
+                                  ImVec2(image_size.x + 6, image_size.y + 6))) {
+                  material.diffuse1 = "";
+                }
+
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNone))
+                  ImGui::SetTooltip("(brak)");
+
+                ImGui::SameLine();
               }
 
-              if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNone))
-                ImGui::SetTooltip(name.c_str());
+              for (const auto &[name, texture] :
+                   selected_scene->resMan.GetTexturesMap()) {
 
-              width_accumulator += image_size.x + 10;
-              if (width_accumulator + image_size.x + 10 < w_width - 8)
-                ImGui::SameLine();
-              else
-                width_accumulator = 0;
+                if (!filter.PassFilter(name.c_str()))
+                  continue;
+
+                if (ImGui::ImageButton(name.c_str(), (ImTextureRef)texture,
+                                       image_size, ImVec2(0, 1),
+                                       ImVec2(1, 0))) {
+
+                  material.diffuse1 = name;
+                }
+
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNone))
+                  ImGui::SetTooltip(name.c_str());
+
+                width_accumulator += image_size.x + 10;
+                if (width_accumulator + image_size.x + 10 < w_width - 8)
+                  ImGui::SameLine();
+                else
+                  width_accumulator = 0;
+              }
+
+              EndCustomCombo(wpos, wpos2);
             }
 
-            ImGui::EndCombo();
+            // ImGui::EndChild();
+            ImGui::PopID();
+            i++;
           }
+          ImGui::Dummy(ImVec2(0, 10));
 
-          // ImGui::EndChild();
-          ImGui::PopID();
-          i++;
-        }
-        ImGui::Dummy(ImVec2(0, 10));
+          ManagedModel *model = selected_scene->resMan.GetModel(omodel->model);
 
-        ManagedModel *model = selected_scene->resMan.GetModel(omodel->model);
+          if (model) {
+            const char *animation_name = "(brak)";
+            if (omodel->animation_idx >= 0 &&
+                omodel->animation_idx < model->model.GetAnimations().size())
+              animation_name =
+                  model->model.GetAnimations()[omodel->animation_idx]
+                      .GetName()
+                      .c_str();
 
-        if (model) {
-          const char *animation_name = "(brak)";
-          if (omodel->animation_idx >= 0 &&
-              omodel->animation_idx < model->model.GetAnimations().size())
-            animation_name = model->model.GetAnimations()[omodel->animation_idx]
-                                 .GetName()
-                                 .c_str();
+            ImGui::SetCursorPosX(8);
+            InputAllignedText("animacja", 26);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
 
-          if (ImGui::BeginCombo("animacja", animation_name)) {
-            int i = 0;
+            if (BeginCustomCombo2(&wpos, &wpos2, "animacja",
+                                  ICON_FA_PERSON_WALKING, animation_name, 2)) {
+              int i = 0;
 
-            if (ImGui::Selectable("(brak)", -1 == omodel->animation_idx))
-              omodel->animation_idx = -1;
+              if (ImGui::Selectable("(brak)", -1 == omodel->animation_idx))
+                omodel->animation_idx = -1;
 
-            for (const auto &animation : model->model.GetAnimations()) {
-              if (ImGui::Selectable(animation.GetName().c_str(),
-                                    i == omodel->animation_idx))
-                omodel->animation_idx = i;
-              i++;
+              for (const auto &animation : model->model.GetAnimations()) {
+                if (ImGui::Selectable(animation.GetName().c_str(),
+                                      i == omodel->animation_idx))
+                  omodel->animation_idx = i;
+                i++;
+              }
+              EndCustomCombo(wpos, wpos2);
             }
-            ImGui::EndCombo();
+          } else {
+            ImGui::TextWrapped(
+                "animacja: (objekt nie posiada prawidłowego modelu)");
           }
-        } else {
-          ImGui::TextWrapped(
-              "animacja: (objekt nie posiada prawidłowego modelu)");
+
+          ImGui::SetCursorPosX(8);
+          InputAllignedText("prędkość animacji");
+          ImGui::SameLine();
+          ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+          ImGui::DragFloat("##prędkość animacji", &omodel->animation_speed, 0.1,
+                           -FLT_MAX, FLT_MAX);
+
+          // ManagedModel *model =
+          // selected_scene->resMan.GetModel(omodel->model);
+          Renderer::Animation *animation =
+              model ? model->model.GetCurrentAnimation() : nullptr;
+
+          ImGui::SetCursorPosX(8);
+          InputAllignedText("czas animacji");
+          ImGui::SameLine();
+          ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+          ImGui::SliderFloat("##czas animacji", &omodel->animation_time, 0,
+                             animation ? animation->GetDuration() : 100);
+
+          ImGui::Dummy(ImVec2(2, 2));
         }
-
-        ImGui::DragFloat("prędkość animacji", &omodel->animation_speed, 0.1,
-                         -FLT_MAX, FLT_MAX);
-
-        // ManagedModel *model =
-        // selected_scene->resMan.GetModel(omodel->model);
-        Renderer::Animation *animation =
-            model ? model->model.GetCurrentAnimation() : nullptr;
-        ImGui::SliderFloat("czas animacji", &omodel->animation_time, 0,
-                           animation ? animation->GetDuration() : 100);
+        if (!hidemodelprop)
+          ImGui::EndChild();
+        ImGui::PopStyleColor(1);
       }
     }
   }
