@@ -148,8 +148,6 @@ Scene::Scene(Scene &&other) {
   screen_canvas = other.screen_canvas;
   color_canvas = other.color_canvas;
   initialised = other.initialised;
-  script_classes = std::move(other.script_classes);
-  luas = std::move(other.luas);
   resMan = std::move(other.resMan);
   objPool = std::move(other.objPool);
   // other.self = nullptr;
@@ -185,8 +183,6 @@ Scene &Scene::operator=(Scene &&other) {
     screen_canvas = other.screen_canvas;
     color_canvas = other.color_canvas;
     initialised = other.initialised;
-    script_classes = std::move(other.script_classes);
-    luas = std::move(other.luas);
     resMan = std::move(other.resMan);
     objPool = std::move(other.objPool);
     // other.self = nullptr;
@@ -277,6 +273,9 @@ Scene::Scene(const std::string &name) {
 
   resMan = std::move(ResourceManager{current_folder / "models"});
 
+  init_lua(&L);
+  add_lua(L);
+
   for (auto &ent :
        std::filesystem::directory_iterator(current_folder / "scripts")) {
     if (std::filesystem::is_directory(ent.path())) {
@@ -284,9 +283,6 @@ Scene::Scene(const std::string &name) {
       if (FileUtils::FileExists(script_path)) {
         auto res_fs = FileUtils::ReadFile(script_path);
         if (res_fs.has_value()) {
-          lua_State *L;
-          init_lua(&L);
-          add_lua(L);
           std::string path = script_path.string();
           auto rr = res_fs.value();
           if (LUA_OK != lua_load(
@@ -630,8 +626,7 @@ bool Scene::init(Renderer::Render &render) {
 }
 
 void Scene::cleanup() {
-  for (auto L : luas)
-    close_lua(L);
+  close_lua(L);
 
   if (self)
     delete self;
@@ -799,7 +794,8 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
                   : parentObj;
 
   if (node->script_class_idx != -1) {
-    ScriptClass &sc = script_classes[node->script_class_idx];
+    const ScriptClass &sc =
+        objPool.get_script_classes()[node->script_class_idx];
     lua_rawgeti(sc.L, LUA_REGISTRYINDEX, SCENE_SCRIPT_CLASSES_IDX);
     lua_rawgeti(sc.L, -1, node->script_class_idx + 1);
     lua_remove(sc.L, -2);

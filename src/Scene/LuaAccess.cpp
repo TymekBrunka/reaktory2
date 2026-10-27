@@ -9,9 +9,10 @@ void ScriptClass::destroy() {
   if (tableidx != -1) {
     lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_SCRIPT_CLASSES_IDX);
     lua_pushnil(L);
+    for (int i = 1; i < 7; i++)
+      std::cerr << "lua type: " << (int)(lua_type(L, i) - LUA_TNIL) << "\n";
     lua_rawseti(L, -2, tableidx + 1);
-    (*scene)->script_class_free_list.push_back(
-        Scene::tabidx{.tabidx = tableidx, .L = L});
+    (*scene)->objPool.script_class_free_list.push_back(tableidx);
   }
 }
 
@@ -79,20 +80,12 @@ public:
     LUAB_MCARGCHECK(1);
     Scene *scene = *(*ud);
     int tableidx = -1;
-    if (!scene->script_class_free_list.empty()) {
-      int i = scene->script_class_free_list.size() - 1;
-      for (auto freeidx = scene->script_class_free_list.rbegin();
-           freeidx != scene->script_class_free_list.rend(); freeidx++) {
-        if (freeidx->L == L) {
-          tableidx = freeidx->tabidx;
-          scene->script_class_free_list.erase(
-              scene->script_class_free_list.begin() + i);
-          break;
-        }
-        i--;
-      }
+    auto &freelist = scene->objPool.script_class_free_list;
+    if (!freelist.empty()) {
+      tableidx = freelist[freelist.size() - 1];
+      freelist.erase(freelist.begin() + freelist.size() - 1);
     } else {
-      tableidx = scene->script_classes.size();
+      tableidx = scene->objPool.script_classes.size();
     }
 
     if (lua_getfield(L, 2, "name") != LUA_TSTRING) {
@@ -109,12 +102,6 @@ public:
     ScriptClass sc{&scene, L, tableidx, name};
 
     lua_remove(L, -1); // remove name copy from stack
-    scene->script_classes.push_back(std::move(sc));
-
-    lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_SCRIPT_CLASSES_IDX);
-    lua_pushvalue(L, 2);
-    lua_rawseti(L, -2, tableidx + 1);
-    lua_remove(L, -1);
 
     int ftype = lua_getfield(L, 2, "on_attach");
     if (ftype != LUA_TNIL && ftype != LUA_TFUNCTION) {
@@ -166,6 +153,14 @@ public:
     // lua_getfield(L, 2, "on_start");
     // call_lua(L);
 
+    lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_SCRIPT_CLASSES_IDX);
+    lua_pushvalue(L, 2);
+    for (int i = 1; i < 7; i++)
+      std::cerr << "lua type: " << (int)(lua_type(L, i) - LUA_TNIL) << "\n";
+    lua_rawseti(L, -2, tableidx + 1);
+    lua_remove(L, -1);
+
+    scene->objPool.script_classes.push_back(std::move(sc));
     return 0;
   }
 
@@ -387,6 +382,38 @@ public:
       lua_pushnil(L);
       return 1;
     }
+  }
+
+  static int obj_get_self(lua_State *L) {
+    auto ud = LUAB_METHODCHECK(Object *, "ObjectRef");
+    LUAB_MCARGCHECK(0);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_DATA_IDX);
+    lua_rawgeti(L, -1, (*ud)->ref_to_self + 1);
+    return 1;
+  }
+
+  static int obj_set_self(lua_State *L) {
+    auto ud = LUAB_METHODCHECK(Object *, "ObjectRef");
+    LUAB_MCARGCHECK(1);
+    if ((*ud)->ref_to_self == -1) {
+      lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_IN_REG_IDX);
+      Scene *scene = (*(*(Scene ***)lua_touserdata(L, -1)));
+      int tableidx = -1;
+      auto &freelist = scene->objPool.script_data_freelist;
+      if (!freelist.empty()) {
+        tableidx = freelist[freelist.size() - 1];
+        freelist.erase(freelist.begin() + freelist.size() - 1);
+      } else {
+        tableidx = freelist.size();
+      }
+      std::cerr << "new obj at " << lua_rawlen(L, -1) + 1 << "\n";
+    }
+    lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_DATA_IDX);
+    lua_pushvalue(L, 2);
+    for (int i = 1; i < 7; i++)
+      std::cerr << "lua type: " << (int)(lua_type(L, i) - LUA_TNIL) << "\n";
+    lua_rawseti(L, -2, (*ud)->ref_to_self + 1);
+    return 0;
   }
 
   static int obj_tostring(lua_State *L) {
@@ -711,13 +738,22 @@ public:
 };
 
 void Scene::add_lua(lua_State *L) {
-  luas.push_back(L);
-
   lua_newtable(L);
   int scene_script_classes_idx =
       luaL_ref(L, LUA_REGISTRYINDEX); // not the global constexpr
   std::cerr << "scene script classes idx is " << scene_script_classes_idx
             << "\n";
+
+  lua_newtable(L);
+  int scene_data_idx =
+      luaL_ref(L, LUA_REGISTRYINDEX); // not the global constexpr
+  std::cerr << "scene data idx is " << scene_data_idx << "\n";
+
+  Scene ***scene_ud = (Scene ***)lua_newuserdata(L, sizeof(void *));
+  *scene_ud = self;
+  int scene_in_reg_idx =
+      luaL_ref(L, LUA_REGISTRYINDEX); // not the global constexpr
+  std::cerr << "scene in registry idx is " << scene_in_reg_idx << "\n";
 
   lua_newtable(L);
   const char *variant_enums[] = {/*"EMPTY",*/ "NODE", "MODEL", nullptr};
@@ -810,6 +846,8 @@ void Scene::add_lua(lua_State *L) {
         {"model", SceneLuaBindings::obj_try_get_model},
         {"setVariant", SceneLuaBindings::obj_switch_variant},
         {"numChildren", SceneLuaBindings::obj_get_numchildren},
+        {"self", SceneLuaBindings::obj_get_self},
+        {"setSelf", SceneLuaBindings::obj_set_self},
         {"__tostring", SceneLuaBindings::obj_tostring},
         {NULL, NULL},
     };

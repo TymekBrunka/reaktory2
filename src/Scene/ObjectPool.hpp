@@ -1,6 +1,8 @@
 #pragma once
+#include <LuaBindings.hpp>
 #include <ResourceManager.hpp>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -36,6 +38,29 @@ struct oNode {
 };
 
 class Scene;
+class ObjectPool;
+
+static constexpr int SCENE_SCRIPT_CLASSES_IDX = 5;
+static constexpr int SCENE_DATA_IDX = 6;
+static constexpr int SCENE_IN_REG_IDX = 7;
+
+class ScriptClass {
+public:
+  int tableidx;
+  lua_State *L;
+  Scene **scene;
+  std::string name;
+
+  ~ScriptClass() = default;
+  ScriptClass(Scene **scene_, lua_State *L_, int tableidx_, const char *name_)
+      : L(L_), tableidx(tableidx_), name(name_), scene(scene_) {}
+  ScriptClass(const ScriptClass &other);
+  ScriptClass &operator=(const ScriptClass &other);
+  ScriptClass(ScriptClass &&other);
+  ScriptClass &operator=(ScriptClass &&other);
+
+  void destroy();
+};
 
 struct Object {
   uint8_t gen = 1;
@@ -49,25 +74,43 @@ struct Object {
   std::vector<int> lua_params;
   std::variant<oEmptySlot, oNode, oModel> variant;
 
-  inline objH toHandle(int16_t idx) const { return objH{.gen = gen, .idx = idx}; }
+  inline objH toHandle(int16_t idx) const {
+    return objH{.gen = gen, .idx = idx};
+  }
 
-  void change_script_class(Scene *scene, int new_script_class_idx);
+  void change_script_class(ObjectPool *pool, int new_script_class_idx);
 };
 
 class ObjectPool {
+  friend class SceneLuaBindings;
+  friend class ScriptClass;
+  friend class Object;
+
 private:
+  lua_State *L;
+  std::vector<uint16_t> script_data_freelist;
   std::vector<Object> objects;
   std::vector<uint16_t> free_indices;
+
+  std::vector<int> script_class_free_list;
+  std::vector<ScriptClass> script_classes;
   void remove_impl(int16_t idx);
 
 public:
   ObjectPool();
+  ObjectPool(lua_State *L);
 
   ~ObjectPool() = default;
   ObjectPool(const ObjectPool &other) = delete;
   ObjectPool &operator=(const ObjectPool &other) = delete;
   ObjectPool(ObjectPool &&other) = default;
   ObjectPool &operator=(ObjectPool &&other) = default;
+
+  inline const std::vector<ScriptClass> &get_script_classes() const {
+    return script_classes;
+  }
+
+  inline lua_State *get_lua() const { return L; }
 
   inline objH rootH() const { return objH{.gen = objects[0].gen, .idx = 0}; }
 

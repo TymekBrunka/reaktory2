@@ -11,30 +11,6 @@
 #include <ObjectPool.hpp>
 #include <ResourceManager.hpp>
 
-static constexpr int SCENE_SCRIPT_CLASSES_IDX = 5;
-
-class Scene;
-
-class ScriptClass {
-public:
-  int tableidx;
-  lua_State *L;
-  Scene **scene;
-  std::string name;
-
-  ~ScriptClass() = default;
-  ScriptClass(Scene **scene_, lua_State *L_, int tableidx_, const char *name_)
-      : L(L_), tableidx(tableidx_), name(name_), scene(scene_) {}
-  ScriptClass(const ScriptClass &other);
-  ScriptClass &operator=(const ScriptClass &other);
-  ScriptClass(ScriptClass &&other);
-  ScriptClass &operator=(ScriptClass &&other);
-
-  lua_State *get_lua() const { return L; }
-
-  void destroy();
-};
-
 class Scene {
   friend class SceneLuaBindings;
   friend class ScriptClass;
@@ -104,14 +80,7 @@ private:
   std::string name;
   std::filesystem::path current_folder{};
 
-  struct tabidx {
-    int tabidx;
-    lua_State *L;
-  };
-
-  std::vector<tabidx> script_class_free_list;
-  std::vector<ScriptClass> script_classes;
-  std::vector<lua_State *> luas; // to close them later
+  lua_State *L;
 
   bool create_framebuffer();
   void resize_framebuffer(Renderer::rect_size size);
@@ -143,9 +112,6 @@ public:
   static void Cleanup();
 
   inline const std::string &get_name() const { return name; }
-  inline const std::vector<ScriptClass> &get_script_classes() const {
-    return script_classes;
-  }
 
   static bool Init(Renderer::Render &render);
   bool init(Renderer::Render &render);

@@ -505,8 +505,8 @@ void App::draw_gui() {
                 &wpos, &wpos2, "skrypt", ICON_FA_MICROCHIP,
                 node->script_class_idx == -1
                     ? "(brak)"
-                    : selected_scene
-                          ->get_script_classes()[node->script_class_idx]
+                    : selected_scene->objPool
+                          .get_script_classes()[node->script_class_idx]
                           .name.c_str())) {
           ImDrawList *drawlist = ImGui::GetWindowDrawList();
           ImVec2 ra = ImGui::GetContentRegionAvail();
@@ -525,10 +525,10 @@ void App::draw_gui() {
           drawlist->AddText(ImVec2(bpos.x + 1, bpos.y + 2),
                             ImColor(255, 255, 255), "(brak)");
           if (ret)
-            node->change_script_class(selected_scene, -1);
+            node->change_script_class(&selected_scene->objPool, -1);
 
           int sc_idx = 0;
-          for (const auto &sc : selected_scene->get_script_classes()) {
+          for (const auto &sc : selected_scene->objPool.get_script_classes()) {
 
             if (!sc_filter.PassFilter(sc.name.c_str()))
               continue;
@@ -544,7 +544,7 @@ void App::draw_gui() {
             drawlist->AddText(ImVec2(bpos.x + 22, bpos.y + 2),
                               ImColor(255, 255, 255), sc.name.c_str());
             if (ret)
-              node->change_script_class(selected_scene, sc_idx);
+              node->change_script_class(&selected_scene->objPool, sc_idx);
 
             ImGui::PopID();
             sc_idx++;

@@ -4,10 +4,11 @@
 #include <ObjectPool.hpp>
 #include <Scene.hpp>
 #include <cstdint>
+#include <iostream>
 
-void Object::change_script_class(Scene *scene, int new_script_class_idx) {
+void Object::change_script_class(ObjectPool *pool, int new_script_class_idx) {
   if (script_class_idx != -1) {
-    auto L = scene->get_script_classes()[script_class_idx].get_lua();
+    auto L = pool->get_lua();
     lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_SCRIPT_CLASSES_IDX);
     lua_rawgeti(L, -1, script_class_idx + 1);
     lua_remove(L, -2);
@@ -18,12 +19,27 @@ void Object::change_script_class(Scene *scene, int new_script_class_idx) {
     luaL_getmetatable(L, "ObjectRef");
     lua_setmetatable(L, -2);
     call_lua(L, 1);
+
+    if (ref_to_self != -1) {
+      lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_DATA_IDX);
+      lua_pushnil(L);
+      for (int i = 1; i < 7; i++)
+        std::cerr << "lua type: " << (int)(lua_type(L, i) - LUA_TNIL) << "\n";
+      lua_rawseti(L, -2, ref_to_self + 1);
+      lua_remove(L, -1);
+
+      lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_IN_REG_IDX);
+      Scene *scene = (*(*(Scene ***)lua_touserdata(L, -1)));
+      scene->objPool.script_data_freelist.push_back(ref_to_self);
+      ref_to_self = -1;
+    }
+    // lua_remove(L, -1);
   }
 
   script_class_idx = new_script_class_idx;
 
   if (script_class_idx != -1) {
-    auto L = scene->get_script_classes()[script_class_idx].get_lua();
+    auto L = pool->get_lua();
     lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_SCRIPT_CLASSES_IDX);
     lua_rawgeti(L, -1, script_class_idx + 1);
     lua_remove(L, -2);
@@ -38,6 +54,15 @@ void Object::change_script_class(Scene *scene, int new_script_class_idx) {
 }
 
 ObjectPool::ObjectPool() {
+  objects.push_back(Object{.gen = 1,
+                           .transform = glm::mat4(1.0f),
+                           .name = "Scena",
+                           .children = {},
+                           .variant = oNode{}});
+}
+
+ObjectPool::ObjectPool(lua_State *L) {
+  this->L = L;
   objects.push_back(Object{.gen = 1,
                            .transform = glm::mat4(1.0f),
                            .name = "Scena",
@@ -113,7 +138,14 @@ void ObjectPool::remove_impl(int16_t idx) {
   for (int16_t child : objects[idx].children) {
     remove_impl(child);
   }
-  objects[idx].variant.emplace<oEmptySlot>(oEmptySlot{});
+  Object &obj = objects[idx];
+  obj.variant.emplace<oEmptySlot>(oEmptySlot{});
+  if (obj.script_class_idx != -1) {
+    obj.change_script_class(this, -1);
+    lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_IN_REG_IDX);
+    Scene *scene = (*(*(Scene ***)lua_touserdata(L, -1)));
+    scene->objPool.script_data_freelist.push_back(obj.ref_to_self);
+  }
   free_indices.push_back(idx);
 }
 
