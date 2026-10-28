@@ -141,6 +141,8 @@ Scene::Scene(Scene &&other) {
   other.self = tmp;
   size = other.size;
   mpos = other.mpos;
+  L = other.L;
+  other.L = nullptr;
   skybox_texture = other.skybox_texture;
   skybox_loc = other.skybox_loc;
   framebuffer = other.framebuffer;
@@ -176,6 +178,8 @@ Scene &Scene::operator=(Scene &&other) {
     other.self = tmp;
     size = other.size;
     mpos = other.mpos;
+    L = other.L;
+    other.L = nullptr;
     skybox_texture = other.skybox_texture;
     skybox_loc = other.skybox_loc;
     framebuffer = other.framebuffer;
@@ -275,6 +279,7 @@ Scene::Scene(const std::string &name) {
 
   init_lua(&L);
   add_lua(L);
+  objPool = ObjectPool(L);
 
   for (auto &ent :
        std::filesystem::directory_iterator(current_folder / "scripts")) {

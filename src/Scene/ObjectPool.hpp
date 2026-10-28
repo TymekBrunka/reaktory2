@@ -21,6 +21,10 @@ struct Material {
   std::string diffuse1;
 };
 
+struct _ModelName {
+  std::string model;
+};
+
 struct oModel {
   std::string model;
   std::vector<Material> materials;
@@ -51,6 +55,13 @@ public:
   Scene **scene;
   std::string name;
 
+  struct Param {
+    int types = 0;
+    std::string name;
+  };
+
+  std::vector<Param> params;
+
   ~ScriptClass() = default;
   ScriptClass(Scene **scene_, lua_State *L_, int tableidx_, const char *name_)
       : L(L_), tableidx(tableidx_), name(name_), scene(scene_) {}
@@ -62,6 +73,13 @@ public:
   void destroy();
 };
 
+struct Nil {
+  bool dummy = false;
+};
+
+using LuaParam = std::variant<Nil, bool, int, float, std::string, Material,
+                              objH, _ModelName>;
+
 struct Object {
   uint8_t gen = 1;
   bool collapsed = false;
@@ -71,7 +89,7 @@ struct Object {
   glm::mat4 transform = glm::mat4(1.0f);
   std::string name;
   std::vector<int16_t> children;
-  std::vector<int> lua_params;
+  std::vector<LuaParam> lua_params;
   std::variant<oEmptySlot, oNode, oModel> variant;
 
   inline objH toHandle(int16_t idx) const {

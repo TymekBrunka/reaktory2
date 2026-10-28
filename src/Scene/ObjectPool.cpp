@@ -32,6 +32,8 @@ void Object::change_script_class(ObjectPool *pool, int new_script_class_idx) {
       Scene *scene = (*(*(Scene ***)lua_touserdata(L, -1)));
       scene->objPool.script_data_freelist.push_back(ref_to_self);
       ref_to_self = -1;
+
+      lua_params.clear();
     }
     // lua_remove(L, -1);
   }
@@ -50,6 +52,11 @@ void Object::change_script_class(ObjectPool *pool, int new_script_class_idx) {
     luaL_getmetatable(L, "ObjectRef");
     lua_setmetatable(L, -2);
     call_lua(L, 1);
+
+    for (int i = 0;
+         i < pool->get_script_classes()[script_class_idx].params.size(); i++) {
+      lua_params.push_back(LuaParam{});
+    }
   }
 }
 

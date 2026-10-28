@@ -21,6 +21,7 @@ ScriptClass::ScriptClass(const ScriptClass &other) {
   tableidx = other.tableidx;
   scene = other.scene;
   name = other.name;
+  params = other.params;
 }
 
 ScriptClass &ScriptClass::operator=(const ScriptClass &other) {
@@ -29,6 +30,7 @@ ScriptClass &ScriptClass::operator=(const ScriptClass &other) {
     tableidx = other.tableidx;
     scene = other.scene;
     name = other.name;
+    params = other.params;
   }
   return *this;
 }
@@ -37,6 +39,7 @@ ScriptClass::ScriptClass(ScriptClass &&other) {
   L = other.L;
   tableidx = other.tableidx;
   name = std::move(other.name);
+  params = std::move(other.params);
   other.L = nullptr;
   other.tableidx = -1;
   Scene **tmp = scene;
@@ -49,6 +52,7 @@ ScriptClass &ScriptClass::operator=(ScriptClass &&other) {
     L = other.L;
     tableidx = other.tableidx;
     name = std::move(other.name);
+    params = std::move(other.params);
     other.L = nullptr;
     other.tableidx = -1;
     Scene **tmp = scene;
@@ -103,7 +107,56 @@ public:
 
     lua_remove(L, -1); // remove name copy from stack
 
-    int ftype = lua_getfield(L, 2, "on_attach");
+    int ftype = lua_getfield(L, 2, "params");
+    if (ftype != LUA_TNIL && ftype != LUA_TTABLE) {
+      luaL_error(L,
+                 "bad 'params' field type in argument #1 to 'register_class' "
+                 "(table or nil"
+                 " expected, got %s)",
+                 get_lua_typename(L, -1));
+      return 0;
+    }
+
+    if (ftype == LUA_TTABLE) {
+      int len = lua_rawlen(L, -1);
+      for (int i = 1; i <= len; i++) {
+        lua_rawgeti(L, -1, i);
+        lua_rawgeti(L, -1, 1);
+        const char *param_name = lua_tostring(L, -1);
+        if (!param_name) {
+          luaL_error(
+              L,
+              "bad type of 1st element in one of elements in 'params' field in "
+              "argument #1 to 'register_class' "
+              "(string expected, got %s)",
+              get_lua_typename(L, -1));
+          return 0;
+        }
+
+        ScriptClass::Param param{.name = param_name};
+        lua_remove(L, -1);
+
+        lua_rawgeti(L, -1, 2);
+        int isnum;
+        int paramtypes = lua_tointegerx(L, -1, &isnum);
+        if (!isnum) {
+          luaL_error(
+              L,
+              "bad type of 2nd element in one of elements in 'params' field in "
+              "argument #1 to 'register_class' "
+              "(number has no integer representation)");
+          return 0;
+        }
+
+        lua_remove(L, -1);
+        param.types = paramtypes;
+        lua_remove(L, -1);
+
+        sc.params.push_back(param);
+      }
+    }
+
+    ftype = lua_getfield(L, 2, "on_attach");
     if (ftype != LUA_TNIL && ftype != LUA_TFUNCTION) {
       luaL_error(
           L,
@@ -755,15 +808,35 @@ void Scene::add_lua(lua_State *L) {
       luaL_ref(L, LUA_REGISTRYINDEX); // not the global constexpr
   std::cerr << "scene in registry idx is " << scene_in_reg_idx << "\n";
 
-  lua_newtable(L);
-  const char *variant_enums[] = {/*"EMPTY",*/ "NODE", "MODEL", nullptr};
-  int i = 0;
-  for (const char **variant = variant_enums; *variant != nullptr; variant++) {
-    lua_pushnumber(L, i);
-    lua_setfield(L, -2, *variant);
-    i++;
+  {
+    lua_newtable(L);
+    const char *variant_enums[] = {/*"EMPTY",*/ "NODE", "MODEL", nullptr};
+    int i = 0;
+    for (const char **variant = variant_enums; *variant != nullptr; variant++) {
+      lua_pushnumber(L, i);
+      lua_setfield(L, -2, *variant);
+      i++;
+    }
+    lua_setglobal(L, "ObjectVariants");
   }
-  lua_setglobal(L, "ObjectVariants");
+
+  {
+    lua_newtable(L);
+    lua_pushnumber(L, 0);
+    lua_setfield(L, -2, "NIL");
+    const char *variant_enums[] = {"BOOL",     "INT",  "FLOAT", "STRING",
+                                   "MATERIAL", "OBJH", "MODEL", nullptr};
+    int i = 1;
+    for (const char **variant = variant_enums; *variant != nullptr; variant++) {
+      lua_pushnumber(L, i);
+      lua_setfield(L, -2, *variant);
+      i <<= 1;
+    }
+
+    lua_pushnumber(L, 0xffffffff);
+    lua_setfield(L, -2, "ANY");
+    lua_setglobal(L, "ParamTypes");
+  }
 
   // scene
   {
