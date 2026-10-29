@@ -9,8 +9,6 @@ void ScriptClass::destroy() {
   if (tableidx != -1) {
     lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_SCRIPT_CLASSES_IDX);
     lua_pushnil(L);
-    for (int i = 1; i < 7; i++)
-      std::cerr << "lua type: " << (int)(lua_type(L, i) - LUA_TNIL) << "\n";
     lua_rawseti(L, -2, tableidx + 1);
     (*scene)->objPool.script_class_free_list.push_back(tableidx);
   }
@@ -208,8 +206,6 @@ public:
 
     lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_SCRIPT_CLASSES_IDX);
     lua_pushvalue(L, 2);
-    for (int i = 1; i < 7; i++)
-      std::cerr << "lua type: " << (int)(lua_type(L, i) - LUA_TNIL) << "\n";
     lua_rawseti(L, -2, tableidx + 1);
     lua_remove(L, -1);
 
@@ -277,6 +273,10 @@ public:
     auto childidx = lua_tointegerx(L, 3, &isnum);
     if (!isnum) {
       luaL_argerror(L, 2, "number has no integer representation");
+      return 0;
+    }
+    if (childidx < 1 || childidx > (*obj)->children.size()) {
+      luaL_argerror(L, 2, "table index out of range");
       return 0;
     }
     Object *child = (*(*ud))->objPool.getChildOf(*obj, (int16_t)childidx - 1);
@@ -463,10 +463,158 @@ public:
     }
     lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_DATA_IDX);
     lua_pushvalue(L, 2);
-    for (int i = 1; i < 7; i++)
-      std::cerr << "lua type: " << (int)(lua_type(L, i) - LUA_TNIL) << "\n";
     lua_rawseti(L, -2, (*ud)->ref_to_self + 1);
     return 0;
+  }
+
+  static int obj_get_nth_param(lua_State *L) {
+    auto ud = LUAB_METHODCHECK(Object *, "ObjectRef");
+    LUAB_MCARGCHECK(1);
+    int isnum;
+    int idx = lua_tointegerx(L, 2, &isnum);
+    if (!isnum) {
+      luaL_argerror(L, 2, "number has no integer representation");
+      return 0;
+    }
+    if (idx < 1 || idx > (*ud)->lua_params.size()) {
+      luaL_argerror(L, 2, "table index out of range");
+      return 0;
+    }
+
+    auto &param = (*ud)->lua_params[idx - 1];
+    if (const Nil *value = (Nil *)std::get_if<Nil>(&param)) {
+      lua_pushnumber(L, 0);
+      lua_pushnil(L);
+
+    } else if (const bool *value = (bool *)std::get_if<bool>(&param)) {
+      lua_pushnumber(L, 1);
+      lua_pushboolean(L, *value);
+
+    } else if (const int *value = (int *)std::get_if<int>(&param)) {
+      lua_pushnumber(L, 2);
+      lua_pushnumber(L, *value);
+
+    } else if (const float *value = (float *)std::get_if<float>(&param)) {
+      lua_pushnumber(L, 4);
+      lua_pushnumber(L, *value);
+
+    } else if (const std::string *value =
+                   (std::string *)std::get_if<std::string>(&param)) {
+      lua_pushnumber(L, 8);
+      lua_pushstring(L, value->c_str());
+
+    } else if (const Material *value =
+                   (Material *)std::get_if<Material>(&param)) {
+      lua_pushnumber(L, 16);
+      Material *material = (Material *)lua_newuserdata(L, sizeof(Material));
+      memset(material, 0, sizeof(Material));
+      auto tmptr = new (material) Material{};
+      *material = *value;
+      luaL_getmetatable(L, "Material");
+      lua_setmetatable(L, -2);
+
+    } else if (const objH *value = (objH *)std::get_if<objH>(&param)) {
+      lua_pushnumber(L, 32);
+      objH *obj = (objH *)lua_newuserdata(L, sizeof(objH));
+      *obj = *value;
+      luaL_getmetatable(L, "ObjectHandle");
+      lua_setmetatable(L, -2);
+
+    } else if (const _ModelName *value =
+                   (_ModelName *)std::get_if<_ModelName>(&param)) {
+      lua_pushnumber(L, 64);
+      lua_pushstring(L, value->model.c_str());
+    }
+    return 2;
+  }
+
+  static int obj_set_nth_param(lua_State *L) {
+    auto ud = LUAB_METHODCHECK(Object *, "ObjectRef");
+    LUAB_MCARGCHECK(3);
+    int isnum;
+    int idx = lua_tointegerx(L, 2, &isnum);
+    if (!isnum) {
+      luaL_argerror(L, 2, "number has no integer representation");
+      return 0;
+    }
+    if (idx < 1 || idx > (*ud)->lua_params.size()) {
+      luaL_argerror(L, 2, "table index out of range");
+      return 0;
+    }
+    int type = lua_tointegerx(L, 3, &isnum);
+    if (!isnum) {
+      luaL_argerror(L, 3, "number has no integer representation");
+      return 0;
+    }
+
+    switch (type) {
+    case 0:
+      if (!lua_isnil(L, 4)) {
+        luaL_typeerror(L, 4, "nil");
+        return 0;
+      }
+      (*ud)->lua_params[idx - 1] = Nil{};
+      return 0;
+
+    case 1:
+      if (!lua_isboolean(L, 4)) {
+        luaL_typeerror(L, 4, "boolean");
+        return 0;
+      }
+      (*ud)->lua_params[idx - 1] = lua_toboolean(L, 4);
+      return 0;
+
+    case 2: {
+      int num = lua_tointegerx(L, 4, &isnum);
+      if (!isnum) {
+        luaL_argerror(L, 4, "number has no integer representation");
+        return 0;
+      }
+      (*ud)->lua_params[idx - 1] = (int)num;
+      return 0;
+    }
+
+    case 4:
+      if (!lua_isnumber(L, 4)) {
+        luaL_typeerror(L, 4, "number");
+        return 0;
+      }
+      (*ud)->lua_params[idx - 1] = (float)lua_tonumber(L, 4);
+      return 0;
+
+    case 8:
+      if (const char *str = lua_tostring(L, 4)) {
+        (*ud)->lua_params[idx - 1] = std::string(str);
+        return 0;
+      } else {
+        luaL_typeerror(L, 4, "string");
+        return 0;
+      }
+
+    case 16: {
+      LUAB_ARGCHECK(4, Material, material, "Material");
+      (*ud)->lua_params[idx - 1] = *material;
+      return 0;
+    }
+
+    case 32: {
+      LUAB_ARGCHECK(4, objH, obj, "ObjectHandle");
+      (*ud)->lua_params[idx - 1] = *obj;
+      return 0;
+    }
+
+    case 64:
+      if (const char *str = lua_tostring(L, 4)) {
+        (*ud)->lua_params[idx - 1] = _ModelName{.model = str};
+        return 0;
+      } else {
+        luaL_typeerror(L, 4, "string");
+        return 0;
+      }
+
+    default:
+      luaL_argerror(L, 4, "invalid type index");
+    }
   }
 
   static int obj_tostring(lua_State *L) {
@@ -583,8 +731,12 @@ public:
       luaL_argerror(L, 2, "number has no integer representation");
       return 0;
     }
+    if (idx < 1 || idx > (*ud)->materials.size()) {
+      luaL_argerror(L, 2, "table index out of range");
+      return 0;
+    }
     Material *material = (Material *)lua_newuserdata(L, sizeof(Material));
-    memset(material, 0, sizeof(Material));
+    auto tmptr = new (material) Material{};
     *material = (*ud)->materials[idx - 1];
     luaL_getmetatable(L, "Material");
     lua_setmetatable(L, -2);
@@ -598,6 +750,10 @@ public:
     auto idx = lua_tointegerx(L, 2, &isnum);
     if (!isnum) {
       luaL_argerror(L, 2, "number has no integer representation");
+      return 0;
+    }
+    if (idx < 1 || idx > (*ud)->materials.size()) {
+      luaL_argerror(L, 2, "table index out of range");
       return 0;
     }
     LUAB_ARGCHECK(3, Material, material, "Material");
@@ -921,6 +1077,7 @@ void Scene::add_lua(lua_State *L) {
         {"numChildren", SceneLuaBindings::obj_get_numchildren},
         {"self", SceneLuaBindings::obj_get_self},
         {"setSelf", SceneLuaBindings::obj_set_self},
+        {"nthParam", SceneLuaBindings::obj_get_nth_param},
         {"__tostring", SceneLuaBindings::obj_tostring},
         {NULL, NULL},
     };

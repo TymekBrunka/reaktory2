@@ -20,11 +20,11 @@ void Object::change_script_class(ObjectPool *pool, int new_script_class_idx) {
     lua_setmetatable(L, -2);
     call_lua(L, 1);
 
+    lua_params.clear();
+
     if (ref_to_self != -1) {
       lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_DATA_IDX);
       lua_pushnil(L);
-      for (int i = 1; i < 7; i++)
-        std::cerr << "lua type: " << (int)(lua_type(L, i) - LUA_TNIL) << "\n";
       lua_rawseti(L, -2, ref_to_self + 1);
       lua_remove(L, -1);
 
@@ -32,8 +32,6 @@ void Object::change_script_class(ObjectPool *pool, int new_script_class_idx) {
       Scene *scene = (*(*(Scene ***)lua_touserdata(L, -1)));
       scene->objPool.script_data_freelist.push_back(ref_to_self);
       ref_to_self = -1;
-
-      lua_params.clear();
     }
     // lua_remove(L, -1);
   }

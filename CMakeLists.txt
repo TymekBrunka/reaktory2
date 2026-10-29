@@ -152,6 +152,14 @@ add_library(logging STATIC
   src/Components/Logging/Logging.hpp
 )
 
+add_library(Sheet STATIC
+  src/Components/Sheet/Sheet.cpp
+  src/Components/Sheet/Sheet.hpp
+)
+
+target_include_directories(Sheet PUBLIC src/Components/Sheet PRIVATE ${OpenXLSX_INCLUDES})
+target_link_libraries(Sheet PUBLIC pch_core PRIVATE OpenXLSX::OpenXLSX)
+
 add_library(translations STATIC
   src/Components/Logging/Translations.cpp
   src/Components/Logging/Translations.hpp
@@ -246,7 +254,7 @@ add_library(Scene STATIC
   # src/Scene/LuaAccess.hpp
 )
 target_include_directories(Scene PUBLIC src/Scene/)
-target_link_libraries(Scene PUBLIC logging renderer renderer_model fileutils glm::glm Scene_resource_manager Scene_object_pool LuaBindings PRIVATE imgui imguizmo staticassets_scene shaders glad imgui)
+target_link_libraries(Scene PUBLIC logging renderer renderer_model fileutils glm::glm Scene_resource_manager Scene_object_pool LuaBindings Sheet PRIVATE imgui imguizmo staticassets_scene shaders glad imgui)
 target_precompile_headers(Scene REUSE_FROM logging)
 
 add_library(App STATIC

@@ -15,6 +15,7 @@
 #include <Renderer.hpp>
 #include <Renderer_internal.hpp>
 #include <Scene.hpp>
+#include <Sheet.hpp>
 #include <iostream>
 
 #include <shaders.h>
@@ -276,6 +277,8 @@ Scene::Scene(const std::string &name) {
            std::make_format_args(name));
 
   resMan = std::move(ResourceManager{current_folder / "models"});
+
+  ReadXLSXfile(current_folder / "excel_sheets" / "data.xlsx");
 
   init_lua(&L);
   add_lua(L);

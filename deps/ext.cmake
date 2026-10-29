@@ -4,6 +4,9 @@ set(CPM_USE_LOCAL_PACKAGES OFF)
 macro (install)
 endmacro ()
 
+macro (export)
+endmacro ()
+
 # macro (find_package)
 # endmacro ()
 
