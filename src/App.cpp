@@ -313,6 +313,7 @@ bool App::add_scene(const std::string &name) {
   try {
     scene = std::move(Scene{name});
   } catch (const std::exception &err) {
+    std::cerr << "Error: " << err.what() << "\n";
     return false;
   }
 
@@ -348,6 +349,7 @@ bool App::open_scene(const std::string &name) {
   try {
     scene = std::move(Scene{name});
   } catch (const std::exception &err) {
+    std::cerr << "Error: " << err.what() << "\n";
     return false;
   }
 
