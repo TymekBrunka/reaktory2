@@ -1,9 +1,12 @@
 #include "XLCellValue.hpp"
+#include "XLDateTime.hpp"
 #include "XLDocument.hpp"
 #include "XLSheet.hpp"
 #include "XLStyles.hpp"
+#include "XLXmlParserForwardDeclarations.hpp"
 #include <OpenXLSX.hpp>
 #include <Sheet.hpp>
+#include <ctime>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -14,6 +17,29 @@
 // static uint32_t internal_nrfmt_ids_with_date_or_time[] = {
 //     14, 15, 16, 17, 18, 19, 20, 21, 22, 38, 40, 45, 46, 47, 27, 28, 29,
 //     30, 31, 32, 33, 34, 35, 36, 50, 51, 52, 53, 54, 55, 56, 57, 58, 81};
+
+void Sheet::printcell2console(CellValue *cell) {
+  if (const NullCell *value = std::get_if<NullCell>(cell)) {
+    std::cerr << "...";
+  } else if (const ErrorCell *value = std::get_if<ErrorCell>(cell)) {
+    std::cerr << "(Error: " << value->msg << ")";
+  } else if (const std::string *value = std::get_if<std::string>(cell)) {
+    std::cerr << value->c_str();
+  } else if (const int64_t *value = std::get_if<int64_t>(cell)) {
+    std::cerr << (int)*value;
+  } else if (const double *value = std::get_if<double>(cell)) {
+    std::cerr << *value;
+  } else if (const bool *value = std::get_if<bool>(cell)) {
+    std::cerr << (*value ? "true" : "false");
+  } else if (const tm *value = std::get_if<tm>(cell)) {
+    static char dtbuf[50] = {0};
+    if (value->tm_mday == 0)
+      strftime(dtbuf, sizeof(dtbuf), "%H:%M:%S", value);
+    else
+      strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", value);
+    std::cerr << dtbuf;
+  }
+}
 
 struct datetime_identity {
   bool is_datetime = false;
@@ -64,10 +90,11 @@ static bool is_datetime(OpenXLSX::XLDocument &doc,
   return false;
 }
 
-void ReadXLSXfile(const std::filesystem::path &path_) {
+Sheet ReadXLSXfile(const std::filesystem::path &path_) {
   OpenXLSX::XLDocument doc;
   doc.open(path_.string());
   std::vector<datetime_identity> datetime_ids;
+  Sheet sheet;
 
   std::cerr << "=== document has " << doc.styles().numberFormats().count()
             << " number formats.\n";
@@ -82,38 +109,16 @@ void ReadXLSXfile(const std::filesystem::path &path_) {
   std::cerr
       << "--- " << doc.workbook().worksheetCount()
       << " worksheets to load (we're going to use only 1st one anyway)---\n";
-  OpenXLSX::XLWorksheet sheet = doc.workbook().worksheet(1);
-  int width = sheet.columnCount(), height = sheet.rowCount();
+  OpenXLSX::XLWorksheet wbk = doc.workbook().worksheet(1);
+  int width = wbk.columnCount(), height = wbk.rowCount();
   std::cerr << "   \n";
   std::cerr << "   size: " << width << "x" << height << "\n";
-
-  // for (const auto &row : sheet.rows(height)) {
-  //   std::cerr << "   ";
-  //   for (const auto &cell : row.cells(width)) {
-  //     std::cerr << cell.value().typeAsString() << " | ";
-  //   }
-  //   std::cerr << "\n";
-  // }
-
-  for (const auto &row : sheet.rows(height)) {
-    std::cerr << "   ";
-    for (const auto &cell : row.cells(width)) {
-      if (cell.value().type() == OpenXLSX::XLValueType::Float ||
-          cell.value().type() == OpenXLSX::XLValueType::Integer)
-        std::cerr << cell.value().getString() << "\\"
-                  << is_datetime(doc, datetime_ids, cell) << " | ";
-      else {
-        std::cerr << cell.value().getString() << " | ";
-      }
-    }
-    std::cerr << "\n";
-  }
 
   // find first header cell (assuming there's nothing before the table start)
   int startr = 0;
   int startc = 0;
   bool foundstart = false;
-  for (const auto &row : sheet.rows(height)) {
+  for (const auto &row : wbk.rows(height)) {
     startr++;
     if (!row.cellCount())
       continue;
@@ -131,11 +136,11 @@ void ReadXLSXfile(const std::filesystem::path &path_) {
   }
 
   if (!foundstart)
-    return;
+    return sheet;
 
   int lasthidx = startc - 1;
   std::vector<std::string> headers;
-  for (const auto &header : sheet.row(startr).cells(startc, width)) {
+  for (const auto &header : wbk.row(startr).cells(startc, width)) {
     if (header.value().type() != OpenXLSX::XLValueType::String)
       break;
 
@@ -143,17 +148,86 @@ void ReadXLSXfile(const std::filesystem::path &path_) {
     headers.push_back(header.value().getString());
   }
 
-  // for (const auto &row : sheet.rows(startr + 1, height)) {
-  //   std::cerr << "   ";
-  //   for (const auto &cell : row.cells(startc, lasthidx)) {
-  //     std::cerr << cell.value() << " | ";
-  //     // std::string a = cell.value().getString();
-  //   }
-  //   std::cerr << "\n";
-  //   if (!row.cellCount())
-  //     break;
-  // }
+  sheet.width = lasthidx - startc;
+  if (sheet.width <= 0)
+    return sheet;
+
+  for (auto &row : wbk.rows(startr + 1, height)) {
+    if (!row.cellCount())
+      break;
+
+    bool skiprow = true;
+
+    const auto &dtcell = row.findCell(startc);
+    if (dtcell.value().type() == OpenXLSX::XLValueType::Float &&
+        is_datetime(doc, datetime_ids, dtcell)) {
+      double dt = dtcell.value().get<double>();
+      tm d = OpenXLSX::XLDateTime(dt <= 1 ? dt + 1 : dt).tm();
+      if (dt > 1) {
+        sheet.rows.push_back(SheetRow{.offset = sheet.data.size()});
+        sheet.rows[sheet.rows.size() - 1].time = d;
+        skiprow = false;
+      }
+    }
+
+    if (skiprow)
+      continue;
+
+    for (const auto &cell : row.cells(startc + 1, lasthidx)) {
+
+      auto type = cell.value().type();
+
+      CellValue cv;
+      switch (type) {
+      case OpenXLSX::XLValueType::Empty:
+        cv = NullCell{};
+        break;
+      case OpenXLSX::XLValueType::Error:
+        cv = ErrorCell{.msg = std::move(cell.value().get<std::string>())};
+        break;
+      case OpenXLSX::XLValueType::String:
+        cv = std::move(cell.value().get<std::string>());
+        break;
+      case OpenXLSX::XLValueType::Integer:
+        cv = cell.value().get<int64_t>();
+        break;
+      case OpenXLSX::XLValueType::Float:
+        if (is_datetime(doc, datetime_ids, cell)) {
+          double dt = cell.value().get<double>();
+          tm d = OpenXLSX::XLDateTime(dt <= 1 ? dt + 1 : dt).tm();
+          if (dt <= 1)
+            d.tm_mday = 0;
+          cv = d;
+          break;
+        } else {
+          cv = cell.value().get<double>();
+          break;
+        }
+        break;
+      case OpenXLSX::XLValueType::Boolean:
+        cv = cell.value().get<bool>();
+        break;
+      }
+
+      sheet.data.push_back(cv);
+    }
+    sheet.height++;
+  }
+
+  for (int h = 0; h < sheet.height; h++) {
+    static char dtbuf[50] = {0};
+    tm *value = &sheet.rows[h].time;
+    strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", value);
+    std::cerr << dtbuf << " | ";
+
+    for (int w = 0; w < sheet.width; w++) {
+      Sheet::printcell2console(&sheet.data[sheet.rows[h].offset + w]);
+      std::cerr << " | ";
+    }
+    std::cerr << "\n";
+  }
   std::cerr << "------\n";
 
   doc.close();
+  return sheet;
 }
