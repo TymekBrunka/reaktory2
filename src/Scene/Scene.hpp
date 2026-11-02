@@ -10,6 +10,7 @@
 #include <LuaBindings.hpp>
 #include <ObjectPool.hpp>
 #include <ResourceManager.hpp>
+#include <Sheet.hpp>
 
 class Scene {
   friend class SceneLuaBindings;
@@ -60,6 +61,7 @@ public:
   Renderer::rTexture2D screen_canvas = 0;
   Renderer::rTexture2D color_canvas = 0;
   objH selected_object = {.gen = 1, .idx = 0}; // scene node
+  std::string selected_sheet;
 
 private:
   Scene **self; // pointer to blob of memory that stays in place and points at
@@ -81,6 +83,7 @@ private:
   std::filesystem::path current_folder{};
 
   lua_State *L;
+  std::unordered_map<std::string, Sheet> sheets;
 
   bool create_framebuffer();
   void resize_framebuffer(Renderer::rect_size size);
@@ -112,6 +115,8 @@ public:
   static void Cleanup();
 
   inline const std::string &get_name() const { return name; }
+
+  inline const decltype(sheets) &get_sheets() const { return sheets; }
 
   static bool Init(Renderer::Render &render);
   bool init(Renderer::Render &render);

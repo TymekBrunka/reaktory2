@@ -225,6 +225,7 @@ target_precompile_headers(renderer_model REUSE_FROM logging)
 # target_include_directories(NodeEditor PUBLIC src/NodeEditor)
 
 add_library(Scene_resource_manager STATIC
+  src/Scene/Scene.hpp
   src/Scene/ResourceManager.hpp
   src/Scene/ResourceManager.cpp
 )
@@ -237,7 +238,7 @@ add_library(Scene_object_pool STATIC
   src/Scene/ObjectPool.cpp
 )
 target_include_directories(Scene_object_pool PUBLIC src/Scene/)
-target_link_libraries(Scene_object_pool PUBLIC logging Scene_resource_manager LuaBindings)
+target_link_libraries(Scene_object_pool PUBLIC logging Scene_resource_manager LuaBindings PRIVATE Sheet)
 target_precompile_headers(Scene_object_pool REUSE_FROM logging)
 
 add_library(LuaBindings STATIC

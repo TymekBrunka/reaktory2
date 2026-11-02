@@ -1,6 +1,7 @@
 #pragma once
 #include <ctime>
 #include <filesystem>
+#include <expected>
 
 struct NullCell {
   bool dummy;
@@ -29,4 +30,4 @@ struct Sheet {
   static void printcell2console(CellValue *cell);
 };
 
-Sheet ReadXLSXfile(const std::filesystem::path &path_);
+std::expected<Sheet, bool> ReadXLSXfile(const std::filesystem::path &path_);

@@ -5,8 +5,10 @@
 #include "ObjectPool.hpp"
 #include "Renderer.hpp"
 #include "ResourceManager.hpp"
+#include "Sheet.hpp"
 #include "imgui.h"
 #include "pfd/pfd.hpp"
+#include "stdlib.h"
 #include <FontsAwesome/IconsFontAwesome6.h>
 #include <cfloat>
 #include <cstdio>
@@ -1061,6 +1063,74 @@ void App::draw_gui() {
         width_accumulator = 0;
     }
     ImGui::EndChild();
+  }
+  ImGui::End();
+
+  if (ImGui::Begin(ICON_FA_TABLE " Tabele") && selected_scene) {
+    ImGui::Text(ICON_FA_TABLE " Tabele (%d)",
+                selected_scene->get_sheets().size());
+    ImVec2 wsize = ImGui::GetWindowSize();
+    ImGui::BeginChild("sheets_child_tabs", ImVec2(wsize.x - 16, 0),
+                      ImGuiChildFlags_AutoResizeY);
+    for (const auto &[name, sheet] : selected_scene->get_sheets()) {
+      if (ImGui::Selectable(name, name == selected_scene->selected_sheet)) {
+        selected_scene->selected_sheet = name;
+      }
+    }
+    ImGui::EndChild();
+
+    if (selected_scene->selected_sheet >= 0 &&
+        selected_scene->selected_sheet < selected_scene->get_sheets().size()) {
+      const auto &sheet =
+          selected_scene->get_sheets()[selected_scene->selected_sheet];
+
+      ImGui::Text(ICON_FA_TABLE " dane");
+      ImGui::BeginTable(selected_scene->selected_sheet.c_str(), sheet.headers.size(),
+                        ImGuiTableFlags_Resizable |
+                            ImGuiTableFlags_Reorderable |
+                            ImGuiTableFlags_Hideable | ImGuiTableFlags_Borders |
+                            ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY |
+                            ImGuiTableFlags_SizingFixedFit);
+
+      for (const auto header : sheet.headers) {
+        ImGui::TableSetupColumn(header.c_str());
+      }
+      ImGui::TableHeadersRow();
+      const CellValue *cv = sheet.data.data();
+      for (const auto &row : sheet.rows) {
+        static char dtbuf[20] = {0};
+        strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", &row.time);
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted(dtbuf);
+        for (int i = 0; i < sheet.width; i++) {
+          ImGui::TableNextColumn();
+
+          if (const NullCell *value = std::get_if<NullCell>(cv)) {
+            ImGui::TextUnformatted("");
+          } else if (const ErrorCell *value = std::get_if<ErrorCell>(cv)) {
+            ImGui::Text("Błąd: %s", value->msg.c_str());
+          } else if (const std::string *value = std::get_if<std::string>(cv)) {
+            ImGui::TextUnformatted(value->c_str());
+          } else if (const int64_t *value = std::get_if<int64_t>(cv)) {
+            ImGui::Text("%d", (int)*value);
+          } else if (const double *value = std::get_if<double>(cv)) {
+            ImGui::Text("%.2lf", *value);
+          } else if (const bool *value = std::get_if<bool>(cv)) {
+            ImGui::TextUnformatted(*value ? "Prawda" : "Fałsz");
+          } else if (const tm *value = std::get_if<tm>(cv)) {
+            static char dtbuf[50] = {0};
+            if (value->tm_mday == 0)
+              strftime(dtbuf, sizeof(dtbuf), "%H:%M:%S", value);
+            else
+              strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", value);
+            ImGui::TextUnformatted(dtbuf);
+          }
+          cv++;
+        }
+      }
+      ImGui::EndTable();
+    }
   }
   ImGui::End();
 }

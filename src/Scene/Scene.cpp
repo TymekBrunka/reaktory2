@@ -153,6 +153,8 @@ Scene::Scene(Scene &&other) {
   initialised = other.initialised;
   resMan = std::move(other.resMan);
   objPool = std::move(other.objPool);
+  sheets = std::move(other.sheets);
+  selected_sheet = std::move(other.selected_sheet);
   // other.self = nullptr;
   other.size = {640, 480};
   other.skybox_texture = 0;
@@ -190,6 +192,8 @@ Scene &Scene::operator=(Scene &&other) {
     initialised = other.initialised;
     resMan = std::move(other.resMan);
     objPool = std::move(other.objPool);
+    sheets = std::move(other.sheets);
+    selected_sheet = std::move(other.selected_sheet);
     // other.self = nullptr;
     other.size = {640, 480};
     other.skybox_texture = 0;
@@ -278,7 +282,15 @@ Scene::Scene(const std::string &name) {
 
   resMan = std::move(ResourceManager{current_folder / "models"});
 
-  ReadXLSXfile(current_folder / "excel_sheets" / "data.xlsx");
+  for (auto &ent :
+       std::filesystem::directory_iterator(current_folder / "excel_sheets")) {
+    if (std::filesystem::is_regular_file(ent.path())) {
+      std::cerr << "loading " << ent.path() << "\n";
+      auto sheet_res = ReadXLSXfile(ent.path());
+      if (sheet_res.has_value())
+        sheets[ent.path().stem().string()] = sheet_res.value();
+    }
+  }
 
   init_lua(&L);
   add_lua(L);
