@@ -4,7 +4,7 @@
 #include <expected>
 
 struct NullCell {
-  bool dummy;
+  bool dummy = false;
 };
 
 struct ErrorCell {
@@ -16,8 +16,8 @@ typedef std::variant<NullCell, ErrorCell, std::string, int64_t, double, bool,
     CellValue;
 
 struct SheetRow {
-  size_t offset;
-  tm time;
+  size_t offset = 0;
+  std::tm time {};
 };
 
 struct Sheet {

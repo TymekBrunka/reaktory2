@@ -83,6 +83,21 @@ private:
   std::filesystem::path current_folder{};
 
   lua_State *L;
+
+  struct string_hash {
+    using is_transparent = void;
+    [[nodiscard]] inline size_t operator()(const char *txt) const {
+      return std::hash<std::string_view>{}(txt);
+    }
+    [[nodiscard]] inline size_t operator()(std::string_view txt) const {
+      return std::hash<std::string_view>{}(txt);
+    }
+    [[nodiscard]] inline size_t operator()(const std::string &txt) const {
+      return std::hash<std::string>{}(txt);
+    }
+  };
+
+  // std::unordered_map<std::string, Sheet, string_hash, std::equal_to<>> sheets;
   std::unordered_map<std::string, Sheet> sheets;
 
   bool create_framebuffer();
@@ -102,6 +117,14 @@ private:
 public:
   ResourceManager resMan{};
   ObjectPool objPool{};
+
+  struct {
+    bool emit_update = false;
+    int width = 0;
+    std::string sheet_name;
+    SheetRow row;
+    const CellValue *ptr = nullptr;
+  } displayed_row;
 
   Scene() = default;
   Scene(const std::string &name);

@@ -154,7 +154,8 @@ Scene::Scene(Scene &&other) {
   resMan = std::move(other.resMan);
   objPool = std::move(other.objPool);
   sheets = std::move(other.sheets);
-  selected_sheet = std::move(other.selected_sheet);
+  // selected_sheet = std::move(other.selected_sheet);
+  // displayed_row = std::move(other.displayed_row);
   // other.self = nullptr;
   other.size = {640, 480};
   other.skybox_texture = 0;
@@ -163,6 +164,16 @@ Scene::Scene(Scene &&other) {
   other.screen_canvas = 0;
   other.color_canvas = 0;
   other.initialised = false;
+
+  other.displayed_row.emit_update = other.displayed_row.emit_update;
+  other.displayed_row.width = other.displayed_row.width;
+  other.displayed_row.sheet_name = std::move(other.displayed_row.sheet_name);
+  other.displayed_row.row = other.displayed_row.row;
+  other.displayed_row.ptr = other.displayed_row.ptr;
+  other.displayed_row.emit_update = false;
+  other.displayed_row.width = 0;
+  other.displayed_row.row = {};
+  other.displayed_row.ptr = nullptr;
 }
 
 Scene &Scene::operator=(Scene &&other) {
@@ -193,7 +204,8 @@ Scene &Scene::operator=(Scene &&other) {
     resMan = std::move(other.resMan);
     objPool = std::move(other.objPool);
     sheets = std::move(other.sheets);
-    selected_sheet = std::move(other.selected_sheet);
+    // selected_sheet = std::move(other.selected_sheet);
+    // displayed_row = std::move(other.displayed_row);
     // other.self = nullptr;
     other.size = {640, 480};
     other.skybox_texture = 0;
@@ -202,6 +214,16 @@ Scene &Scene::operator=(Scene &&other) {
     other.screen_canvas = 0;
     other.color_canvas = 0;
     other.initialised = false;
+
+    other.displayed_row.emit_update = other.displayed_row.emit_update;
+    other.displayed_row.width = other.displayed_row.width;
+    other.displayed_row.sheet_name = std::move(other.displayed_row.sheet_name);
+    other.displayed_row.row = other.displayed_row.row;
+    other.displayed_row.ptr = other.displayed_row.ptr;
+    other.displayed_row.emit_update = false;
+    other.displayed_row.width = 0;
+    other.displayed_row.row = {};
+    other.displayed_row.ptr = nullptr;
   }
   return *this;
 }
