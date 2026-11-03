@@ -1,5 +1,7 @@
 #include "ObjectPool.hpp"
+#include "Sheet.hpp"
 #include "glm/ext/vector_float4.hpp"
+#include "lua.h"
 #include <LuaBindings.hpp>
 #include <Scene.hpp>
 #include <cstring> // for memset bc cppussy cpp tries to destroy object that's not yet created (junk memory)
@@ -10,7 +12,7 @@ void ScriptClass::destroy() {
     lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_SCRIPT_CLASSES_IDX);
     lua_pushnil(L);
     lua_rawseti(L, -2, tableidx + 1);
-    (*scene)->objPool.script_class_free_list.push_back(tableidx);
+    scene->objPool.script_class_free_list.push_back(tableidx);
   }
 }
 
@@ -40,7 +42,7 @@ ScriptClass::ScriptClass(ScriptClass &&other) {
   params = std::move(other.params);
   other.L = nullptr;
   other.tableidx = -1;
-  Scene **tmp = scene;
+  Scene *tmp = scene;
   scene = other.scene;
   other.scene = tmp;
 }
@@ -53,7 +55,7 @@ ScriptClass &ScriptClass::operator=(ScriptClass &&other) {
     params = std::move(other.params);
     other.L = nullptr;
     other.tableidx = -1;
-    Scene **tmp = scene;
+    Scene *tmp = scene;
     scene = other.scene;
     other.scene = tmp;
   }
@@ -63,24 +65,24 @@ ScriptClass &ScriptClass::operator=(ScriptClass &&other) {
 class SceneLuaBindings {
 public:
   static int scene_get_name(lua_State *L) {
-    auto ud = LUAB_METHODCHECK(Scene **, "Scene");
+    auto ud = LUAB_METHODCHECK(Scene *, "Scene");
     LUAB_MCARGCHECK(0);
-    lua_pushstring(L, (*(*ud))->name.c_str());
+    lua_pushstring(L, (*ud)->name.c_str());
     return 1;
   }
 
   static int scene_tostring(lua_State *L) {
-    auto ud = LUAB_METHODCHECK(Scene **, "Scene");
+    auto ud = LUAB_METHODCHECK(Scene *, "Scene");
     LUAB_MCARGCHECK(0);
-    lua_pushfstring(L, "Scene {name = %s, objects = %d}",
-                    (*(*ud))->name.c_str(), (*(*ud))->objPool.size());
+    lua_pushfstring(L, "Scene {name = %s, objects = %d}", (*ud)->name.c_str(),
+                    (*ud)->objPool.size());
     return 1;
   }
 
   static int add_script_class(lua_State *L) {
-    auto ud = LUAB_METHODCHECK(Scene **, "Scene");
+    auto ud = LUAB_METHODCHECK(Scene *, "Scene");
     LUAB_MCARGCHECK(1);
-    Scene *scene = *(*ud);
+    Scene *scene = *ud;
     int tableidx = -1;
     auto &freelist = scene->objPool.script_class_free_list;
     if (!freelist.empty()) {
@@ -101,7 +103,7 @@ public:
 
     const char *name = lua_tostring(L, -1);
 
-    ScriptClass sc{&scene, L, tableidx, name};
+    ScriptClass sc{scene, L, tableidx, name};
 
     lua_remove(L, -1); // remove name copy from stack
 
@@ -257,16 +259,16 @@ public:
   }
 
   static int pool_tostring(lua_State *L) {
-    auto ud = LUAB_METHODCHECK(Scene **, "ObjectPool");
+    auto ud = LUAB_METHODCHECK(Scene *, "ObjectPool");
     LUAB_MCARGCHECK(0);
     lua_pushfstring(L, "ObjectPool {size=%d, capacity=%d}",
-                    (int)(*(*ud))->objPool.size(),
-                    (int)(*(*ud))->objPool.real_size());
+                    (int)(*ud)->objPool.size(),
+                    (int)(*ud)->objPool.real_size());
     return 1;
   }
 
   static int pool_nth_child_of(lua_State *L) {
-    auto ud = LUAB_METHODCHECK(Scene **, "ObjectPool");
+    auto ud = LUAB_METHODCHECK(Scene *, "ObjectPool");
     LUAB_MCARGCHECK(2);
     LUAB_ARGCHECK(2, Object *, obj, "ObjectRef");
     int isnum;
@@ -279,7 +281,7 @@ public:
       luaL_argerror(L, 2, "table index out of range");
       return 0;
     }
-    Object *child = (*(*ud))->objPool.getChildOf(*obj, (int16_t)childidx - 1);
+    Object *child = (*ud)->objPool.getChildOf(*obj, (int16_t)childidx - 1);
     if (!child) {
       lua_pushnil(L);
       return 1;
@@ -292,11 +294,11 @@ public:
   }
 
   static int pool_get(lua_State *L) {
-    auto ud = LUAB_METHODCHECK(Scene **, "ObjectPool");
+    auto ud = LUAB_METHODCHECK(Scene *, "ObjectPool");
     LUAB_MCARGCHECK(1);
     LUAB_ARGCHECK(2, objH, h, "ObjectHandle");
     // std::cerr << "obj handle is {" << h->gen << ", " << h->idx << "}\n";
-    Object *obj = (*(*ud))->objPool.get(*h);
+    Object *obj = (*ud)->objPool.get(*h);
     if (!obj) {
       lua_pushnil(L);
       return 1;
@@ -309,20 +311,20 @@ public:
   }
 
   static int pool_get_root(lua_State *L) {
-    auto ud = LUAB_METHODCHECK(Scene **, "ObjectPool");
+    auto ud = LUAB_METHODCHECK(Scene *, "ObjectPool");
     LUAB_MCARGCHECK(0);
     objH *obj = (objH *)lua_newuserdata(L, sizeof(objH));
-    *obj = (*(*ud))->objPool.rootH();
+    *obj = (*ud)->objPool.rootH();
     luaL_getmetatable(L, "ObjectHandle");
     lua_setmetatable(L, -2);
     return 1;
   }
 
   static int pool_remove(lua_State *L) {
-    auto ud = LUAB_METHODCHECK(Scene **, "ObjectPool");
+    auto ud = LUAB_METHODCHECK(Scene *, "ObjectPool");
     LUAB_MCARGCHECK(1);
     LUAB_ARGCHECK(2, objH, obj, "ObjectHandle");
-    (*(*ud))->objPool.remove(*obj);
+    (*ud)->objPool.remove(*obj);
     return 0;
   }
 
@@ -450,7 +452,7 @@ public:
     LUAB_MCARGCHECK(1);
     if ((*ud)->ref_to_self == -1) {
       lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_IN_REG_IDX);
-      Scene *scene = (*(*(Scene ***)lua_touserdata(L, -1)));
+      Scene *scene = (*(Scene **)lua_touserdata(L, -1));
       int tableidx = -1;
       auto &freelist = scene->objPool.script_data_freelist;
       if (!freelist.empty()) {
@@ -944,6 +946,86 @@ public:
                     ud->w);
     return 1;
   }
+
+  static int row_tostring(lua_State *L) {
+    auto ud = LUAB_METHODCHECK(DisplayRow *, "Row");
+    LUAB_MCARGCHECK(0);
+    lua_pushfstring(L, "Row {sheet = %s, width = %d}", (*ud)->sheet_name,
+                    (*ud)->width);
+    return 1;
+  }
+
+  static int row_get_width(lua_State *L) {
+    auto ud = LUAB_METHODCHECK(DisplayRow *, "Row");
+    LUAB_MCARGCHECK(0);
+    lua_pushnumber(L, (*ud)->width);
+    return 1;
+  }
+
+  static int row_get_sheet(lua_State *L) {
+    auto ud = LUAB_METHODCHECK(DisplayRow *, "Row");
+    LUAB_MCARGCHECK(0);
+    lua_pushstring(L, (*ud)->sheet_name.c_str());
+    return 1;
+  }
+
+  static int row_get_nth_cell(lua_State *L) {
+    auto ud = LUAB_METHODCHECK(DisplayRow *, "Row");
+    LUAB_MCARGCHECK(1);
+    int isnum;
+    auto idx = lua_tointegerx(L, 2, &isnum);
+    if (!isnum) {
+      luaL_argerror(L, 2, "number has no integer representation");
+      return 0;
+    }
+    if (idx < 1 || idx > (*ud)->width) {
+      luaL_argerror(L, 2, "table index out of range");
+      return 0;
+    }
+    const CellValue *cv = (*ud)->ptr + idx - 1;
+    if (const NullCell *value = std::get_if<NullCell>(cv)) {
+      lua_pushnil(L);
+
+    } else if (const ErrorCell *value = std::get_if<ErrorCell>(cv)) {
+      lua_pushstring(L, value->msg.c_str());
+      lua_pushboolean(L, 1);
+      return 2;
+
+    } else if (const std::string *value = std::get_if<std::string>(cv)) {
+      lua_pushstring(L, value->c_str());
+
+    } else if (const int64_t *value = std::get_if<int64_t>(cv)) {
+      lua_pushnumber(L, *value);
+
+    } else if (const double *value = std::get_if<double>(cv)) {
+      lua_pushnumber(L, *value);
+
+    } else if (const bool *value = std::get_if<bool>(cv)) {
+      lua_pushboolean(L, *value);
+
+    } else if (const tm *value = std::get_if<tm>(cv)) {
+      lua_newtable(L);
+      lua_pushnumber(L, value->tm_sec);
+      lua_setfield(L, -2, "sec");
+      lua_pushnumber(L, value->tm_min);
+      lua_setfield(L, -2, "min");
+      lua_pushnumber(L, value->tm_hour);
+      lua_setfield(L, -2, "hour");
+      lua_pushnumber(L, value->tm_yday + 1);
+      lua_setfield(L, -2, "yday");
+      lua_pushnumber(L, value->tm_wday + 1);
+      lua_setfield(L, -2, "wday");
+      lua_pushboolean(L, value->tm_isdst);
+      lua_setfield(L, -2, "isdst");
+      lua_pushnumber(L, value->tm_mday + 1);
+      lua_setfield(L, -2, "day");
+      lua_pushnumber(L, value->tm_mon + 1);
+      lua_setfield(L, -2, "month");
+      lua_pushnumber(L, value->tm_year + 1900);
+      lua_setfield(L, -2, "year");
+    }
+    return 1;
+  }
 };
 
 void Scene::add_lua(lua_State *L) {
@@ -958,8 +1040,8 @@ void Scene::add_lua(lua_State *L) {
       luaL_ref(L, LUA_REGISTRYINDEX); // not the global constexpr
   std::cerr << "scene data idx is " << scene_data_idx << "\n";
 
-  Scene ***scene_ud = (Scene ***)lua_newuserdata(L, sizeof(void *));
-  *scene_ud = self;
+  Scene **scene_ud = (Scene **)lua_newuserdata(L, sizeof(void *));
+  *scene_ud = this;
   int scene_in_reg_idx =
       luaL_ref(L, LUA_REGISTRYINDEX); // not the global constexpr
   std::cerr << "scene in registry idx is " << scene_in_reg_idx << "\n";
@@ -996,8 +1078,8 @@ void Scene::add_lua(lua_State *L) {
 
   // scene
   {
-    Scene ***ud = (Scene ***)lua_newuserdata(L, sizeof(void *));
-    *ud = self;
+    Scene **ud = (Scene **)lua_newuserdata(L, sizeof(void *));
+    *ud = this;
     luaL_newmetatable(L, "Scene");
     lua_pushvalue(L, -1);           /* pushes the metatable */
     lua_setfield(L, -2, "__index"); /* metatable.__index = metatable */
@@ -1129,8 +1211,8 @@ void Scene::add_lua(lua_State *L) {
 
   // object pool
   {
-    Scene ***ud = (Scene ***)lua_newuserdata(L, sizeof(void *));
-    *ud = self;
+    Scene **ud = (Scene **)lua_newuserdata(L, sizeof(void *));
+    *ud = this;
     luaL_newmetatable(L, "ObjectPool");
     lua_pushvalue(L, -1);           /* pushes the metatable */
     lua_setfield(L, -2, "__index"); /* metatable.__index = metatable */
@@ -1146,6 +1228,25 @@ void Scene::add_lua(lua_State *L) {
     luaL_setfuncs(L, funcs, 0);
     lua_setmetatable(L, -2); // 1st - udata, 2nd - (meta)table
     lua_setfield(L, -2, "pool");
+  }
+
+  // Table row
+  {
+    DisplayRow **ud = (DisplayRow **)lua_newuserdata(L, sizeof(void *));
+    *ud = &displayed_row;
+    luaL_newmetatable(L, "Row");
+    lua_pushvalue(L, -1);           /* pushes the metatable */
+    lua_setfield(L, -2, "__index"); /* metatable.__index = metatable */
+    luaL_Reg funcs[] = {
+        {"width", SceneLuaBindings::row_get_width},
+        {"sheet", SceneLuaBindings::row_get_sheet},
+        {"nthCell", SceneLuaBindings::row_get_nth_cell},
+        {"__tostring", SceneLuaBindings::row_tostring},
+        {NULL, NULL},
+    };
+    luaL_setfuncs(L, funcs, 0);
+    lua_setmetatable(L, -2); // 1st - udata, 2nd - (meta)table
+    lua_setfield(L, -2, "display_data");
   }
 
   // lua_remove(L, -1);

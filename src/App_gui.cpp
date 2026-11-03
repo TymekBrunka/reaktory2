@@ -1067,81 +1067,81 @@ void App::draw_gui() {
   ImGui::End();
 
   if (ImGui::Begin(ICON_FA_TABLE " Tabele") && selected_scene) {
-    // ImGui::Text(ICON_FA_TABLE " Tabele (%d)",
-    //             selected_scene->get_sheets().size());
-    // ImVec2 wsize = ImGui::GetWindowSize();
-    // ImGui::BeginChild("sheets_child_tabs", ImVec2(wsize.x - 16, 0),
-    //                   ImGuiChildFlags_AutoResizeY);
-    // for (const auto &[name, sheet] : selected_scene->get_sheets()) {
-    //   if (ImGui::Selectable(name.c_str(),
-    //                         name == selected_scene->selected_sheet)) {
-    //     selected_scene->selected_sheet = name;
-    //   }
-    // }
-    // ImGui::EndChild();
-    //
-    // const auto sheet_ =
-    //     selected_scene->get_sheets().find(selected_scene->selected_sheet);
+    ImGui::Text(ICON_FA_TABLE " Tabele (%d)",
+                selected_scene->get_sheets().size());
+    ImVec2 wsize = ImGui::GetWindowSize();
+    ImGui::BeginChild("sheets_child_tabs", ImVec2(wsize.x - 16, 0),
+                      ImGuiChildFlags_AutoResizeY);
+    for (const auto &[name, sheet] : selected_scene->get_sheets()) {
+      if (ImGui::Selectable(name.c_str(),
+                            name == selected_scene->selected_sheet)) {
+        selected_scene->selected_sheet = name;
+      }
+    }
+    ImGui::EndChild();
 
-    // if (sheet_ != selected_scene->get_sheets().end()) {
-    //   const auto &sheet = sheet_->second;
-    //   ImGui::Text(ICON_FA_TABLE " dane");
-    //   ImGui::BeginTable(
-    //       selected_scene->selected_sheet.c_str(), sheet.headers.size(),
-    //       ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable |
-    //           ImGuiTableFlags_Hideable | ImGuiTableFlags_Borders |
-    //           ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY |
-    //           ImGuiTableFlags_SizingFixedFit);
-    //
-    //   for (const auto header : sheet.headers) {
-    //     ImGui::TableSetupColumn(header.c_str());
-    //   }
-    //   ImGui::TableHeadersRow();
-    //   const CellValue *cv = sheet.data.data();
-    //   for (const auto &row : sheet.rows) {
-    //     static char dtbuf[20] = {0};
-    //     strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", &row.time);
-    //     ImGui::TableNextRow();
-    //     ImGui::TableNextColumn();
-    //     if (ImGui::Selectable(dtbuf, false,
-    //                           ImGuiSelectableFlags_SpanAllColumns |
-    //                               ImGuiSelectableFlags_AllowOverlap)) {
-    //
-    //       selected_scene->displayed_row.emit_update = true;
-    //       selected_scene->displayed_row.width = sheet.width;
-    //       selected_scene->displayed_row.sheet_name = sheet_->first;
-    //       selected_scene->displayed_row.row = row;
-    //       selected_scene->displayed_row.ptr = sheet.data.data() + row.offset;
-    //     }
-    //     // ImGui::TextUnformatted(dtbuf);
-    //     for (int i = 0; i < sheet.width; i++) {
-    //       ImGui::TableNextColumn();
-    //
-    //       if (const NullCell *value = std::get_if<NullCell>(cv)) {
-    //         ImGui::TextUnformatted("");
-    //       } else if (const ErrorCell *value = std::get_if<ErrorCell>(cv)) {
-    //         ImGui::Text("Błąd: %s", value->msg.c_str());
-    //       } else if (const std::string *value = std::get_if<std::string>(cv)) {
-    //         ImGui::TextUnformatted(value->c_str());
-    //       } else if (const int64_t *value = std::get_if<int64_t>(cv)) {
-    //         ImGui::Text("%d", (int)*value);
-    //       } else if (const double *value = std::get_if<double>(cv)) {
-    //         ImGui::Text("%.2lf", *value);
-    //       } else if (const bool *value = std::get_if<bool>(cv)) {
-    //         ImGui::TextUnformatted(*value ? "Prawda" : "Fałsz");
-    //       } else if (const tm *value = std::get_if<tm>(cv)) {
-    //         static char dtbuf[50] = {0};
-    //         if (value->tm_mday == 0)
-    //           strftime(dtbuf, sizeof(dtbuf), "%H:%M:%S", value);
-    //         else
-    //           strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", value);
-    //         ImGui::TextUnformatted(dtbuf);
-    //       }
-    //       cv++;
-    //     }
-    //   }
-    //   ImGui::EndTable();
-    // }
+    const auto sheet_ =
+        selected_scene->get_sheets().find(selected_scene->selected_sheet);
+
+    if (sheet_ != selected_scene->get_sheets().end()) {
+      const auto &sheet = sheet_->second;
+      ImGui::Text(ICON_FA_TABLE " dane");
+      ImGui::BeginTable(
+          selected_scene->selected_sheet.c_str(), sheet.headers.size(),
+          ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable |
+              ImGuiTableFlags_Hideable | ImGuiTableFlags_Borders |
+              ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY |
+              ImGuiTableFlags_SizingFixedFit);
+
+      for (const auto header : sheet.headers) {
+        ImGui::TableSetupColumn(header.c_str());
+      }
+      ImGui::TableHeadersRow();
+      const CellValue *cv = sheet.data.data();
+      for (const auto &row : sheet.rows) {
+        static char dtbuf[20] = {0};
+        strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", &row.time);
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        if (ImGui::Selectable(dtbuf, false,
+                              ImGuiSelectableFlags_SpanAllColumns |
+                                  ImGuiSelectableFlags_AllowOverlap)) {
+
+          selected_scene->displayed_row.emit_update = true;
+          selected_scene->displayed_row.width = sheet.width;
+          selected_scene->displayed_row.sheet_name = sheet_->first;
+          selected_scene->displayed_row.row = row;
+          selected_scene->displayed_row.ptr = sheet.data.data() + row.offset;
+        }
+        // ImGui::TextUnformatted(dtbuf);
+        for (int i = 0; i < sheet.width; i++) {
+          ImGui::TableNextColumn();
+
+          if (const NullCell *value = std::get_if<NullCell>(cv)) {
+            ImGui::TextUnformatted("");
+          } else if (const ErrorCell *value = std::get_if<ErrorCell>(cv)) {
+            ImGui::Text("Błąd: %s", value->msg.c_str());
+          } else if (const std::string *value = std::get_if<std::string>(cv)) {
+            ImGui::TextUnformatted(value->c_str());
+          } else if (const int64_t *value = std::get_if<int64_t>(cv)) {
+            ImGui::Text("%d", (int)*value);
+          } else if (const double *value = std::get_if<double>(cv)) {
+            ImGui::Text("%.2lf", *value);
+          } else if (const bool *value = std::get_if<bool>(cv)) {
+            ImGui::TextUnformatted(*value ? "Prawda" : "Fałsz");
+          } else if (const tm *value = std::get_if<tm>(cv)) {
+            static char dtbuf[50] = {0};
+            if (value->tm_mday == 0)
+              strftime(dtbuf, sizeof(dtbuf), "%H:%M:%S", value);
+            else
+              strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", value);
+            ImGui::TextUnformatted(dtbuf);
+          }
+          cv++;
+        }
+      }
+      ImGui::EndTable();
+    }
   }
   ImGui::End();
 }

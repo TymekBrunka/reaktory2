@@ -41,6 +41,12 @@ struct oNode {
   bool dummy = false;
 };
 
+struct oDataPoint {
+  int header_idx = -1;
+  std::string header; // key
+  std::string display_text;
+};
+
 class Scene;
 class ObjectPool;
 
@@ -52,7 +58,7 @@ class ScriptClass {
 public:
   int tableidx;
   lua_State *L;
-  Scene **scene;
+  Scene *scene;
   std::string name;
 
   struct Param {
@@ -63,7 +69,7 @@ public:
   std::vector<Param> params;
 
   ~ScriptClass() = default;
-  ScriptClass(Scene **scene_, lua_State *L_, int tableidx_, const char *name_)
+  ScriptClass(Scene *scene_, lua_State *L_, int tableidx_, const char *name_)
       : L(L_), tableidx(tableidx_), name(name_), scene(scene_) {}
   ScriptClass(const ScriptClass &other);
   ScriptClass &operator=(const ScriptClass &other);

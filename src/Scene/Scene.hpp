@@ -12,6 +12,14 @@
 #include <ResourceManager.hpp>
 #include <Sheet.hpp>
 
+struct DisplayRow {
+  bool emit_update = false;
+  int width = 0;
+  std::string sheet_name;
+  SheetRow row;
+  const CellValue *ptr = nullptr;
+};
+
 class Scene {
   friend class SceneLuaBindings;
   friend class ScriptClass;
@@ -64,8 +72,6 @@ public:
   std::string selected_sheet;
 
 private:
-  Scene **self; // pointer to blob of memory that stays in place and points at
-                // scene that migh get moved in memory;
   glm::vec3 input{};
   // struct {
   //   Renderer::rUnifomIdx camera_idx;
@@ -97,7 +103,8 @@ private:
     }
   };
 
-  // std::unordered_map<std::string, Sheet, string_hash, std::equal_to<>> sheets;
+  // std::unordered_map<std::string, Sheet, string_hash, std::equal_to<>>
+  // sheets;
   std::unordered_map<std::string, Sheet> sheets;
 
   bool create_framebuffer();
@@ -118,20 +125,14 @@ public:
   ResourceManager resMan{};
   ObjectPool objPool{};
 
-  struct {
-    bool emit_update = false;
-    int width = 0;
-    std::string sheet_name;
-    SheetRow row;
-    const CellValue *ptr = nullptr;
-  } displayed_row;
+  DisplayRow displayed_row;
 
   Scene() = default;
   Scene(const std::string &name);
   Scene(const Scene &other) = delete;
   Scene &operator=(const Scene &other) = delete;
-  Scene(Scene &&other);
-  Scene &operator=(Scene &&other);
+  // Scene(Scene &&other);
+  // Scene &operator=(Scene &&other);
   ~Scene();
 
   inline bool is_initialised() const { return initialised; }

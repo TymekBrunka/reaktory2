@@ -29,7 +29,7 @@ void Object::change_script_class(ObjectPool *pool, int new_script_class_idx) {
       lua_remove(L, -1);
 
       lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_IN_REG_IDX);
-      Scene *scene = (*(*(Scene ***)lua_touserdata(L, -1)));
+      Scene *scene = (*(Scene **)lua_touserdata(L, -1));
       scene->objPool.script_data_freelist.push_back(ref_to_self);
       ref_to_self = -1;
     }

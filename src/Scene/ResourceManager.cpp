@@ -23,7 +23,7 @@ static void populateTexturesFromModel(
     mmodel.materials.push_back(ManagedModel::ManagedMaterial{.diffuse1 = path});
     if (!model.GetTmpMaterialData(i)->diffuse1.empty())
       if (path2mesh_map.find(path) == path2mesh_map.end())
-        path2mesh_map[path] == i;
+        path2mesh_map[path] = i;
   }
 
   model.init();

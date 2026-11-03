@@ -309,27 +309,25 @@ bool App::add_scene(const std::string &name) {
     return false;
   }
 
-  Scene scene;
   try {
-    scene = std::move(Scene{name});
+    scenes.emplace(name, name);
+    std::string cpy;
+    if (selected_scene_idx)
+      cpy = *selected_scene_idx;
+
+    if (!scenes[name].init(render)) {
+      std::cerr << "failed to init scene\n";
+      return false;
+    }
+
+    if (selected_scene_idx) {
+      auto iter = scenes.find(cpy);
+      selected_scene_idx = &iter->first;
+      selected_scene = &iter->second;
+    }
   } catch (const std::exception &err) {
     std::cerr << "Error: " << err.what() << "\n";
     return false;
-  }
-
-  if (!scene.init(render)) {
-    std::cerr << "failed to init scene\n";
-    return false;
-  }
-
-  if (selected_scene_idx) {
-    std::string cpy = *selected_scene_idx;
-    scenes[name] = std::move(scene);
-    auto iter = scenes.find(cpy);
-    selected_scene_idx = &iter->first;
-    selected_scene = &iter->second;
-  } else {
-    scenes[name] = std::move(scene);
   }
 
   return true;
@@ -345,27 +343,25 @@ bool App::open_scene(const std::string &name) {
     return false;
   }
 
-  Scene scene;
   try {
-    scene = std::move(Scene{name});
+    scenes.emplace(name, name);
+    std::string cpy;
+    if (selected_scene_idx)
+      cpy = *selected_scene_idx;
+
+    if (!scenes[name].init(render)) {
+      std::cerr << "failed to init scene\n";
+      return false;
+    }
+
+    if (selected_scene_idx) {
+      auto iter = scenes.find(cpy);
+      selected_scene_idx = &iter->first;
+      selected_scene = &iter->second;
+    }
   } catch (const std::exception &err) {
     std::cerr << "Error: " << err.what() << "\n";
     return false;
-  }
-
-  if (!scene.init(render)) {
-    std::cerr << "failed to init scene\n";
-    return false;
-  }
-
-  if (selected_scene_idx) {
-    std::string cpy = *selected_scene_idx;
-    scenes[name] = std::move(scene);
-    auto iter = scenes.find(cpy);
-    selected_scene_idx = &iter->first;
-    selected_scene = &iter->second;
-  } else {
-    scenes[name] = std::move(scene);
   }
 
   return true;

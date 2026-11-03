@@ -127,107 +127,6 @@ static float selection_cube_vertices[] = {
     -0.5, -0.5, -0.5, -0.5, -0.5, 0.5,  -0.5, 0.5,  0.5,
     -0.5, -0.5, -0.5, -0.5, 0.5,  0.5,  -0.5, 0.5,  -0.5};
 
-Scene::Scene(Scene &&other) {
-  bool b = atomic_load_explicit(&other.is_busy, memory_order_seq_cst);
-  atomic_store_explicit(&is_busy, b, memory_order_seq_cst);
-
-  name = std::move(other.name);
-  current_folder = std::move(other.current_folder);
-  if (self)
-    *self = &other;
-  if (other.self)
-    *other.self = this;
-  auto tmp = self;
-  self = other.self;
-  other.self = tmp;
-  size = other.size;
-  mpos = other.mpos;
-  L = other.L;
-  other.L = nullptr;
-  skybox_texture = other.skybox_texture;
-  skybox_loc = other.skybox_loc;
-  framebuffer = other.framebuffer;
-  renderbuffer = other.renderbuffer;
-  screen_canvas = other.screen_canvas;
-  color_canvas = other.color_canvas;
-  initialised = other.initialised;
-  resMan = std::move(other.resMan);
-  objPool = std::move(other.objPool);
-  sheets = std::move(other.sheets);
-  // selected_sheet = std::move(other.selected_sheet);
-  // displayed_row = std::move(other.displayed_row);
-  // other.self = nullptr;
-  other.size = {640, 480};
-  other.skybox_texture = 0;
-  other.framebuffer = 0;
-  other.renderbuffer = 0;
-  other.screen_canvas = 0;
-  other.color_canvas = 0;
-  other.initialised = false;
-
-  other.displayed_row.emit_update = other.displayed_row.emit_update;
-  other.displayed_row.width = other.displayed_row.width;
-  other.displayed_row.sheet_name = std::move(other.displayed_row.sheet_name);
-  other.displayed_row.row = other.displayed_row.row;
-  other.displayed_row.ptr = other.displayed_row.ptr;
-  other.displayed_row.emit_update = false;
-  other.displayed_row.width = 0;
-  other.displayed_row.row = {};
-  other.displayed_row.ptr = nullptr;
-}
-
-Scene &Scene::operator=(Scene &&other) {
-  if (this != &other) {
-    bool b = atomic_load_explicit(&other.is_busy, memory_order_seq_cst);
-    atomic_store_explicit(&is_busy, b, memory_order_seq_cst);
-
-    name = std::move(other.name);
-    current_folder = std::move(other.current_folder);
-    if (self)
-      *self = &other;
-    if (other.self)
-      *other.self = this;
-    auto tmp = self;
-    self = other.self;
-    other.self = tmp;
-    size = other.size;
-    mpos = other.mpos;
-    L = other.L;
-    other.L = nullptr;
-    skybox_texture = other.skybox_texture;
-    skybox_loc = other.skybox_loc;
-    framebuffer = other.framebuffer;
-    renderbuffer = other.renderbuffer;
-    screen_canvas = other.screen_canvas;
-    color_canvas = other.color_canvas;
-    initialised = other.initialised;
-    resMan = std::move(other.resMan);
-    objPool = std::move(other.objPool);
-    sheets = std::move(other.sheets);
-    // selected_sheet = std::move(other.selected_sheet);
-    // displayed_row = std::move(other.displayed_row);
-    // other.self = nullptr;
-    other.size = {640, 480};
-    other.skybox_texture = 0;
-    other.framebuffer = 0;
-    other.renderbuffer = 0;
-    other.screen_canvas = 0;
-    other.color_canvas = 0;
-    other.initialised = false;
-
-    other.displayed_row.emit_update = other.displayed_row.emit_update;
-    other.displayed_row.width = other.displayed_row.width;
-    other.displayed_row.sheet_name = std::move(other.displayed_row.sheet_name);
-    other.displayed_row.row = other.displayed_row.row;
-    other.displayed_row.ptr = other.displayed_row.ptr;
-    other.displayed_row.emit_update = false;
-    other.displayed_row.width = 0;
-    other.displayed_row.row = {};
-    other.displayed_row.ptr = nullptr;
-  }
-  return *this;
-}
-
 struct Vertex {
   Renderer::vec2 pos;
   Renderer::vec3 col;
@@ -288,14 +187,11 @@ bool Scene::create_folder_structure(const std::string &name,
 }
 
 Scene::Scene(const std::string &name) {
-  self = new Scene *;
-  *self = this;
   this->name = name;
   current_folder = FileUtils::APP_ROOT / "scenes" / std::filesystem::path(name);
   if (!create_folder_structure(name, current_folder)) {
     Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene", TL(MSG_SCENE_CREATE_ERROR),
              std::make_format_args(name));
-    delete self;
     throw std::runtime_error("");
   }
 
@@ -365,7 +261,6 @@ Scene::Scene(const std::string &name) {
           default:
             break;
           }
-          delete self;
           throw std::runtime_error("");
         }
       }
@@ -670,9 +565,6 @@ bool Scene::init(Renderer::Render &render) {
 void Scene::cleanup() {
   close_lua(L);
 
-  if (self)
-    delete self;
-
   if (initialised) {
     glDeleteTextures(1, &skybox_texture);
     glDeleteFramebuffers(1, &framebuffer);
@@ -783,6 +675,8 @@ void Scene::render(Renderer::Render &render) {
   draw_models_recursive(objPool.rootH().idx, render.GetDelta(), glm::mat4(1.0f),
                         objPool.rootH());
 
+  displayed_row.emit_update = false;
+
   if (mousebuttonLclick && mpos.width <= size.width &&
       mpos.height <= size.height) {
 
@@ -838,16 +732,37 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
   if (node->script_class_idx != -1) {
     const ScriptClass &sc =
         objPool.get_script_classes()[node->script_class_idx];
+
     lua_rawgeti(sc.L, LUA_REGISTRYINDEX, SCENE_SCRIPT_CLASSES_IDX);
     lua_rawgeti(sc.L, -1, node->script_class_idx + 1);
     lua_remove(sc.L, -2);
-    lua_getfield(sc.L, -1, "on_frame");
-    lua_remove(sc.L, -2);
-    Object **obj = (Object **)lua_newuserdata(sc.L, sizeof(Object *));
-    *obj = node;
-    luaL_getmetatable(sc.L, "ObjectRef");
-    lua_setmetatable(sc.L, -2);
-    call_lua(sc.L, 1);
+
+    if (displayed_row.emit_update) {
+      if (lua_getfield(sc.L, -1, "on_update") == LUA_TFUNCTION) {
+        Object **obj = (Object **)lua_newuserdata(sc.L, sizeof(Object *));
+        *obj = node;
+        luaL_getmetatable(sc.L, "ObjectRef");
+        lua_setmetatable(sc.L, -2);
+        DisplayRow **ud = (DisplayRow **)lua_newuserdata(sc.L, sizeof(void *));
+        *ud = &displayed_row;
+        luaL_getmetatable(sc.L, "Row");
+        lua_setmetatable(sc.L, -2);
+        call_lua(sc.L, 2);
+      } else
+        lua_remove(sc.L, -1);
+    }
+
+    if (lua_getfield(sc.L, -1, "on_frame") == LUA_TFUNCTION) {
+      lua_remove(sc.L, -2);
+      Object **obj = (Object **)lua_newuserdata(sc.L, sizeof(Object *));
+      *obj = node;
+      luaL_getmetatable(sc.L, "ObjectRef");
+      lua_setmetatable(sc.L, -2);
+      call_lua(sc.L, 1);
+    } else {
+      lua_remove(sc.L, -1);
+      lua_remove(sc.L, -1);
+    }
   }
 
   if (oModel *omodel = (oModel *)std::get_if<oModel>(&node->variant)) {
