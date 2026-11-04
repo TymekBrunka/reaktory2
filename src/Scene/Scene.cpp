@@ -5,6 +5,7 @@
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/geometric.hpp"
 #include "glm/matrix.hpp"
+#include <cstdio>
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
 
@@ -32,7 +33,6 @@ static ImGuizmo::OPERATION mCurrentGizmoOperation(
     (ImGuizmo::OPERATION)((int)ImGuizmo::UNIVERSAL | (int)ImGuizmo::BOUNDS));
 static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
 
-bool Scene::render_selection_bb = false;
 Renderer::rProgram Scene::skybox_program = 0;
 Renderer::rFBO Scene::skybox_fbo = 0;
 Renderer::rFBO Scene::skybox_ebo = 0;
@@ -204,7 +204,7 @@ Scene::Scene(const std::string &name) {
        std::filesystem::directory_iterator(current_folder / "excel_sheets")) {
     if (std::filesystem::is_regular_file(ent.path())) {
       std::cerr << "loading " << ent.path() << "\n";
-      auto sheet_res = ReadXLSXfile(ent.path());
+      auto sheet_res = ReadXLSXfile(ent.path(), ++next_sheet_idx);
       if (sheet_res.has_value())
         sheets[ent.path().stem().string()] = sheet_res.value();
     }
@@ -824,7 +824,27 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
         model.Draw();
       }
     }
+  } else if (oDataPoint *odatapoint =
+                 (oDataPoint *)std::get_if<oDataPoint>(&node->variant)) {
+
+    if (displayed_row.sheet_idx != odatapoint->sheet_idx) {
+      odatapoint->sheet_idx = displayed_row.sheet_idx;
+      auto header = displayed_row.headers.find(odatapoint->header);
+      if (header != displayed_row.headers.end())
+        odatapoint->header_idx = header->second;
+      else
+        odatapoint->header_idx = -1;
+    }
+    if (displayed_row.emit_update) {
+      odatapoint->update_text(&displayed_row);
+    }
+
+    // finaly render it
+    if (odatapoint->header_idx > 0) {
+
+    }
   }
+
   for (int16_t i = 0; i < node->children.size(); i++) {
     draw_models_recursive(node->children[i], delta, modelTransform, parentObj);
   }

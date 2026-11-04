@@ -25,6 +25,10 @@ struct _ModelName {
   std::string model;
 };
 
+struct _HeaderName {
+  std::string header;
+};
+
 struct oModel {
   std::string model;
   std::vector<Material> materials;
@@ -41,10 +45,15 @@ struct oNode {
   bool dummy = false;
 };
 
+class DisplayRow;
 struct oDataPoint {
+  int sheet_idx =
+      -1; // sheet index is used for determining whether to update header index
   int header_idx = -1;
   std::string header; // key
   std::string display_text;
+
+  void update_text(DisplayRow *displayed_row);
 };
 
 class Scene;
@@ -84,7 +93,7 @@ struct Nil {
 };
 
 using LuaParam = std::variant<Nil, bool, int, float, std::string, Material,
-                              objH, _ModelName>;
+                              objH, _ModelName, _HeaderName>;
 
 struct Object {
   uint8_t gen = 1;
@@ -96,7 +105,7 @@ struct Object {
   std::string name;
   std::vector<int16_t> children;
   std::vector<LuaParam> lua_params;
-  std::variant<oEmptySlot, oNode, oModel> variant;
+  std::variant<oEmptySlot, oNode, oModel, oDataPoint> variant;
 
   inline objH toHandle(int16_t idx) const {
     return objH{.gen = gen, .idx = idx};
@@ -157,4 +166,8 @@ public:
 
   objH add_model_node(ResourceManager &resMan, objH obj,
                       const std::string_view &model_name);
+
+  objH add_node(objH obj);
+
+  objH add_datapoint_node(objH obj);
 };

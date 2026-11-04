@@ -13,7 +13,24 @@
 #include <Sheet.hpp>
 
 struct DisplayRow {
+
+  struct string_hash {
+    using is_transparent = void;
+    [[nodiscard]] inline size_t operator()(const char *txt) const {
+      return std::hash<std::string_view>{}(txt);
+    }
+    [[nodiscard]] inline size_t operator()(std::string_view txt) const {
+      return std::hash<std::string_view>{}(txt);
+    }
+    [[nodiscard]] inline size_t operator()(const std::string &txt) const {
+      return std::hash<std::string>{}(txt);
+    }
+  };
+
+  std::unordered_map<std::string, int, string_hash, std::equal_to<>> headers;
+
   bool emit_update = false;
+  int sheet_idx = 0;
   int width = 0;
   std::string sheet_name;
   SheetRow row;
@@ -23,7 +40,7 @@ struct DisplayRow {
 class Scene {
   friend class SceneLuaBindings;
   friend class ScriptClass;
-  static bool render_selection_bb;
+  bool render_selection_bb = false;
   static Renderer::rProgram skybox_program;
   static Renderer::rFBO skybox_fbo;
   static Renderer::rEBO skybox_ebo;
@@ -57,6 +74,7 @@ class Scene {
   bool mousebuttonR = false;
   bool mousebuttonLclick = false;
   atomic_bool is_busy = true;
+  int next_sheet_idx = 0;
   Renderer::rect_size size{640, 480};
   glm::vec2 last_mpos{0, 0};
   Renderer::rect_size mpos{0, 0};
@@ -103,9 +121,7 @@ private:
     }
   };
 
-  // std::unordered_map<std::string, Sheet, string_hash, std::equal_to<>>
-  // sheets;
-  std::unordered_map<std::string, Sheet> sheets;
+  std::unordered_map<std::string, Sheet, string_hash, std::equal_to<>> sheets;
 
   bool create_framebuffer();
   void resize_framebuffer(Renderer::rect_size size);

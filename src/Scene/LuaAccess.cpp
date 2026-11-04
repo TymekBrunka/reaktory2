@@ -526,6 +526,11 @@ public:
                    (_ModelName *)std::get_if<_ModelName>(&param)) {
       lua_pushnumber(L, 64);
       lua_pushstring(L, value->model.c_str());
+
+    } else if (const _HeaderName *value =
+                   (_HeaderName *)std::get_if<_HeaderName>(&param)) {
+      lua_pushnumber(L, 128);
+      lua_pushstring(L, value->header.c_str());
     }
     return 2;
   }
@@ -1062,8 +1067,9 @@ void Scene::add_lua(lua_State *L) {
     lua_newtable(L);
     lua_pushnumber(L, 0);
     lua_setfield(L, -2, "NIL");
-    const char *variant_enums[] = {"BOOL",     "INT",  "FLOAT", "STRING",
-                                   "MATERIAL", "OBJH", "MODEL", nullptr};
+    const char *variant_enums[] = {"BOOL",   "INT",      "FLOAT",
+                                   "STRING", "MATERIAL", "OBJH",
+                                   "MODEL",  "HEADER",   nullptr};
     int i = 1;
     for (const char **variant = variant_enums; *variant != nullptr; variant++) {
       lua_pushnumber(L, i);

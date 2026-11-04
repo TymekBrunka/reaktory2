@@ -58,6 +58,43 @@ void Object::change_script_class(ObjectPool *pool, int new_script_class_idx) {
   }
 }
 
+void oDataPoint::update_text(DisplayRow *displayed_row) {
+  if (!displayed_row->ptr)
+    return;
+
+  if (header_idx < 1 && !display_text.empty()) {
+    display_text = "";
+    return;
+  }
+
+  static char fmt[256] = {0};
+  const CellValue *cell = displayed_row->ptr + header_idx - 1;
+  if (const NullCell *value = std::get_if<NullCell>(cell)) {
+    snprintf(fmt, sizeof(fmt), "");
+    display_text = fmt;
+  } else if (const ErrorCell *value = std::get_if<ErrorCell>(cell)) {
+    snprintf(fmt, sizeof(fmt), "Błąd: %s", value->msg.c_str());
+    display_text = fmt;
+  } else if (const std::string *value = std::get_if<std::string>(cell)) {
+    display_text = *value;
+  } else if (const int64_t *value = std::get_if<int64_t>(cell)) {
+    snprintf(fmt, sizeof(fmt), "%d", (int)*value);
+    display_text = fmt;
+  } else if (const double *value = std::get_if<double>(cell)) {
+    snprintf(fmt, sizeof(fmt), "%.2lf", (double)*value);
+    display_text = fmt;
+  } else if (const bool *value = std::get_if<bool>(cell)) {
+    display_text = *value ? "true" : "false";
+  } else if (const tm *value = std::get_if<tm>(cell)) {
+    static char dtbuf[50] = {0};
+    if (value->tm_mday == 0)
+      strftime(dtbuf, sizeof(dtbuf), "%H:%M:%S", value);
+    else
+      strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", value);
+    display_text = dtbuf;
+  }
+}
+
 ObjectPool::ObjectPool() {
   objects.push_back(Object{.gen = 1,
                            .transform = glm::mat4(1.0f),
@@ -194,6 +231,19 @@ objH ObjectPool::add_model_node(ResourceManager &resMan, objH obj,
 
   objH child =
       add(Object{.parent = obj, .name = name, .variant = std::move(omodel)});
+  get(obj)->children.push_back(child.idx);
+  return child;
+}
+
+objH ObjectPool::add_node(objH obj) {
+  objH child = add(Object{.parent = obj, .name = "dane", .variant = oNode{}});
+  get(obj)->children.push_back(child.idx);
+  return child;
+}
+
+objH ObjectPool::add_datapoint_node(objH obj) {
+  objH child =
+      add(Object{.parent = obj, .name = "dane", .variant = oDataPoint{}});
   get(obj)->children.push_back(child.idx);
   return child;
 }

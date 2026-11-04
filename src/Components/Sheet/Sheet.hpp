@@ -21,6 +21,7 @@ struct SheetRow {
 };
 
 struct Sheet {
+  int idx = 0;
   int width = 0;
   int height = 0;
   std::vector<std::string> headers;
@@ -30,4 +31,4 @@ struct Sheet {
   static void printcell2console(CellValue *cell);
 };
 
-std::expected<Sheet, bool> ReadXLSXfile(const std::filesystem::path &path_);
+std::expected<Sheet, bool> ReadXLSXfile(const std::filesystem::path &path_, int sheetidx);
