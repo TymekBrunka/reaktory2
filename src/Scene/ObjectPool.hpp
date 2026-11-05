@@ -6,6 +6,28 @@
 #include <string>
 #include <vector>
 
+class Text3D {
+private:
+  Renderer::rVBO vbo = 0;
+  Renderer::rVAO vao = 0;
+  size_t v_capacity = 0;
+  std::vector<int> buf;
+  std::string text;
+
+public:
+  Text3D() = default;
+  ~Text3D();
+
+  Text3D(const Text3D &other) = delete;
+  Text3D &operator=(const Text3D &other) = delete;
+  Text3D(Text3D &&other) noexcept;
+  Text3D &operator=(Text3D &&other) noexcept;
+
+  inline const std::string &string() const { return text; }
+  void setText(const char *text_);
+  void draw(const glm::mat4 &pos);
+};
+
 struct objH {
   uint8_t gen;
   // uint16_t idx;
@@ -51,7 +73,7 @@ struct oDataPoint {
       -1; // sheet index is used for determining whether to update header index
   int header_idx = -1;
   std::string header; // key
-  std::string display_text;
+  Text3D display_text;
 
   void update_text(DisplayRow *displayed_row);
 };
@@ -161,7 +183,7 @@ public:
   inline int16_t real_size() const { return objects.size(); };
 
   Object *get(objH obj);
-  objH add(const Object &obj);
+  objH add(Object &&obj);
   void remove(objH obj);
 
   objH add_model_node(ResourceManager &resMan, objH obj,

@@ -359,13 +359,16 @@ static void type_datapoint_draw(Scene *selected_scene, ImVec2 *wpos,
     EndCustomCombo(*wpos, *wpos2);
   }
 
+  int hdridx = odatapoint->header_idx;
+  int sheetidx = odatapoint->sheet_idx;
   odatapoint->sheet_idx = selected_scene->displayed_row.sheet_idx;
   auto header = selected_scene->displayed_row.headers.find(odatapoint->header);
   if (header != selected_scene->displayed_row.headers.end())
     odatapoint->header_idx = header->second;
   else
     odatapoint->header_idx = -1;
-  odatapoint->update_text(&selected_scene->displayed_row);
+  if (hdridx != odatapoint->header_idx || sheetidx != odatapoint->sheet_idx)
+    odatapoint->update_text(&selected_scene->displayed_row);
 }
 
 // -------------------------------------------------------------------------------------------------------------------
@@ -1049,7 +1052,7 @@ void App::draw_gui() {
           ImGui::SameLine();
           type_datapoint_draw(selected_scene, &wpos, &wpos2, odatapoint);
 
-          ImGui::Text(odatapoint->display_text.c_str());
+          ImGui::Text(odatapoint->display_text.string().c_str());
           // ImGui::Text("%d", odatapoint->sheet_idx);
           // ImGui::Text("%d", odatapoint->header_idx);
 
@@ -1245,6 +1248,7 @@ void App::draw_gui() {
               strftime(dtbuf, sizeof(dtbuf), "%H:%M:%S", value);
             else
               strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", value);
+            ImGui::SetCursorPosX(8);
             ImGui::TextUnformatted(dtbuf);
           }
           cv++;

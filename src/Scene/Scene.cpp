@@ -5,6 +5,7 @@
 #include "glm/ext/matrix_float4x4.hpp"
 #include "glm/geometric.hpp"
 #include "glm/matrix.hpp"
+#include "images.h"
 #include <cstdio>
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
@@ -33,6 +34,13 @@ static ImGuizmo::OPERATION mCurrentGizmoOperation(
     (ImGuizmo::OPERATION)((int)ImGuizmo::UNIVERSAL | (int)ImGuizmo::BOUNDS));
 static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
 
+Renderer::rProgram Scene::text_program = 0;
+Renderer::rProgram Scene::m_text_texture = 0;
+Renderer::rProgram Scene::m_text_length = 0;
+Renderer::rProgram Scene::m_text_position = 0;
+Renderer::rProgram Scene::m_text_ID = 0;
+Renderer::rProgram Scene::m_text_view = 0;
+Renderer::rProgram Scene::m_text_projection = 0;
 Renderer::rProgram Scene::skybox_program = 0;
 Renderer::rFBO Scene::skybox_fbo = 0;
 Renderer::rFBO Scene::skybox_ebo = 0;
@@ -126,6 +134,15 @@ static float selection_cube_vertices[] = {
 
     -0.5, -0.5, -0.5, -0.5, -0.5, 0.5,  -0.5, 0.5,  0.5,
     -0.5, -0.5, -0.5, -0.5, 0.5,  0.5,  -0.5, 0.5,  -0.5};
+
+static float text_bpos[] = {
+    -0.5, 0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5,
+};
+
+static float text_tpos[] = {
+    -0.0625, 0.0625, -0.0625, -0.0625, 0.0625, -0.0625,
+    -0.0625, 0.0625, 0.0625,  -0.0625, 0.0625, 0.0625,
+};
 
 struct Vertex {
   Renderer::vec2 pos;
@@ -411,6 +428,54 @@ bool Scene::Init(Renderer::Render &render) {
 
   selection_bb_program = res_shader.value();
 
+  res_shader = render.LoadProgram("text_datapoint", (const char *)text_vs_data,
+                                  (const char *)text_fs_data);
+
+  if (!res_shader.has_value()) {
+    render.UnloadProgram(tri_program);
+    render.UnloadProgram(skybox_program);
+    render.UnloadProgram(skinning_program);
+    render.UnloadProgram(selection_bb_program);
+    tri_program = 0;
+    skybox_program = 0;
+    skinning_program = 0;
+    selection_bb_program = 0;
+    return false;
+  }
+
+  text_program = res_shader.value();
+  glUniform2fv(glGetUniformLocation(text_program, "bpos"), 6, text_bpos);
+  glUniform2fv(glGetUniformLocation(text_program, "tpos"), 6, text_tpos);
+  m_text_view = glGetUniformLocation(text_program, "view");
+  m_text_ID = glGetUniformLocation(text_program, "ID");
+  m_text_projection = glGetUniformLocation(text_program, "projection");
+  m_text_position = glGetUniformLocation(text_program, "pos");
+  m_text_length = glGetUniformLocation(text_program, "length");
+
+  auto res_img = Renderer::Render::sLoadTexture(
+      Renderer::Image{.width = font_png_width,
+                      .height = font_png_height,
+                      .channels = font_png_channels,
+                      .mipmap_levels = 0,
+                      .pixels = (unsigned char *)font_png_pixels},
+      true);
+
+  if (!res_img.has_value()) {
+    render.UnloadProgram(tri_program);
+    render.UnloadProgram(skybox_program);
+    render.UnloadProgram(skinning_program);
+    render.UnloadProgram(selection_bb_program);
+    render.UnloadProgram(text_program);
+    tri_program = 0;
+    skybox_program = 0;
+    skinning_program = 0;
+    selection_bb_program = 0;
+    text_program = 0;
+    return false;
+  }
+  m_text_texture = res_img.value();
+  glUniform1i(m_text_texture, 0);
+
   model_view_loc = glGetUniformLocation(skinning_program, "view");
   model_projection_loc = glGetUniformLocation(skinning_program, "projection");
   model_model_loc = glGetUniformLocation(skinning_program, "model");
@@ -666,6 +731,12 @@ void Scene::render(Renderer::Render &render) {
   glUniformMatrix4fv(model_projection_loc, 1, GL_FALSE,
                      glm::value_ptr(projection));
 
+  glUseProgram(text_program);
+
+  glUniformMatrix4fv(m_text_view, 1, GL_FALSE, glm::value_ptr(view));
+  glUniformMatrix4fv(m_text_projection, 1, GL_FALSE,
+                     glm::value_ptr(projection));
+
   // glm::mat4 model = glm::mat4(1.0f);
   // glUniformMatrix4fv(model_model_loc, 1, GL_FALSE, glm::value_ptr(model));
   // resMan.GetModel("CesiumMan.m3d")->model.Advance(render.GetDelta());
@@ -839,9 +910,38 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
       odatapoint->update_text(&displayed_row);
     }
 
+    if (node->toHandle(idx) == selected_object) {
+      glm::mat4 world2local = parentTransform * node->transform;
+      ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection),
+                           ImGuizmo::TRANSLATE, mCurrentGizmoMode,
+                           glm::value_ptr(world2local), NULL, NULL, NULL);
+
+      node->transform = glm::inverse(parentTransform) * world2local;
+      modelTransform = parentTransform * node->transform;
+    }
+
     // finaly render it
     if (odatapoint->header_idx > 0) {
 
+      glm::vec3 color = glm::vec3(((float)parentObj.gen) / 256,
+                                  ((float)(parentObj.idx % 256)) / 256,
+                                  ((float)(parentObj.idx / 256)) / 256);
+
+      glUseProgram(text_program);
+      glUniform3fv(m_text_ID, 1, glm::value_ptr(color));
+
+      static float text_bpos[] = {
+          -0.5, 0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5,
+      };
+
+      static float text_tpos[] = {
+          -0.0625, 0.0625, -0.0625, -0.0625, 0.0625, -0.0625,
+          -0.0625, 0.0625, 0.0625,  -0.0625, 0.0625, 0.0625,
+      };
+
+      glUniform2fv(glGetUniformLocation(text_program, "bpos"), 6, text_bpos);
+      glUniform2fv(glGetUniformLocation(text_program, "tpos"), 6, text_tpos);
+      odatapoint->display_text.draw(node->transform);
     }
   }
 
@@ -881,6 +981,13 @@ void Scene::Cleanup() {
   glDeleteBuffers(1, &selection_bb_fbo);
   glDeleteProgram(selection_bb_program);
   selection_bb_program = 0;
+
+  if (!text_program)
+    return;
+
+  glDeleteProgram(text_program);
+  glDeleteTextures(1, &m_text_texture);
+  text_program = 0;
 }
 
 Scene::~Scene() {

@@ -1,10 +1,95 @@
 #include "Model.hpp"
+#include "Renderer.hpp"
 #include "ResourceManager.hpp"
+#include "glm/ext/vector_float3.hpp"
+#include "glm/gtc/type_ptr.hpp"
 #include <LuaBindings.hpp>
 #include <ObjectPool.hpp>
 #include <Scene.hpp>
 #include <cstdint>
+#include <glad/gl.h>
 #include <iostream>
+
+Text3D::~Text3D() {
+  if (vao)
+    glDeleteVertexArrays(1, &vao);
+
+  if (vbo)
+    glDeleteBuffers(1, &vbo);
+}
+
+Text3D::Text3D(Text3D &&other) noexcept {
+  vbo = other.vbo;
+  vao = other.vao;
+  v_capacity = other.v_capacity;
+  text = std::move(other.text);
+  buf = std::move(other.buf);
+  other.vbo = 0;
+  other.vao = 0;
+  other.v_capacity = 0;
+};
+
+Text3D &Text3D::operator=(Text3D &&other) noexcept {
+  if (this != &other) {
+    vbo = other.vbo;
+    vao = other.vao;
+    v_capacity = other.v_capacity;
+    text = std::move(other.text);
+    buf = std::move(other.buf);
+    other.vbo = 0;
+    other.vao = 0;
+    other.v_capacity = 0;
+  }
+  return *this;
+};
+
+void Text3D::setText(const char *text_) {
+  text = text_;
+  if (text.capacity() > v_capacity) {
+    if (!vbo)
+      glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    buf.resize(text.capacity() * 6); // 6 verticies per character
+    glBufferData(GL_ARRAY_BUFFER, text.capacity() * 6, buf.data(),
+                 GL_DYNAMIC_DRAW);
+    v_capacity = text.capacity();
+
+    const Renderer::rLocation loc_charidx =
+        glGetAttribLocation(Scene::text_program, "charIdx");
+
+    if (!vao)
+      glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+    glEnableVertexAttribArray(loc_charidx);
+    glVertexAttribIPointer(loc_charidx, 1, GL_INT, sizeof(int), (void *)0);
+    glBindVertexArray(0);
+  }
+
+  for (int i = 0; i < text.size(); i++) {
+    buf[0 + (6 * i)] = text[i];
+    buf[1 + (6 * i)] = text[i];
+    buf[2 + (6 * i)] = text[i];
+    buf[3 + (6 * i)] = text[i];
+    buf[4 + (6 * i)] = text[i];
+    buf[5 + (6 * i)] = text[i];
+  }
+  glBindBuffer(GL_ARRAY_BUFFER, vbo);
+  glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(int) * text.size() * 6, buf.data());
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void Text3D::draw(const glm::mat4 &pos) {
+  glUseProgram(Scene::text_program);
+  glUniform1i(Scene::m_text_length, text.size());
+  glUniformMatrix4fv(Scene::m_text_position, 1, false, glm::value_ptr(pos));
+  glBindVertexArray(vao);
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, Scene::m_text_texture);
+  glDrawArrays(GL_TRIANGLES, 0, text.size() * 6);
+  glBindVertexArray(0);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glUseProgram(0);
+}
 
 void Object::change_script_class(ObjectPool *pool, int new_script_class_idx) {
   if (script_class_idx != -1) {
@@ -62,8 +147,8 @@ void oDataPoint::update_text(DisplayRow *displayed_row) {
   if (!displayed_row->ptr)
     return;
 
-  if (header_idx < 1 && !display_text.empty()) {
-    display_text = "";
+  if (header_idx < 1 && !display_text.string().empty()) {
+    display_text.setText("");
     return;
   }
 
@@ -71,27 +156,27 @@ void oDataPoint::update_text(DisplayRow *displayed_row) {
   const CellValue *cell = displayed_row->ptr + header_idx - 1;
   if (const NullCell *value = std::get_if<NullCell>(cell)) {
     snprintf(fmt, sizeof(fmt), "");
-    display_text = fmt;
+    display_text.setText(fmt);
   } else if (const ErrorCell *value = std::get_if<ErrorCell>(cell)) {
     snprintf(fmt, sizeof(fmt), "Błąd: %s", value->msg.c_str());
-    display_text = fmt;
+    display_text.setText(fmt);
   } else if (const std::string *value = std::get_if<std::string>(cell)) {
-    display_text = *value;
+    display_text.setText(value->c_str());
   } else if (const int64_t *value = std::get_if<int64_t>(cell)) {
     snprintf(fmt, sizeof(fmt), "%d", (int)*value);
-    display_text = fmt;
+    display_text.setText(fmt);
   } else if (const double *value = std::get_if<double>(cell)) {
     snprintf(fmt, sizeof(fmt), "%.2lf", (double)*value);
-    display_text = fmt;
+    display_text.setText(fmt);
   } else if (const bool *value = std::get_if<bool>(cell)) {
-    display_text = *value ? "true" : "false";
+    display_text.setText(*value ? "true" : "false");
   } else if (const tm *value = std::get_if<tm>(cell)) {
     static char dtbuf[50] = {0};
     if (value->tm_mday == 0)
       strftime(dtbuf, sizeof(dtbuf), "%H:%M:%S", value);
     else
       strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", value);
-    display_text = dtbuf;
+    display_text.setText(dtbuf);
   }
 }
 
@@ -134,7 +219,7 @@ Object *ObjectPool::get(objH obj) {
   return &objects[obj.idx];
 }
 
-objH ObjectPool::add(const Object &obj) {
+objH ObjectPool::add(Object &&obj) {
   int16_t idx = 0;
   if (free_indices.size() != 0) {
     idx = free_indices[free_indices.size() - 1];
@@ -145,7 +230,7 @@ objH ObjectPool::add(const Object &obj) {
   }
 
   uint8_t gen = objects[idx].gen;
-  objects[idx] = obj;
+  objects[idx] = std::move(obj);
   objects[idx].gen = ++gen;
   return objH{.gen = gen, .idx = idx};
 }

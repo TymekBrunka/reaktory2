@@ -39,6 +39,8 @@ add_subdirectory(src/BuildTools)
 bytepack_(
   OUTPUT shaders
   SOURCES
+    assets/shaders/text.vs
+    assets/shaders/text.fs
     assets/shaders/selection_bb.vs
     assets/shaders/selection_bb.fs
     assets/shaders/simple.vs
@@ -67,6 +69,7 @@ imgpack_(
     assets/images/icons.png
     assets/images/keybind_icons.png
     assets/images/placeholder.png
+    assets/images/font.png
 )
 
 bytepack_(
@@ -225,7 +228,6 @@ target_precompile_headers(renderer_model REUSE_FROM logging)
 # target_include_directories(NodeEditor PUBLIC src/NodeEditor)
 
 add_library(Scene_resource_manager STATIC
-  src/Scene/Scene.hpp
   src/Scene/ResourceManager.hpp
   src/Scene/ResourceManager.cpp
 )
@@ -234,11 +236,12 @@ target_link_libraries(Scene_resource_manager PUBLIC logging renderer renderer_mo
 target_precompile_headers(Scene_resource_manager REUSE_FROM logging)
 
 add_library(Scene_object_pool STATIC
+  src/Scene/Scene.hpp
   src/Scene/ObjectPool.hpp
   src/Scene/ObjectPool.cpp
 )
 target_include_directories(Scene_object_pool PUBLIC src/Scene/)
-target_link_libraries(Scene_object_pool PUBLIC logging Scene_resource_manager LuaBindings PRIVATE Sheet)
+target_link_libraries(Scene_object_pool PUBLIC logging Scene_resource_manager LuaBindings PRIVATE Sheet renderer glad)
 target_precompile_headers(Scene_object_pool REUSE_FROM logging)
 
 add_library(LuaBindings STATIC
@@ -265,7 +268,7 @@ add_library(App STATIC
   src/App_popups.cpp
 )
 target_include_directories(App PUBLIC src)
-target_link_libraries(App PUBLIC Scene icon_img logging renderer imgui fileutils images images_bigger PRIVATE pfd)
+target_link_libraries(App PUBLIC Scene icon_img logging renderer imgui fileutils images images_bigger mimalloc-static PRIVATE pfd)
 target_precompile_headers(App REUSE_FROM logging)
 
 add_executable(main src/main.cpp)

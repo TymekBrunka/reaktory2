@@ -1,6 +1,7 @@
 #pragma once
 #include <Model.hpp>
 #include <Renderer.hpp>
+#include <cstddef>
 #include <filesystem>
 #include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
@@ -41,6 +42,17 @@ class Scene {
   friend class SceneLuaBindings;
   friend class ScriptClass;
   bool render_selection_bb = false;
+
+public:
+  static Renderer::rProgram text_program;
+  static Renderer::rProgram m_text_texture;
+  static Renderer::rProgram m_text_length;
+  static Renderer::rProgram m_text_position;
+
+private:
+  static Renderer::rProgram m_text_ID;
+  static Renderer::rProgram m_text_view;
+  static Renderer::rProgram m_text_projection;
   static Renderer::rProgram skybox_program;
   static Renderer::rFBO skybox_fbo;
   static Renderer::rEBO skybox_ebo;
