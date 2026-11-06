@@ -53,6 +53,7 @@ private:
   static Renderer::rProgram m_text_ID;
   static Renderer::rProgram m_text_view;
   static Renderer::rProgram m_text_projection;
+  static Renderer::rProgram m_text_pixel_size;
   static Renderer::rProgram skybox_program;
   static Renderer::rFBO skybox_fbo;
   static Renderer::rEBO skybox_ebo;
@@ -146,6 +147,9 @@ private:
 
   void draw_models_recursive(int16_t idx, float delta,
                              glm::mat4 parentTransform, objH parentObj);
+
+  void draw_onscreen_recursive(int16_t idx, float delta,
+                               glm::mat4 parentTransform, objH parentObj);
 
   void add_lua(lua_State *L);
 

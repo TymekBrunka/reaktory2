@@ -337,7 +337,32 @@ static void type_datapoint_draw(Scene *selected_scene, ImVec2 *wpos,
 
   ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
-  ImGui::InputText("##sheet##header", &odatapoint->header);
+
+  bool ud_requires_update = false;
+  ImGui::InputText(
+      "##sheet##header", &odatapoint->header, ImGuiInputTextFlags_CallbackEdit,
+      [](ImGuiInputTextCallbackData *data) {
+        bool *requires_update = (bool *)data->UserData;
+        *requires_update = true;
+        return 0;
+      },
+      &ud_requires_update);
+
+  if (ud_requires_update) {
+    int hdridx = odatapoint->header_idx;
+    int sheetidx = odatapoint->sheet_idx;
+    odatapoint->sheet_idx = selected_scene->displayed_row.sheet_idx;
+    auto header =
+        selected_scene->displayed_row.headers.find(odatapoint->header);
+    if (header != selected_scene->displayed_row.headers.end())
+      odatapoint->header_idx = header->second;
+    else
+      odatapoint->header_idx = -1;
+    if (hdridx != odatapoint->header_idx || sheetidx != odatapoint->sheet_idx)
+      odatapoint->update_text(&selected_scene->displayed_row);
+
+    ud_requires_update = false;
+  }
 
   if (ret)
     OpenCustomCombo("datapoint_header");
@@ -358,17 +383,6 @@ static void type_datapoint_draw(Scene *selected_scene, ImVec2 *wpos,
     }
     EndCustomCombo(*wpos, *wpos2);
   }
-
-  int hdridx = odatapoint->header_idx;
-  int sheetidx = odatapoint->sheet_idx;
-  odatapoint->sheet_idx = selected_scene->displayed_row.sheet_idx;
-  auto header = selected_scene->displayed_row.headers.find(odatapoint->header);
-  if (header != selected_scene->displayed_row.headers.end())
-    odatapoint->header_idx = header->second;
-  else
-    odatapoint->header_idx = -1;
-  if (hdridx != odatapoint->header_idx || sheetidx != odatapoint->sheet_idx)
-    odatapoint->update_text(&selected_scene->displayed_row);
 }
 
 // -------------------------------------------------------------------------------------------------------------------
@@ -1052,7 +1066,27 @@ void App::draw_gui() {
           ImGui::SameLine();
           type_datapoint_draw(selected_scene, &wpos, &wpos2, odatapoint);
 
-          ImGui::Text(odatapoint->display_text.string().c_str());
+          ImGui::SetCursorPosX(8);
+          InputAllignedText("Tekst");
+          ImGui::SameLine();
+
+          bool ud_requires_update = false;
+          ImGui::InputText(
+              "##datapoint##text",
+              (std::string *)&odatapoint->display_text.string(),
+              ImGuiInputTextFlags_CallbackEdit,
+              [](ImGuiInputTextCallbackData *data) {
+                bool *requires_update = (bool *)data->UserData;
+                *requires_update = true;
+                return 0;
+              },
+              &ud_requires_update);
+
+          if (ud_requires_update) {
+            odatapoint->display_text.setText(
+                odatapoint->display_text.string().c_str());
+            ud_requires_update = false;
+          }
           // ImGui::Text("%d", odatapoint->sheet_idx);
           // ImGui::Text("%d", odatapoint->header_idx);
 

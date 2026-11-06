@@ -41,6 +41,7 @@ Renderer::rProgram Scene::m_text_position = 0;
 Renderer::rProgram Scene::m_text_ID = 0;
 Renderer::rProgram Scene::m_text_view = 0;
 Renderer::rProgram Scene::m_text_projection = 0;
+Renderer::rProgram Scene::m_text_pixel_size = 0;
 Renderer::rProgram Scene::skybox_program = 0;
 Renderer::rFBO Scene::skybox_fbo = 0;
 Renderer::rFBO Scene::skybox_ebo = 0;
@@ -140,8 +141,8 @@ static float text_bpos[] = {
 };
 
 static float text_tpos[] = {
-    -0.0625, 0.0625, -0.0625, -0.0625, 0.0625, -0.0625,
-    -0.0625, 0.0625, 0.0625,  -0.0625, 0.0625, 0.0625,
+    0.0, 0.0, 0.0,    -0.0625, 0.0625, -0.0625,
+    0.0, 0.0, 0.0625, -0.0625, 0.0625, 0.0,
 };
 
 struct Vertex {
@@ -338,6 +339,10 @@ bool Scene::resize(Renderer::rect_size size) {
     return false;
 
   this->size = size;
+  float pixel_size[2] = {1.0f / size.width, 1.0f / size.height};
+  glUseProgram(text_program);
+  glUniform2fv(m_text_pixel_size, 1, pixel_size);
+  glUseProgram(0);
   resize_framebuffer(size);
 
   projection =
@@ -444,8 +449,10 @@ bool Scene::Init(Renderer::Render &render) {
   }
 
   text_program = res_shader.value();
+  glUseProgram(text_program);
   glUniform2fv(glGetUniformLocation(text_program, "bpos"), 6, text_bpos);
   glUniform2fv(glGetUniformLocation(text_program, "tpos"), 6, text_tpos);
+  m_text_pixel_size = glGetUniformLocation(text_program, "psize");
   m_text_view = glGetUniformLocation(text_program, "view");
   m_text_ID = glGetUniformLocation(text_program, "ID");
   m_text_projection = glGetUniformLocation(text_program, "projection");
@@ -471,10 +478,12 @@ bool Scene::Init(Renderer::Render &render) {
     skinning_program = 0;
     selection_bb_program = 0;
     text_program = 0;
+    glUseProgram(0);
     return false;
   }
   m_text_texture = res_img.value();
-  glUniform1i(m_text_texture, 0);
+  glUniform1i(glGetUniformLocation(text_program, "text"), 0);
+  glUseProgram(0);
 
   model_view_loc = glGetUniformLocation(skinning_program, "view");
   model_projection_loc = glGetUniformLocation(skinning_program, "projection");
@@ -746,6 +755,13 @@ void Scene::render(Renderer::Render &render) {
   draw_models_recursive(objPool.rootH().idx, render.GetDelta(), glm::mat4(1.0f),
                         objPool.rootH());
 
+  glClear(GL_DEPTH_BUFFER_BIT);
+
+  draw_onscreen_recursive(objPool.rootH().idx, render.GetDelta(),
+                          glm::mat4(1.0f), objPool.rootH());
+
+  glClear(GL_DEPTH_BUFFER_BIT);
+
   displayed_row.emit_update = false;
 
   if (mousebuttonLclick && mpos.width <= size.width &&
@@ -919,9 +935,26 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
       node->transform = glm::inverse(parentTransform) * world2local;
       modelTransform = parentTransform * node->transform;
     }
+  }
 
-    // finaly render it
-    if (odatapoint->header_idx > 0) {
+  for (int16_t i = 0; i < node->children.size(); i++) {
+    draw_models_recursive(node->children[i], delta, modelTransform, parentObj);
+  }
+}
+
+void Scene::draw_onscreen_recursive(int16_t idx, float delta,
+                                    glm::mat4 parentTransform, objH parentObj) {
+
+  Object *node = &objPool.get(objPool.rootH())[idx];
+  glm::mat4 modelTransform = node->transform * parentTransform;
+  parentObj = node->toHandle(idx) == selected_object || parentObj.idx == 0
+                  ? node->toHandle(idx)
+                  : parentObj;
+
+  if (oDataPoint *odatapoint =
+          (oDataPoint *)std::get_if<oDataPoint>(&node->variant)) {
+
+    if (!odatapoint->display_text.string().empty()) {
 
       glm::vec3 color = glm::vec3(((float)parentObj.gen) / 256,
                                   ((float)(parentObj.idx % 256)) / 256,
@@ -929,24 +962,13 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
 
       glUseProgram(text_program);
       glUniform3fv(m_text_ID, 1, glm::value_ptr(color));
-
-      static float text_bpos[] = {
-          -0.5, 0.5, -0.5, -0.5, 0.5, -0.5, -0.5, 0.5, 0.5, -0.5, 0.5, 0.5,
-      };
-
-      static float text_tpos[] = {
-          -0.0625, 0.0625, -0.0625, -0.0625, 0.0625, -0.0625,
-          -0.0625, 0.0625, 0.0625,  -0.0625, 0.0625, 0.0625,
-      };
-
-      glUniform2fv(glGetUniformLocation(text_program, "bpos"), 6, text_bpos);
-      glUniform2fv(glGetUniformLocation(text_program, "tpos"), 6, text_tpos);
-      odatapoint->display_text.draw(node->transform);
+      odatapoint->display_text.draw(modelTransform);
     }
   }
 
   for (int16_t i = 0; i < node->children.size(); i++) {
-    draw_models_recursive(node->children[i], delta, modelTransform, parentObj);
+    draw_onscreen_recursive(node->children[i], delta, modelTransform,
+                            parentObj);
   }
 }
 

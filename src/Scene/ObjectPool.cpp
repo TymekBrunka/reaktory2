@@ -45,12 +45,12 @@ Text3D &Text3D::operator=(Text3D &&other) noexcept {
 
 void Text3D::setText(const char *text_) {
   text = text_;
-  if (text.capacity() > v_capacity) {
+  if (text.size() > v_capacity) {
     if (!vbo)
       glGenBuffers(1, &vbo);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     buf.resize(text.capacity() * 6); // 6 verticies per character
-    glBufferData(GL_ARRAY_BUFFER, text.capacity() * 6, buf.data(),
+    glBufferData(GL_ARRAY_BUFFER, sizeof(int) * text.capacity() * 6, buf.data(),
                  GL_DYNAMIC_DRAW);
     v_capacity = text.capacity();
 
@@ -74,7 +74,8 @@ void Text3D::setText(const char *text_) {
     buf[5 + (6 * i)] = text[i];
   }
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
-  glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(int) * text.size() * 6, buf.data());
+  glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(int) * text.size() * 6,
+                  buf.data());
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
@@ -89,6 +90,44 @@ void Text3D::draw(const glm::mat4 &pos) {
   glBindVertexArray(0);
   glBindTexture(GL_TEXTURE_2D, 0);
   glUseProgram(0);
+}
+
+void oDataPoint::update_text(DisplayRow *displayed_row) {
+  if (header_idx < 1) {
+    if (header.empty() && !display_text.string().empty())
+      display_text.setText("");
+    return;
+  }
+
+  if (!displayed_row->ptr)
+    return;
+
+  static char fmt[256] = {0};
+  const CellValue *cell = displayed_row->ptr + header_idx - 1;
+  if (const NullCell *value = std::get_if<NullCell>(cell)) {
+    snprintf(fmt, sizeof(fmt), "");
+    display_text.setText(fmt);
+  } else if (const ErrorCell *value = std::get_if<ErrorCell>(cell)) {
+    snprintf(fmt, sizeof(fmt), "Błąd: %s", value->msg.c_str());
+    display_text.setText(fmt);
+  } else if (const std::string *value = std::get_if<std::string>(cell)) {
+    display_text.setText(value->c_str());
+  } else if (const int64_t *value = std::get_if<int64_t>(cell)) {
+    snprintf(fmt, sizeof(fmt), "%d", (int)*value);
+    display_text.setText(fmt);
+  } else if (const double *value = std::get_if<double>(cell)) {
+    snprintf(fmt, sizeof(fmt), "%.2lf", (double)*value);
+    display_text.setText(fmt);
+  } else if (const bool *value = std::get_if<bool>(cell)) {
+    display_text.setText(*value ? "true" : "false");
+  } else if (const tm *value = std::get_if<tm>(cell)) {
+    static char dtbuf[50] = {0};
+    if (value->tm_mday == 0)
+      strftime(dtbuf, sizeof(dtbuf), "%H:%M:%S", value);
+    else
+      strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", value);
+    display_text.setText(dtbuf);
+  }
 }
 
 void Object::change_script_class(ObjectPool *pool, int new_script_class_idx) {
@@ -140,43 +179,6 @@ void Object::change_script_class(ObjectPool *pool, int new_script_class_idx) {
          i < pool->get_script_classes()[script_class_idx].params.size(); i++) {
       lua_params.push_back(LuaParam{});
     }
-  }
-}
-
-void oDataPoint::update_text(DisplayRow *displayed_row) {
-  if (!displayed_row->ptr)
-    return;
-
-  if (header_idx < 1 && !display_text.string().empty()) {
-    display_text.setText("");
-    return;
-  }
-
-  static char fmt[256] = {0};
-  const CellValue *cell = displayed_row->ptr + header_idx - 1;
-  if (const NullCell *value = std::get_if<NullCell>(cell)) {
-    snprintf(fmt, sizeof(fmt), "");
-    display_text.setText(fmt);
-  } else if (const ErrorCell *value = std::get_if<ErrorCell>(cell)) {
-    snprintf(fmt, sizeof(fmt), "Błąd: %s", value->msg.c_str());
-    display_text.setText(fmt);
-  } else if (const std::string *value = std::get_if<std::string>(cell)) {
-    display_text.setText(value->c_str());
-  } else if (const int64_t *value = std::get_if<int64_t>(cell)) {
-    snprintf(fmt, sizeof(fmt), "%d", (int)*value);
-    display_text.setText(fmt);
-  } else if (const double *value = std::get_if<double>(cell)) {
-    snprintf(fmt, sizeof(fmt), "%.2lf", (double)*value);
-    display_text.setText(fmt);
-  } else if (const bool *value = std::get_if<bool>(cell)) {
-    display_text.setText(*value ? "true" : "false");
-  } else if (const tm *value = std::get_if<tm>(cell)) {
-    static char dtbuf[50] = {0};
-    if (value->tm_mday == 0)
-      strftime(dtbuf, sizeof(dtbuf), "%H:%M:%S", value);
-    else
-      strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", value);
-    display_text.setText(dtbuf);
   }
 }
 
