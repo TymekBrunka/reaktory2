@@ -6,6 +6,7 @@
 #include "glm/geometric.hpp"
 #include "glm/matrix.hpp"
 #include "images.h"
+#include "lua.h"
 #include <cstdio>
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
@@ -218,16 +219,6 @@ Scene::Scene(const std::string &name) {
 
   resMan = std::move(ResourceManager{current_folder / "models"});
 
-  for (auto &ent :
-       std::filesystem::directory_iterator(current_folder / "excel_sheets")) {
-    if (std::filesystem::is_regular_file(ent.path())) {
-      std::cerr << "loading " << ent.path() << "\n";
-      auto sheet_res = ReadXLSXfile(ent.path(), ++next_sheet_idx);
-      if (sheet_res.has_value())
-        sheets[ent.path().stem().string()] = sheet_res.value();
-    }
-  }
-
   init_lua(&L);
   add_lua(L);
   objPool = ObjectPool(L);
@@ -281,6 +272,46 @@ Scene::Scene(const std::string &name) {
           }
           throw std::runtime_error("");
         }
+      }
+    }
+  }
+
+  if (lua_getglobal(L, "HEADERS") != LUA_TTABLE) {
+    lua_remove(L, -1);
+    throw std::runtime_error("zmienna HEADERS nie jest listą");
+  }
+
+  int len = luaL_len(L, -1);
+  for (int i = 0; i < len; i++) {
+    if (lua_rawgeti(L, -1, i + 1) != LUA_TSTRING) {
+      lua_remove(L, -1);
+      lua_remove(L, -1);
+      throw std::runtime_error(
+          "element w liście HEADERS nie jest ciągiem znaków");
+    }
+
+    const char *hdr = lua_tostring(L, -1);
+    sampler.sampler2sheet.push_back(-1);
+    sampler.header_names.push_back(hdr);
+    sampler.headers[hdr] = i;
+    lua_remove(L, -1);
+  }
+  lua_remove(L, -1);
+
+  for (auto &ent :
+       std::filesystem::directory_iterator(current_folder / "excel_sheets")) {
+    if (std::filesystem::is_regular_file(ent.path())) {
+      std::cerr << "loading " << ent.path() << "\n";
+      auto sheet_res = ReadXLSXfile(ent.path(), ++next_sheet_idx);
+      if (sheet_res.has_value()) {
+        auto &sheet = sheet_res.value();
+        for (int i = 0; i < sheet.headers.size(); i++) {
+          auto it = sampler.headers.find(sheet.headers[i]);
+          if (it != sampler.headers.end()) {
+            sheet.sheet2sampler[i] = it->second;
+          }
+        }
+        sheets[ent.path().stem().string()] = sheet;
       }
     }
   }
@@ -762,7 +793,7 @@ void Scene::render(Renderer::Render &render) {
 
   glClear(GL_DEPTH_BUFFER_BIT);
 
-  displayed_row.emit_update = false;
+  sampler.emit_update = false;
 
   if (mousebuttonLclick && mpos.width <= size.width &&
       mpos.height <= size.height) {
@@ -824,14 +855,14 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
     lua_rawgeti(sc.L, -1, node->script_class_idx + 1);
     lua_remove(sc.L, -2);
 
-    if (displayed_row.emit_update) {
+    if (sampler.emit_update) {
       if (lua_getfield(sc.L, -1, "on_update") == LUA_TFUNCTION) {
         Object **obj = (Object **)lua_newuserdata(sc.L, sizeof(Object *));
         *obj = node;
         luaL_getmetatable(sc.L, "ObjectRef");
         lua_setmetatable(sc.L, -2);
-        DisplayRow **ud = (DisplayRow **)lua_newuserdata(sc.L, sizeof(void *));
-        *ud = &displayed_row;
+        Sampler **ud = (Sampler **)lua_newuserdata(sc.L, sizeof(void *));
+        *ud = &sampler;
         luaL_getmetatable(sc.L, "Row");
         lua_setmetatable(sc.L, -2);
         call_lua(sc.L, 2);
@@ -911,31 +942,32 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
         model.Draw();
       }
     }
-  } else if (oDataPoint *odatapoint =
-                 (oDataPoint *)std::get_if<oDataPoint>(&node->variant)) {
-
-    if (displayed_row.sheet_idx != odatapoint->sheet_idx) {
-      odatapoint->sheet_idx = displayed_row.sheet_idx;
-      auto header = displayed_row.headers.find(odatapoint->header);
-      if (header != displayed_row.headers.end())
-        odatapoint->header_idx = header->second;
-      else
-        odatapoint->header_idx = -1;
-    }
-    if (displayed_row.emit_update) {
-      odatapoint->update_text(&displayed_row);
-    }
-
-    if (node->toHandle(idx) == selected_object) {
-      glm::mat4 world2local = parentTransform * node->transform;
-      ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection),
-                           ImGuizmo::TRANSLATE, mCurrentGizmoMode,
-                           glm::value_ptr(world2local), NULL, NULL, NULL);
-
-      node->transform = glm::inverse(parentTransform) * world2local;
-      modelTransform = parentTransform * node->transform;
-    }
   }
+  // } else if (oDataPoint *odatapoint =
+  //                (oDataPoint *)std::get_if<oDataPoint>(&node->variant)) {
+  //
+  //   if (sampler.sheet_idx != odatapoint->sheet_idx) {
+  //     odatapoint->sheet_idx = sampler.sheet_idx;
+  //     auto header = sampler.headers.find(odatapoint->header);
+  //     if (header != sampler.headers.end())
+  //       odatapoint->header_idx = header->second;
+  //     else
+  //       odatapoint->header_idx = -1;
+  //   }
+  //   if (sampler.emit_update) {
+  //     odatapoint->update_text(&sampler);
+  //   }
+  //
+  //   if (node->toHandle(idx) == selected_object) {
+  //     glm::mat4 world2local = parentTransform * node->transform;
+  //     ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection),
+  //                          ImGuizmo::TRANSLATE, mCurrentGizmoMode,
+  //                          glm::value_ptr(world2local), NULL, NULL, NULL);
+  //
+  //     node->transform = glm::inverse(parentTransform) * world2local;
+  //     modelTransform = parentTransform * node->transform;
+  //   }
+  // }
 
   for (int16_t i = 0; i < node->children.size(); i++) {
     draw_models_recursive(node->children[i], delta, modelTransform, parentObj);
@@ -945,31 +977,31 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
 void Scene::draw_onscreen_recursive(int16_t idx, float delta,
                                     glm::mat4 parentTransform, objH parentObj) {
 
-  Object *node = &objPool.get(objPool.rootH())[idx];
-  glm::mat4 modelTransform = node->transform * parentTransform;
-  parentObj = node->toHandle(idx) == selected_object || parentObj.idx == 0
-                  ? node->toHandle(idx)
-                  : parentObj;
-
-  if (oDataPoint *odatapoint =
-          (oDataPoint *)std::get_if<oDataPoint>(&node->variant)) {
-
-    if (!odatapoint->display_text.string().empty()) {
-
-      glm::vec3 color = glm::vec3(((float)parentObj.gen) / 256,
-                                  ((float)(parentObj.idx % 256)) / 256,
-                                  ((float)(parentObj.idx / 256)) / 256);
-
-      glUseProgram(text_program);
-      glUniform3fv(m_text_ID, 1, glm::value_ptr(color));
-      odatapoint->display_text.draw(modelTransform);
-    }
-  }
-
-  for (int16_t i = 0; i < node->children.size(); i++) {
-    draw_onscreen_recursive(node->children[i], delta, modelTransform,
-                            parentObj);
-  }
+  // Object *node = &objPool.get(objPool.rootH())[idx];
+  // glm::mat4 modelTransform = node->transform * parentTransform;
+  // parentObj = node->toHandle(idx) == selected_object || parentObj.idx == 0
+  //                 ? node->toHandle(idx)
+  //                 : parentObj;
+  //
+  // if (oDataPoint *odatapoint =
+  //         (oDataPoint *)std::get_if<oDataPoint>(&node->variant)) {
+  //
+  //   if (!odatapoint->display_text.string().empty()) {
+  //
+  //     glm::vec3 color = glm::vec3(((float)parentObj.gen) / 256,
+  //                                 ((float)(parentObj.idx % 256)) / 256,
+  //                                 ((float)(parentObj.idx / 256)) / 256);
+  //
+  //     glUseProgram(text_program);
+  //     glUniform3fv(m_text_ID, 1, glm::value_ptr(color));
+  //     odatapoint->display_text.draw(modelTransform);
+  //   }
+  // }
+  //
+  // for (int16_t i = 0; i < node->children.size(); i++) {
+  //   draw_onscreen_recursive(node->children[i], delta, modelTransform,
+  //                           parentObj);
+  // }
 }
 
 void Scene::Cleanup() {

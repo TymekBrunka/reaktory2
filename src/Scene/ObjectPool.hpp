@@ -67,15 +67,29 @@ struct oNode {
   bool dummy = false;
 };
 
-class DisplayRow;
-struct oDataPoint {
-  int sheet_idx =
-      -1; // sheet index is used for determining whether to update header index
+class Sampler;
+// struct oDataPoint {
+//   int sheet_idx =
+//       -1; // sheet index is used for determining whether to update header index
+//   int header_idx = -1;
+//   std::string header; // key
+//   Text3D display_text;
+//
+//   void update_text(Sampler *displayed_row);
+// };
+
+struct DPHeader {
   int header_idx = -1;
   std::string header; // key
+};
+
+struct oDataPoint2 {
+  int sheet_idx =
+      -1; // sheet index is used for determining whether to update header index
+  std::vector<DPHeader> headers;
   Text3D display_text;
 
-  void update_text(DisplayRow *displayed_row);
+  void update_text(Sampler *displayed_row);
 };
 
 class Scene;
@@ -127,7 +141,7 @@ struct Object {
   std::string name;
   std::vector<int16_t> children;
   std::vector<LuaParam> lua_params;
-  std::variant<oEmptySlot, oNode, oModel, oDataPoint> variant;
+  std::variant<oEmptySlot, oNode, oModel, oDataPoint2> variant;
 
   inline objH toHandle(int16_t idx) const {
     return objH{.gen = gen, .idx = idx};

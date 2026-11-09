@@ -27,6 +27,7 @@ struct Sheet {
   std::vector<std::string> headers;
   std::vector<CellValue> data;
   std::vector<SheetRow> rows;
+  std::unordered_map<int, int> sheet2sampler;
 
   static void printcell2console(CellValue *cell);
 };

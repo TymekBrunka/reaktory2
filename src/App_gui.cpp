@@ -322,68 +322,71 @@ static void type_material_draw(Scene *selected_scene, ImVec2 *wpos,
   }
 }
 
-static void type_datapoint_draw(Scene *selected_scene, ImVec2 *wpos,
-                                ImVec2 *wpos2, oDataPoint *odatapoint) {
-
-  ImDrawList *drawlist = ImGui::GetWindowDrawList();
-  ImVec2 cpos = ImGui::GetCursorPos();
-  bool ret = ImGui::Button("##datapoint_header_", ImVec2(16, 22));
-  ImVec2 bpos = ImGui::GetItemRectMin();
-  ImVec2 bpos2 = ImGui::GetItemRectMax();
-  drawlist->AddRectFilled(bpos, ImVec2(bpos.x + 16, bpos2.y), 0xFF54371E);
-  drawlist->AddTriangleFilled(
-      ImVec2(bpos.x + 4, bpos.y + 8), ImVec2(bpos.x + 12, bpos.y + 8),
-      ImVec2(bpos.x + 8, bpos.y + 16), ImColor(255, 255, 255));
-
-  ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
-  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
-
-  bool ud_requires_update = false;
-  ImGui::InputText(
-      "##sheet##header", &odatapoint->header, ImGuiInputTextFlags_CallbackEdit,
-      [](ImGuiInputTextCallbackData *data) {
-        bool *requires_update = (bool *)data->UserData;
-        *requires_update = true;
-        return 0;
-      },
-      &ud_requires_update);
-
-  if (ud_requires_update) {
-    int hdridx = odatapoint->header_idx;
-    int sheetidx = odatapoint->sheet_idx;
-    odatapoint->sheet_idx = selected_scene->displayed_row.sheet_idx;
-    auto header =
-        selected_scene->displayed_row.headers.find(odatapoint->header);
-    if (header != selected_scene->displayed_row.headers.end())
-      odatapoint->header_idx = header->second;
-    else
-      odatapoint->header_idx = -1;
-    if (hdridx != odatapoint->header_idx || sheetidx != odatapoint->sheet_idx)
-      odatapoint->update_text(&selected_scene->displayed_row);
-
-    ud_requires_update = false;
-  }
-
-  if (ret)
-    OpenCustomCombo("datapoint_header");
-
-  if (BeginCustomCombo("datapoint_header", wpos, wpos2)) {
-    for (const auto &[name, idx] : selected_scene->displayed_row.headers) {
-      if (ImGui::Selectable(name.c_str(), false)) {
-        odatapoint->header = name;
-        odatapoint->header_idx = idx;
-        odatapoint->sheet_idx = selected_scene->displayed_row.sheet_idx;
-        odatapoint->update_text(&selected_scene->displayed_row);
-        // auto sheet =
-        //     selected_scene->get_sheets().find(selected_scene->selected_sheet);
-        //
-        // if (sheet != selected_scene->get_sheets().end())
-        //   odatapoint->sheet_idx = sheet->second.idx;
-      }
-    }
-    EndCustomCombo(*wpos, *wpos2);
-  }
-}
+// static void type_datapoint_draw(Scene *selected_scene, ImVec2 *wpos,
+//                                 ImVec2 *wpos2, oDataPoint *odatapoint) {
+//
+//   ImDrawList *drawlist = ImGui::GetWindowDrawList();
+//   ImVec2 cpos = ImGui::GetCursorPos();
+//   bool ret = ImGui::Button("##datapoint_header_", ImVec2(16, 22));
+//   ImVec2 bpos = ImGui::GetItemRectMin();
+//   ImVec2 bpos2 = ImGui::GetItemRectMax();
+//   drawlist->AddRectFilled(bpos, ImVec2(bpos.x + 16, bpos2.y), 0xFF54371E);
+//   drawlist->AddTriangleFilled(
+//       ImVec2(bpos.x + 4, bpos.y + 8), ImVec2(bpos.x + 12, bpos.y + 8),
+//       ImVec2(bpos.x + 8, bpos.y + 16), ImColor(255, 255, 255));
+//
+//   ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
+//   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+//
+//   bool ud_requires_update = false;
+//   ImGui::InputText(
+//       "##sheet##header", &odatapoint->header,
+//       ImGuiInputTextFlags_CallbackEdit,
+//       [](ImGuiInputTextCallbackData *data) {
+//         bool *requires_update = (bool *)data->UserData;
+//         *requires_update = true;
+//         return 0;
+//       },
+//       &ud_requires_update);
+//
+//   if (ud_requires_update) {
+//     int hdridx = odatapoint->header_idx;
+//     int sheetidx = odatapoint->sheet_idx;
+//     odatapoint->sheet_idx = selected_scene->sampler.sheet_idx;
+//     auto header =
+//         selected_scene->sampler.headers.find(odatapoint->header);
+//     if (header != selected_scene->sampler.headers.end())
+//       odatapoint->header_idx = header->second;
+//     else
+//       odatapoint->header_idx = -1;
+//     if (hdridx != odatapoint->header_idx || sheetidx !=
+//     odatapoint->sheet_idx)
+//       odatapoint->update_text(&selected_scene->sampler);
+//     odatapoint->display_text.setText("\x1b[32m");
+//
+//     ud_requires_update = false;
+//   }
+//
+//   if (ret)
+//     OpenCustomCombo("datapoint_header");
+//
+//   if (BeginCustomCombo("datapoint_header", wpos, wpos2)) {
+//     for (const auto &[name, idx] : selected_scene->sampler.headers) {
+//       if (ImGui::Selectable(name.c_str(), false)) {
+//         odatapoint->header = name;
+//         odatapoint->header_idx = idx;
+//         odatapoint->sheet_idx = selected_scene->sampler.sheet_idx;
+//         odatapoint->update_text(&selected_scene->sampler);
+//         // auto sheet =
+//         // selected_scene->get_sheets().find(selected_scene->selected_sheet);
+//         //
+//         // if (sheet != selected_scene->get_sheets().end())
+//         //   odatapoint->sheet_idx = sheet->second.idx;
+//       }
+//     }
+//     EndCustomCombo(*wpos, *wpos2);
+//   }
+// }
 
 // -------------------------------------------------------------------------------------------------------------------
 
@@ -484,12 +487,14 @@ void App::draw_object_tree(Object *node, int idx, bool is_descendant) {
     float char_vis_width = ImGui::CalcTextSize(ICON_FA_DRAW_POLYGON).x;
     drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y + 1),
                       ImColor(200, 50, 25), ICON_FA_DRAW_POLYGON);
-  } else if (const oDataPoint *odatapoint =
-                 std::get_if<oDataPoint>(&node->variant)) {
-    float char_vis_width = ImGui::CalcTextSize(ICON_FA_DRAW_POLYGON).x;
-    drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y + 1),
-                      ImColor(100, 150, 25), ICON_FA_HAND_LIZARD);
   }
+  // } else if (const oDataPoint *odatapoint =
+  //                std::get_if<oDataPoint>(&node->variant)) {
+  //   float char_vis_width = ImGui::CalcTextSize(ICON_FA_DRAW_POLYGON).x;
+  //   drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y +
+  //   1),
+  //                     ImColor(100, 150, 25), ICON_FA_HAND_LIZARD);
+  // }
   drawlist->AddText(ImVec2(bpos2.x + 22 + 3, bpos2.y + 1),
                     ImColor(220, 220, 220), node->name.c_str());
 
@@ -700,10 +705,10 @@ void App::draw_gui() {
       if (ImGui::Selectable("węzeł", false)) {
         selected_scene->objPool.add_node(selected_scene->selected_object);
       }
-      if (ImGui::Selectable("widok danych", false)) {
-        selected_scene->objPool.add_datapoint_node(
-            selected_scene->selected_object);
-      }
+      // if (ImGui::Selectable("widok danych", false)) {
+      //   selected_scene->objPool.add_datapoint_node(
+      //       selected_scene->selected_object);
+      // }
       ImGui::EndCombo();
     }
 
@@ -890,18 +895,18 @@ void App::draw_gui() {
               }
               EndCustomCombo(wpos, wpos2);
             }
-
-          } else if (_HeaderName *value =
-                         (_HeaderName *)std::get_if<_HeaderName>(&param)) {
-            ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
-            static oDataPoint dp{};
-            int hdridx = dp.header_idx;
-            int sheetidx = dp.sheet_idx;
-            type_datapoint_draw(selected_scene, &wpos, &wpos2, &dp);
-            if (dp.header_idx != hdridx || dp.sheet_idx != sheetidx)
-              value->header = dp.header;
           }
+          // } else if (_HeaderName *value =
+          //                (_HeaderName *)std::get_if<_HeaderName>(&param)) {
+          //   ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
+          //   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+          //   static oDataPoint dp{};
+          //   int hdridx = dp.header_idx;
+          //   int sheetidx = dp.sheet_idx;
+          //   type_datapoint_draw(selected_scene, &wpos, &wpos2, &dp);
+          //   if (dp.header_idx != hdridx || dp.sheet_idx != sheetidx)
+          //     value->header = dp.header;
+          // }
 
           ImVec2 bpos2 = ImGui::GetItemRectMax();
           drawlist->AddRectFilled(bpos, ImVec2(bpos.x + 16, bpos2.y),
@@ -942,10 +947,10 @@ void App::draw_gui() {
               if (ImGui::Selectable("model"))
                 param = _ModelName{};
             }
-            if (128 & scparam.types) {
-              if (ImGui::Selectable("nagłówek"))
-                param = _HeaderName{};
-            }
+            // if (128 & scparam.types) {
+            //   if (ImGui::Selectable("nagłówek"))
+            //     param = _HeaderName{};
+            // }
             EndCustomCombo(wpos, wpos2);
           }
 
@@ -1048,54 +1053,54 @@ void App::draw_gui() {
         if (!hidemodelprop)
           ImGui::EndChild();
         ImGui::PopStyleColor(1);
-
-      } else if (oDataPoint *odatapoint =
-                     (oDataPoint *)std::get_if<oDataPoint>(&node->variant)) {
-
-        static bool hidedatapointprop = false;
-        if (BeginSection(3, &hidedatapointprop,
-                         ICON_FA_DRAW_POLYGON " widok danych", 0xFF0054DB,
-                         0xFF0C1F3D)) {
-
-          ImGui::Dummy(ImVec2(2, 2));
-          ImVec2 wpos;
-          ImVec2 wpos2;
-
-          ImGui::SetCursorPosX(8);
-          InputAllignedText("Nagłówek");
-          ImGui::SameLine();
-          type_datapoint_draw(selected_scene, &wpos, &wpos2, odatapoint);
-
-          ImGui::SetCursorPosX(8);
-          InputAllignedText("Tekst");
-          ImGui::SameLine();
-
-          bool ud_requires_update = false;
-          ImGui::InputText(
-              "##datapoint##text",
-              (std::string *)&odatapoint->display_text.string(),
-              ImGuiInputTextFlags_CallbackEdit,
-              [](ImGuiInputTextCallbackData *data) {
-                bool *requires_update = (bool *)data->UserData;
-                *requires_update = true;
-                return 0;
-              },
-              &ud_requires_update);
-
-          if (ud_requires_update) {
-            odatapoint->display_text.setText(
-                odatapoint->display_text.string().c_str());
-            ud_requires_update = false;
-          }
-          // ImGui::Text("%d", odatapoint->sheet_idx);
-          // ImGui::Text("%d", odatapoint->header_idx);
-
-          ImGui::Dummy(ImVec2(2, 2));
-        }
-        if (!hidedatapointprop)
-          ImGui::EndChild();
-        ImGui::PopStyleColor(1);
       }
+      // } else if (oDataPoint *odatapoint =
+      //                (oDataPoint *)std::get_if<oDataPoint>(&node->variant)) {
+      //
+      //   static bool hidedatapointprop = false;
+      //   if (BeginSection(3, &hidedatapointprop,
+      //                    ICON_FA_DRAW_POLYGON " widok danych", 0xFF0054DB,
+      //                    0xFF0C1F3D)) {
+      //
+      //     ImGui::Dummy(ImVec2(2, 2));
+      //     ImVec2 wpos;
+      //     ImVec2 wpos2;
+      //
+      //     ImGui::SetCursorPosX(8);
+      //     InputAllignedText("Nagłówek");
+      //     ImGui::SameLine();
+      //     type_datapoint_draw(selected_scene, &wpos, &wpos2, odatapoint);
+      //
+      //     ImGui::SetCursorPosX(8);
+      //     InputAllignedText("Tekst");
+      //     ImGui::SameLine();
+      //
+      //     bool ud_requires_update = false;
+      //     ImGui::InputText(
+      //         "##datapoint##text",
+      //         (std::string *)&odatapoint->display_text.string(),
+      //         ImGuiInputTextFlags_CallbackEdit,
+      //         [](ImGuiInputTextCallbackData *data) {
+      //           bool *requires_update = (bool *)data->UserData;
+      //           *requires_update = true;
+      //           return 0;
+      //         },
+      //         &ud_requires_update);
+      //
+      //     if (ud_requires_update) {
+      //       odatapoint->display_text.setText(
+      //           odatapoint->display_text.string().c_str());
+      //       ud_requires_update = false;
+      //     }
+      //     // ImGui::Text("%d", odatapoint->sheet_idx);
+      //     // ImGui::Text("%d", odatapoint->header_idx);
+      //
+      //     ImGui::Dummy(ImVec2(2, 2));
+      //   }
+      //   if (!hidedatapointprop)
+      //     ImGui::EndChild();
+      //   ImGui::PopStyleColor(1);
+      // }
     }
   }
 
@@ -1223,6 +1228,9 @@ void App::draw_gui() {
     if (sheet_ != selected_scene->get_sheets().end()) {
       const auto &sheet = sheet_->second;
       ImGui::Text(ICON_FA_TABLE " dane");
+      ImVec2 region = ImGui::GetContentRegionAvail();
+      region.y -= 100;
+      ImGui::BeginChild(2, region);
       ImGui::BeginTable(
           selected_scene->selected_sheet.c_str(), sheet.headers.size(),
           ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable |
@@ -1244,21 +1252,21 @@ void App::draw_gui() {
                               ImGuiSelectableFlags_SpanAllColumns |
                                   ImGuiSelectableFlags_AllowOverlap)) {
 
-          if (selected_scene->displayed_row.sheet_idx != sheet.idx) {
-            selected_scene->displayed_row.sheet_idx = sheet.idx;
-            selected_scene->displayed_row.headers.clear();
+          if (selected_scene->sampler.sheet_idx != sheet.idx) {
+            selected_scene->sampler.sheet_idx = sheet.idx;
+            selected_scene->sampler.headers.clear();
             int i = 0;
             for (const std::string &header : sheet.headers) {
-              selected_scene->displayed_row.headers[header] = i;
+              selected_scene->sampler.headers[header] = i;
               i++;
             }
           }
 
-          selected_scene->displayed_row.emit_update = true;
-          selected_scene->displayed_row.width = sheet.width;
-          selected_scene->displayed_row.sheet_name = sheet_->first;
-          selected_scene->displayed_row.row = row;
-          selected_scene->displayed_row.ptr = sheet.data.data() + row.offset;
+          selected_scene->sampler.emit_update = true;
+          selected_scene->sampler.width = sheet.width;
+          selected_scene->sampler.sheet_name = sheet_->first + " ";
+          selected_scene->sampler.row = row;
+          selected_scene->sampler.ptr = sheet.data.data() + row.offset;
         }
         // ImGui::TextUnformatted(dtbuf);
         for (int i = 0; i < sheet.width; i++) {
@@ -1286,6 +1294,29 @@ void App::draw_gui() {
             ImGui::TextUnformatted(dtbuf);
           }
           cv++;
+        }
+      }
+      ImGui::EndTable();
+      ImGui::EndChild();
+
+      ImGui::BeginTable(
+          "##sheets##table_headers",
+          selected_scene->sampler.header_names.size(),
+          ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable |
+              ImGuiTableFlags_Borders | ImGuiTableFlags_ScrollX |
+              ImGuiTableFlags_ScrollY | ImGuiTableFlags_SizingFixedFit);
+
+      for (const auto header : selected_scene->sampler.header_names) {
+        ImGui::TableSetupColumn(header.c_str());
+      }
+      ImGui::TableHeadersRow();
+      ImGui::TableNextRow();
+      for (int hdr : selected_scene->sampler.sampler2sheet) {
+        if (hdr != -1) {
+          auto it = selected_scene->get_sheets().find(
+              selected_scene->sampler.sheet_name);
+          if (it != selected_scene->get_sheets().end())
+            ImGui::TextUnformatted(it->second.headers[hdr].c_str());
         }
       }
       ImGui::EndTable();

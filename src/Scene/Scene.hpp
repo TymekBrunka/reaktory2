@@ -13,7 +13,7 @@
 #include <ResourceManager.hpp>
 #include <Sheet.hpp>
 
-struct DisplayRow {
+struct Sampler {
 
   struct string_hash {
     using is_transparent = void;
@@ -28,10 +28,12 @@ struct DisplayRow {
     }
   };
 
+  std::vector<int> sampler2sheet;
   std::unordered_map<std::string, int, string_hash, std::equal_to<>> headers;
+  std::vector<std::string> header_names;
 
   bool emit_update = false;
-  int sheet_idx = 0;
+  int sheet_idx = -1;
   int width = 0;
   std::string sheet_name;
   SheetRow row;
@@ -157,7 +159,7 @@ public:
   ResourceManager resMan{};
   ObjectPool objPool{};
 
-  DisplayRow displayed_row;
+  Sampler sampler;
 
   Scene() = default;
   Scene(const std::string &name);

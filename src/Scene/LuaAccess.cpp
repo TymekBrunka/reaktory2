@@ -953,7 +953,7 @@ public:
   }
 
   static int row_tostring(lua_State *L) {
-    auto ud = LUAB_METHODCHECK(DisplayRow *, "Row");
+    auto ud = LUAB_METHODCHECK(Sampler *, "Row");
     LUAB_MCARGCHECK(0);
     lua_pushfstring(L, "Row {sheet = %s, width = %d}", (*ud)->sheet_name,
                     (*ud)->width);
@@ -961,21 +961,21 @@ public:
   }
 
   static int row_get_width(lua_State *L) {
-    auto ud = LUAB_METHODCHECK(DisplayRow *, "Row");
+    auto ud = LUAB_METHODCHECK(Sampler *, "Row");
     LUAB_MCARGCHECK(0);
     lua_pushnumber(L, (*ud)->width);
     return 1;
   }
 
   static int row_get_sheet(lua_State *L) {
-    auto ud = LUAB_METHODCHECK(DisplayRow *, "Row");
+    auto ud = LUAB_METHODCHECK(Sampler *, "Row");
     LUAB_MCARGCHECK(0);
     lua_pushstring(L, (*ud)->sheet_name.c_str());
     return 1;
   }
 
   static int row_get_nth_cell(lua_State *L) {
-    auto ud = LUAB_METHODCHECK(DisplayRow *, "Row");
+    auto ud = LUAB_METHODCHECK(Sampler *, "Row");
     LUAB_MCARGCHECK(1);
     int isnum;
     auto idx = lua_tointegerx(L, 2, &isnum);
@@ -1067,9 +1067,8 @@ void Scene::add_lua(lua_State *L) {
     lua_newtable(L);
     lua_pushnumber(L, 0);
     lua_setfield(L, -2, "NIL");
-    const char *variant_enums[] = {"BOOL",   "INT",      "FLOAT",
-                                   "STRING", "MATERIAL", "OBJH",
-                                   "MODEL",  "HEADER",   nullptr};
+    const char *variant_enums[] = {"BOOL",     "INT",  "FLOAT", "STRING",
+                                   "MATERIAL", "OBJH", "MODEL", nullptr};
     int i = 1;
     for (const char **variant = variant_enums; *variant != nullptr; variant++) {
       lua_pushnumber(L, i);
@@ -1238,8 +1237,8 @@ void Scene::add_lua(lua_State *L) {
 
   // Table row
   {
-    DisplayRow **ud = (DisplayRow **)lua_newuserdata(L, sizeof(void *));
-    *ud = &displayed_row;
+    Sampler **ud = (Sampler **)lua_newuserdata(L, sizeof(void *));
+    *ud = &sampler;
     luaL_newmetatable(L, "Row");
     lua_pushvalue(L, -1);           /* pushes the metatable */
     lua_setfield(L, -2, "__index"); /* metatable.__index = metatable */
