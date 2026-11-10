@@ -217,7 +217,7 @@ Scene::Scene(const std::string &name) {
   Log::log(Log::DEFAULT, 0, "Scene", TL(MSG_SCENE_OPEN_SUCCESS),
            std::make_format_args(name));
 
-  resMan = std::move(ResourceManager{current_folder / "models"});
+  resMan = std::move(ResourceManager{current_folder});
 
   init_lua(&L);
   add_lua(L);
@@ -294,6 +294,7 @@ Scene::Scene(const std::string &name) {
     sampler.sampler2sheet.push_back(-1);
     sampler.header_names.push_back(hdr);
     sampler.headers[hdr] = i;
+    sampler.values.push_back(NullCell{});
     lua_remove(L, -1);
   }
   lua_remove(L, -1);
@@ -654,12 +655,37 @@ bool Scene::init(Renderer::Render &render) {
   skybox_loc = glGetUniformLocation(skybox_program, "skybox");
   glUniform1i(skybox_loc, 0);
 
+  for (auto &ent :
+       std::filesystem::directory_iterator(current_folder / "models")) {
+    if (std::filesystem::is_directory(ent.path())) {
+      FileUtils::path path = ent.path() / ent.path().filename();
+      auto res_model = Renderer::Model::LoadFromFile(FileUtils::RealFs{}, path, false);
+      if (!res_model.has_value()) {
+        if (!res_img_read.has_value()) {
+          std::string path = path;
+          Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+                   TL(MSG_GENERIC_FILE_NOT_FOUND), std::make_format_args(path));
+
+          free(res_img_read.value().pixels);
+
+          glDeleteFramebuffers(1, &framebuffer);
+          glBindFramebuffer(GL_FRAMEBUFFER, 0);
+          initialised = false;
+          return false;
+        }
+      }
+      auto e1 =
+          resMan.ImportModel(FileUtils::RealFs{}, path, &res_model.value());
+    }
+  }
+
   initialised = true;
   atomic_store(&is_busy, false);
 
   // // ---------------------- model test
   // auto e1 = resMan.ImportModel(FileUtils::RealFs{},
-  //                              std::filesystem::path{"assets"} / "example" /
+  //                              std::filesystem::path{"assets"} / "example"
+  //                              /
   //                                  "models" / "CesiumMan.m3d");
   // resMan.GetModel("CesiumMan.m3d")
   //     ->model.SetAnimation(
@@ -942,32 +968,33 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
         model.Draw();
       }
     }
+  } else if (oDataPoint2 *odatapoint =
+                 (oDataPoint2 *)std::get_if<oDataPoint2>(&node->variant)) {
+
+    if (sampler.sheet_idx != odatapoint->sheet_idx) {
+      odatapoint->sheet_idx = sampler.sheet_idx;
+      for (auto &hdr : odatapoint->headers) {
+        auto header = sampler.headers.find(hdr.header);
+        if (header != sampler.headers.end())
+          hdr.header_idx = header->second;
+        else
+          hdr.header_idx = -1;
+      }
+    }
+    if (sampler.emit_update) {
+      odatapoint->update_text(&sampler);
+    }
+
+    if (node->toHandle(idx) == selected_object) {
+      glm::mat4 world2local = parentTransform * node->transform;
+      ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection),
+                           ImGuizmo::TRANSLATE, mCurrentGizmoMode,
+                           glm::value_ptr(world2local), NULL, NULL, NULL);
+
+      node->transform = glm::inverse(parentTransform) * world2local;
+      modelTransform = parentTransform * node->transform;
+    }
   }
-  // } else if (oDataPoint *odatapoint =
-  //                (oDataPoint *)std::get_if<oDataPoint>(&node->variant)) {
-  //
-  //   if (sampler.sheet_idx != odatapoint->sheet_idx) {
-  //     odatapoint->sheet_idx = sampler.sheet_idx;
-  //     auto header = sampler.headers.find(odatapoint->header);
-  //     if (header != sampler.headers.end())
-  //       odatapoint->header_idx = header->second;
-  //     else
-  //       odatapoint->header_idx = -1;
-  //   }
-  //   if (sampler.emit_update) {
-  //     odatapoint->update_text(&sampler);
-  //   }
-  //
-  //   if (node->toHandle(idx) == selected_object) {
-  //     glm::mat4 world2local = parentTransform * node->transform;
-  //     ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection),
-  //                          ImGuizmo::TRANSLATE, mCurrentGizmoMode,
-  //                          glm::value_ptr(world2local), NULL, NULL, NULL);
-  //
-  //     node->transform = glm::inverse(parentTransform) * world2local;
-  //     modelTransform = parentTransform * node->transform;
-  //   }
-  // }
 
   for (int16_t i = 0; i < node->children.size(); i++) {
     draw_models_recursive(node->children[i], delta, modelTransform, parentObj);
@@ -977,31 +1004,31 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
 void Scene::draw_onscreen_recursive(int16_t idx, float delta,
                                     glm::mat4 parentTransform, objH parentObj) {
 
-  // Object *node = &objPool.get(objPool.rootH())[idx];
-  // glm::mat4 modelTransform = node->transform * parentTransform;
-  // parentObj = node->toHandle(idx) == selected_object || parentObj.idx == 0
-  //                 ? node->toHandle(idx)
-  //                 : parentObj;
-  //
-  // if (oDataPoint *odatapoint =
-  //         (oDataPoint *)std::get_if<oDataPoint>(&node->variant)) {
-  //
-  //   if (!odatapoint->display_text.string().empty()) {
-  //
-  //     glm::vec3 color = glm::vec3(((float)parentObj.gen) / 256,
-  //                                 ((float)(parentObj.idx % 256)) / 256,
-  //                                 ((float)(parentObj.idx / 256)) / 256);
-  //
-  //     glUseProgram(text_program);
-  //     glUniform3fv(m_text_ID, 1, glm::value_ptr(color));
-  //     odatapoint->display_text.draw(modelTransform);
-  //   }
-  // }
-  //
-  // for (int16_t i = 0; i < node->children.size(); i++) {
-  //   draw_onscreen_recursive(node->children[i], delta, modelTransform,
-  //                           parentObj);
-  // }
+  Object *node = &objPool.get(objPool.rootH())[idx];
+  glm::mat4 modelTransform = node->transform * parentTransform;
+  parentObj = node->toHandle(idx) == selected_object || parentObj.idx == 0
+                  ? node->toHandle(idx)
+                  : parentObj;
+
+  if (oDataPoint2 *odatapoint =
+          (oDataPoint2 *)std::get_if<oDataPoint2>(&node->variant)) {
+
+    if (!odatapoint->display_text.string().empty()) {
+
+      glm::vec3 color = glm::vec3(((float)parentObj.gen) / 256,
+                                  ((float)(parentObj.idx % 256)) / 256,
+                                  ((float)(parentObj.idx / 256)) / 256);
+
+      glUseProgram(text_program);
+      glUniform3fv(m_text_ID, 1, glm::value_ptr(color));
+      odatapoint->display_text.draw(modelTransform);
+    }
+  }
+
+  for (int16_t i = 0; i < node->children.size(); i++) {
+    draw_onscreen_recursive(node->children[i], delta, modelTransform,
+                            parentObj);
+  }
 }
 
 void Scene::Cleanup() {

@@ -390,6 +390,30 @@ static void type_material_draw(Scene *selected_scene, ImVec2 *wpos,
 
 // -------------------------------------------------------------------------------------------------------------------
 
+void show_cell_value(const CellValue *cv) {
+  if (const NullCell *value = std::get_if<NullCell>(cv)) {
+    ImGui::TextUnformatted("");
+  } else if (const ErrorCell *value = std::get_if<ErrorCell>(cv)) {
+    ImGui::Text("Błąd: %s", value->msg.c_str());
+  } else if (const std::string *value = std::get_if<std::string>(cv)) {
+    ImGui::TextUnformatted(value->c_str());
+  } else if (const int64_t *value = std::get_if<int64_t>(cv)) {
+    ImGui::Text("%d", (int)*value);
+  } else if (const double *value = std::get_if<double>(cv)) {
+    ImGui::Text("%.2lf", *value);
+  } else if (const bool *value = std::get_if<bool>(cv)) {
+    ImGui::TextUnformatted(*value ? "Prawda" : "Fałsz");
+  } else if (const tm *value = std::get_if<tm>(cv)) {
+    static char dtbuf[50] = {0};
+    if (value->tm_mday == 0)
+      strftime(dtbuf, sizeof(dtbuf), "%H:%M:%S", value);
+    else
+      strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", value);
+    ImGui::SetCursorPosX(8);
+    ImGui::TextUnformatted(dtbuf);
+  }
+}
+
 void App::draw_object_tree(Object *node, int idx, bool is_descendant) {
   ImGui::PushID(idx);
   ImDrawList *drawlist = ImGui::GetWindowDrawList();
@@ -487,14 +511,12 @@ void App::draw_object_tree(Object *node, int idx, bool is_descendant) {
     float char_vis_width = ImGui::CalcTextSize(ICON_FA_DRAW_POLYGON).x;
     drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y + 1),
                       ImColor(200, 50, 25), ICON_FA_DRAW_POLYGON);
+  } else if (const oDataPoint2 *odatapoint =
+                 std::get_if<oDataPoint2>(&node->variant)) {
+    float char_vis_width = ImGui::CalcTextSize(ICON_FA_DRAW_POLYGON).x;
+    drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y + 1),
+                      ImColor(100, 150, 25), ICON_FA_HAND_LIZARD);
   }
-  // } else if (const oDataPoint *odatapoint =
-  //                std::get_if<oDataPoint>(&node->variant)) {
-  //   float char_vis_width = ImGui::CalcTextSize(ICON_FA_DRAW_POLYGON).x;
-  //   drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y +
-  //   1),
-  //                     ImColor(100, 150, 25), ICON_FA_HAND_LIZARD);
-  // }
   drawlist->AddText(ImVec2(bpos2.x + 22 + 3, bpos2.y + 1),
                     ImColor(220, 220, 220), node->name.c_str());
 
@@ -705,10 +727,10 @@ void App::draw_gui() {
       if (ImGui::Selectable("węzeł", false)) {
         selected_scene->objPool.add_node(selected_scene->selected_object);
       }
-      // if (ImGui::Selectable("widok danych", false)) {
-      //   selected_scene->objPool.add_datapoint_node(
-      //       selected_scene->selected_object);
-      // }
+      if (ImGui::Selectable("widok danych", false)) {
+        selected_scene->objPool.add_datapoint_node(
+            selected_scene->selected_object);
+      }
       ImGui::EndCombo();
     }
 
@@ -1053,54 +1075,76 @@ void App::draw_gui() {
         if (!hidemodelprop)
           ImGui::EndChild();
         ImGui::PopStyleColor(1);
+      } else if (oDataPoint2 *odatapoint =
+                     (oDataPoint2 *)std::get_if<oDataPoint2>(&node->variant)) {
+
+        static bool hidedatapointprop = false;
+        if (BeginSection(3, &hidedatapointprop,
+                         ICON_FA_DRAW_POLYGON " widok danych", 0xFF0054DB,
+                         0xFF0C1F3D)) {
+
+          ImGui::Dummy(ImVec2(2, 2));
+          ImVec2 wpos;
+          ImVec2 wpos2;
+
+          ImGui::SetCursorPosX(8);
+          InputAllignedText("Nagłówki");
+          ImGui::SameLine();
+
+          static char headers[50] = {0};
+          snprintf(headers, sizeof(headers), "ilość: %d",
+                   (int)odatapoint->headers.size());
+
+          if (BeginCustomCombo2(&wpos, &wpos2, "headers", ICON_FA_HEADING,
+                                headers)) {
+
+            if (ImGui::Button("Dodaj nagłówek")) {
+              odatapoint->headers.push_back(DPHeader{});
+            }
+
+            int i = 0;
+            for (auto &header : odatapoint->headers) {
+              ImGui::SetCursorPosX(8);
+              ImGui::PushID(i + 1);
+              if (ImGui::Button(ICON_FA_TRASH)) {
+                odatapoint->headers.erase(odatapoint->headers.begin() + i);
+                ImGui::PopID();
+                break;
+              }
+              ImGui::SameLine();
+
+              ImVec2 wp;
+              ImVec2 wp2;
+
+              if (BeginCustomCombo2(&wp, &wp2, "header", ICON_FA_HEADING,
+                                    header.header.c_str())) {
+
+                if (ImGui::Selectable("(brak)", header.header_idx == -1)) {
+                  header.header = "";
+                  header.header_idx = -1;
+                }
+
+                int j = 0;
+                for (const auto &hdr : selected_scene->sampler.header_names) {
+                  if (ImGui::Selectable(hdr.c_str(), j == header.header_idx)) {
+                    header.header = hdr;
+                    header.header_idx = j;
+                  }
+                }
+                EndCustomCombo(wp, wp2);
+              }
+              ImGui::PopID();
+              i++;
+            }
+            EndCustomCombo(wpos, wpos2);
+          }
+
+          ImGui::Dummy(ImVec2(2, 2));
+        }
+        if (!hidedatapointprop)
+          ImGui::EndChild();
+        ImGui::PopStyleColor(1);
       }
-      // } else if (oDataPoint *odatapoint =
-      //                (oDataPoint *)std::get_if<oDataPoint>(&node->variant)) {
-      //
-      //   static bool hidedatapointprop = false;
-      //   if (BeginSection(3, &hidedatapointprop,
-      //                    ICON_FA_DRAW_POLYGON " widok danych", 0xFF0054DB,
-      //                    0xFF0C1F3D)) {
-      //
-      //     ImGui::Dummy(ImVec2(2, 2));
-      //     ImVec2 wpos;
-      //     ImVec2 wpos2;
-      //
-      //     ImGui::SetCursorPosX(8);
-      //     InputAllignedText("Nagłówek");
-      //     ImGui::SameLine();
-      //     type_datapoint_draw(selected_scene, &wpos, &wpos2, odatapoint);
-      //
-      //     ImGui::SetCursorPosX(8);
-      //     InputAllignedText("Tekst");
-      //     ImGui::SameLine();
-      //
-      //     bool ud_requires_update = false;
-      //     ImGui::InputText(
-      //         "##datapoint##text",
-      //         (std::string *)&odatapoint->display_text.string(),
-      //         ImGuiInputTextFlags_CallbackEdit,
-      //         [](ImGuiInputTextCallbackData *data) {
-      //           bool *requires_update = (bool *)data->UserData;
-      //           *requires_update = true;
-      //           return 0;
-      //         },
-      //         &ud_requires_update);
-      //
-      //     if (ud_requires_update) {
-      //       odatapoint->display_text.setText(
-      //           odatapoint->display_text.string().c_str());
-      //       ud_requires_update = false;
-      //     }
-      //     // ImGui::Text("%d", odatapoint->sheet_idx);
-      //     // ImGui::Text("%d", odatapoint->header_idx);
-      //
-      //     ImGui::Dummy(ImVec2(2, 2));
-      //   }
-      //   if (!hidedatapointprop)
-      //     ImGui::EndChild();
-      //   ImGui::PopStyleColor(1);
-      // }
     }
   }
 
@@ -1254,45 +1298,35 @@ void App::draw_gui() {
 
           if (selected_scene->sampler.sheet_idx != sheet.idx) {
             selected_scene->sampler.sheet_idx = sheet.idx;
-            selected_scene->sampler.headers.clear();
             int i = 0;
-            for (const std::string &header : sheet.headers) {
-              selected_scene->sampler.headers[header] = i;
-              i++;
+            for (auto &hdr : selected_scene->sampler.sampler2sheet)
+              hdr = -1;
+            for (const auto &[sht, smp] : sheet.sheet2sampler) {
+              selected_scene->sampler.sampler2sheet[smp] = sht;
             }
+          }
+
+          int i = 0;
+          for (auto &cell : selected_scene->sampler.values) {
+            int idx = selected_scene->sampler.sampler2sheet[i];
+            if (idx < 1) {
+              cell = NullCell{};
+            } else {
+              cell = sheet.data[row.offset + idx - 1];
+            }
+            i++;
           }
 
           selected_scene->sampler.emit_update = true;
           selected_scene->sampler.width = sheet.width;
-          selected_scene->sampler.sheet_name = sheet_->first + " ";
+          selected_scene->sampler.sheet_name = sheet_->first;
           selected_scene->sampler.row = row;
           selected_scene->sampler.ptr = sheet.data.data() + row.offset;
         }
         // ImGui::TextUnformatted(dtbuf);
         for (int i = 0; i < sheet.width; i++) {
           ImGui::TableNextColumn();
-
-          if (const NullCell *value = std::get_if<NullCell>(cv)) {
-            ImGui::TextUnformatted("");
-          } else if (const ErrorCell *value = std::get_if<ErrorCell>(cv)) {
-            ImGui::Text("Błąd: %s", value->msg.c_str());
-          } else if (const std::string *value = std::get_if<std::string>(cv)) {
-            ImGui::TextUnformatted(value->c_str());
-          } else if (const int64_t *value = std::get_if<int64_t>(cv)) {
-            ImGui::Text("%d", (int)*value);
-          } else if (const double *value = std::get_if<double>(cv)) {
-            ImGui::Text("%.2lf", *value);
-          } else if (const bool *value = std::get_if<bool>(cv)) {
-            ImGui::TextUnformatted(*value ? "Prawda" : "Fałsz");
-          } else if (const tm *value = std::get_if<tm>(cv)) {
-            static char dtbuf[50] = {0};
-            if (value->tm_mday == 0)
-              strftime(dtbuf, sizeof(dtbuf), "%H:%M:%S", value);
-            else
-              strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", value);
-            ImGui::SetCursorPosX(8);
-            ImGui::TextUnformatted(dtbuf);
-          }
+          show_cell_value(cv);
           cv++;
         }
       }
@@ -1311,14 +1345,52 @@ void App::draw_gui() {
       }
       ImGui::TableHeadersRow();
       ImGui::TableNextRow();
+      int j = 0;
+      auto sssheet =
+          selected_scene->get_sheets().find(selected_scene->sampler.sheet_name);
+      bool sheet_found = sssheet != selected_scene->get_sheets().end();
+      Sheet *ssheet = (Sheet *)&sssheet->second;
+
       for (int hdr : selected_scene->sampler.sampler2sheet) {
-        if (hdr != -1) {
-          auto it = selected_scene->get_sheets().find(
-              selected_scene->sampler.sheet_name);
-          if (it != selected_scene->get_sheets().end())
-            ImGui::TextUnformatted(it->second.headers[hdr].c_str());
+        ImGui::TableSetColumnIndex(j);
+        ImGui::PushID(j + 1);
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        if (ImGui::BeginCombo(
+                "##sheets##table_header_combo",
+                sheet_found
+                    ? (hdr == -1 ? "(brak)" : ssheet->headers[hdr].c_str())
+                    : "(brak)")) {
+
+          if (ImGui::Selectable("(brak)", !sheet_found)) {
+            if (hdr != -1)
+              ssheet->sheet2sampler.erase(ssheet->sheet2sampler.find(hdr));
+            selected_scene->sampler.sampler2sheet[j] = -1;
+          }
+
+          if (sheet_found) {
+            int k = 0;
+            for (const std::string &sheethdr : ssheet->headers) {
+              if (ImGui::Selectable(sheethdr.c_str(), hdr == k)) {
+                ssheet->sheet2sampler[k] = j;
+                selected_scene->sampler.sampler2sheet[j] = k;
+              }
+              k++;
+            }
+          }
+          ImGui::EndCombo();
         }
+        ImGui::PopID();
+        j++;
       }
+
+      j = 0;
+      ImGui::TableNextRow();
+      for (const auto &cv : selected_scene->sampler.values) {
+        ImGui::TableSetColumnIndex(j);
+        show_cell_value(&cv);
+        j++;
+      }
+
       ImGui::EndTable();
     }
   }

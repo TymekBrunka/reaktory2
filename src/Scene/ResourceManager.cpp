@@ -18,10 +18,13 @@ static void populateTexturesFromModel(
       path2mesh_map;
 
   for (int i = 0; i < model.GetNumMeshes(); i++) {
-    const std::string path =
-        filename + "/" + model.GetTmpMaterialData(i)->diffuse1;
+    auto matdata = model.GetTmpMaterialData(i);
+    if (!matdata)
+      continue;
+
+    const std::string path = filename + "/" + matdata->diffuse1;
     mmodel.materials.push_back(ManagedModel::ManagedMaterial{.diffuse1 = path});
-    if (!model.GetTmpMaterialData(i)->diffuse1.empty())
+    if (!matdata->diffuse1.empty())
       if (path2mesh_map.find(path) == path2mesh_map.end())
         path2mesh_map[path] = i;
   }
@@ -44,24 +47,112 @@ ResourceManager::ImportModel(const FileUtils::Fs &fs,
   std::string filename = filepath.filename().to_string();
   if (!allow_reload)
     if (models.find(filename) != models.end())
-      return (&(*models.find(filename)).second);
+      return &models.find(filename)->second;
 
   auto model = Renderer::Model::LoadFromFile(fs, filepath, false);
   if (!model.has_value())
     return std::unexpected(3);
+
+  if (do_copy_files) {
+    auto &model_ = model.value();
+    std::filesystem::create_directory(folder / "models" / filename);
+
+    if (filename.ends_with(".obj")) {
+      const std::string path =
+          filepath.to_string().substr(0, filename.size() - 5) + ".mtl";
+
+      auto res_blob = ((FileUtils::Fs *)&fs)->ReadFile(path);
+
+      if (!res_blob.has_value()) {
+        switch (res_blob.error()) {
+        case -2:
+          Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
+                   TL(MSG_GENERIC_FILE_NOT_FOUND), std::make_format_args(path));
+          break;
+
+        case -1:
+          Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
+                   TL(MSG_GENERIC_OPEN_ERROR), std::make_format_args(path));
+          break;
+
+        case 1:
+          Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
+                   TL(MSG_GENERIC_READ_ERROR), std::make_format_args(path));
+          break;
+
+        default:
+          break;
+        }
+      }
+
+      auto err = FileUtils::WriteFileIfNotExists(
+          folder / "models" / filename /
+              (filename.substr(0, filename.size() - 5) + ".mtl"),
+          res_blob.value().data, res_blob.value().length);
+      if (!err.has_value()) {
+        Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
+                 err.error() == -1 ? TL(MSG_GENERIC_OPEN_ERROR)
+                                   : TL(MSG_GENERIC_WRITE_ERROR),
+                 std::make_format_args(path));
+      }
+    }
+
+    for (int i = 0; i < model_.GetNumMeshes(); i++) {
+      auto matdata = model_.GetTmpMaterialData(i);
+      if (!matdata)
+        continue;
+
+      const std::string path =
+          filepath.folder().to_string() + matdata->diffuse1;
+      auto res_blob = ((FileUtils::Fs *)&fs)->ReadFile(path);
+
+      if (!res_blob.has_value()) {
+        switch (res_blob.error()) {
+        case -2:
+          Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
+                   TL(MSG_GENERIC_FILE_NOT_FOUND), std::make_format_args(path));
+          break;
+
+        case -1:
+          Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
+                   TL(MSG_GENERIC_OPEN_ERROR), std::make_format_args(path));
+          break;
+
+        case 1:
+          Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
+                   TL(MSG_GENERIC_READ_ERROR), std::make_format_args(path));
+          break;
+
+        default:
+          break;
+        }
+      }
+
+      auto err = FileUtils::WriteFileIfNotExists(
+          folder / "models" / filename / matdata->diffuse1,
+          res_blob.value().data, res_blob.value().length);
+      if (!err.has_value()) {
+        Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
+                 err.error() == -1 ? TL(MSG_GENERIC_OPEN_ERROR)
+                                   : TL(MSG_GENERIC_WRITE_ERROR),
+                 std::make_format_args(path));
+      }
+    }
+  }
 
   ManagedModel mmodel{.model = std::move(model.value())};
   populateTexturesFromModel(mmodel.model, mmodel, filename, textures);
 
   models[filename] = std::move(mmodel);
   if (do_copy_files) {
-    FileUtils::ReadResult blob = FileUtils::ReadFile(filepath).value();
-    std::filesystem::create_directory(folder / filename);
+    FileUtils::ReadResult blob =
+        ((FileUtils::Fs *)&fs)->ReadFile(filepath).value();
+    // std::filesystem::create_directory(folder / "models" / filename);
     auto e1 = FileUtils::WriteFile(folder / "models" / filename / filename,
                                    blob.data, blob.length);
   }
 
-  return (&(*models.find(filename)).second);
+  return &models.find(filename)->second;
 }
 
 std::expected<ManagedModel *, int>
@@ -76,17 +167,17 @@ ResourceManager::ImportModel(const FileUtils::Fs &fs,
 
   if (!allow_reload)
     if (models.find(filename) != models.end())
-      return (&(*models.find(filename)).second);
+      return &models.find(filename)->second;
 
   models[filename] = std::move(mmodel);
-  if (do_copy_files) {
-    FileUtils::ReadResult blob = FileUtils::ReadFile(filepath).value();
-    std::filesystem::create_directory(folder / "models" / filename);
-    auto e1 = FileUtils::WriteFile(folder / "models" / filename / filename,
-                                   blob.data, blob.length);
-  }
+  // if (do_copy_files) {
+  //   FileUtils::ReadResult blob = fs.ReadFile(filepath).value();
+  //   std::filesystem::create_directory(folder / "models" / filename);
+  //   auto e1 = FileUtils::WriteFile(folder / "models" / filename / filename,
+  //                                  blob.data, blob.length);
+  // }
 
-  return (&(*models.find(filename)).second);
+  return &models.find(filename)->second;
 }
 
 std::expected<Renderer::rTexture2D, int>
@@ -100,7 +191,7 @@ ResourceManager::ImportTexture(const FileUtils::Fs &fs,
   std::string filename = filepath.filename().to_string();
   if (!allow_reload)
     if (textures.find(filename) != textures.end())
-      return ((*textures.find(filename)).second);
+      return (textures.find(filename)->second);
 
   auto res_fs = Renderer::Render::sLoadImage(fs, filepath);
 
@@ -150,7 +241,7 @@ ResourceManager::ImportTexture(const FileUtils::Fs &fs,
                                    blob.length);
   }
 
-  return (res_img.value());
+  return res_img.value();
 }
 
 std::expected<Renderer::rTexture2D, int>

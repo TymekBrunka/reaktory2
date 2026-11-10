@@ -139,6 +139,16 @@ public:
     return *this;
   }
 
+  // inline std::string extension() const {
+  //   if (const std::filesystem::path *paf =
+  //           std::get_if<std::filesystem::path>(&Path)) {
+  //     return paf->extension().string();
+  //   } else {
+  //     const std::string &s = std::get<std::string>(Path);
+  //     return path{s.substr(s.find_last_of('.'))};
+  //   }
+  // }
+
   inline path folder() const {
     if (const std::filesystem::path *paf =
             std::get_if<std::filesystem::path>(&Path)) {

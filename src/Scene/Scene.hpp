@@ -31,6 +31,7 @@ struct Sampler {
   std::vector<int> sampler2sheet;
   std::unordered_map<std::string, int, string_hash, std::equal_to<>> headers;
   std::vector<std::string> header_names;
+  std::vector<CellValue> values;
 
   bool emit_update = false;
   int sheet_idx = -1;
