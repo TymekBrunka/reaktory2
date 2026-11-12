@@ -6,7 +6,6 @@
 #include "glm/geometric.hpp"
 #include "glm/matrix.hpp"
 #include "images.h"
-#include "lua.h"
 #include <cstdio>
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
@@ -38,6 +37,7 @@ static ImGuizmo::MODE mCurrentGizmoMode(ImGuizmo::LOCAL);
 Renderer::rProgram Scene::text_program = 0;
 Renderer::rProgram Scene::m_text_texture = 0;
 Renderer::rProgram Scene::m_text_length = 0;
+Renderer::rProgram Scene::m_text_height = 0;
 Renderer::rProgram Scene::m_text_position = 0;
 Renderer::rProgram Scene::m_text_ID = 0;
 Renderer::rProgram Scene::m_text_view = 0;
@@ -144,6 +144,18 @@ static float text_bpos[] = {
 static float text_tpos[] = {
     0.0, 0.0, 0.0,    -0.0625, 0.0625, -0.0625,
     0.0, 0.0, 0.0625, -0.0625, 0.0625, 0.0,
+};
+
+consteval glm::vec4 rgba2vec4(uint32_t in) {
+  return glm::vec4((in / (256 * 256 * 256)) / 255.0,
+                   ((in / (256 * 256)) % 256) / 255.0,
+                   ((in / 256) % 256) / 256.0, (in % 256) / 255.0);
+}
+
+static glm::vec4 txt_colors[] = {
+    rgba2vec4(0x111111FF), rgba2vec4(0xDE5D68FF), rgba2vec4(0x8FD573FF),
+    rgba2vec4(0xDBB671FF), rgba2vec4(0x57A5E5FF), rgba2vec4(0xBB70D2FF),
+    rgba2vec4(0x51A8B3FF), rgba2vec4(0xCCCCCCFF),
 };
 
 struct Vertex {
@@ -276,26 +288,29 @@ Scene::Scene(const std::string &name) {
     }
   }
 
-  if (lua_getglobal(L, "HEADERS") != LUA_TTABLE) {
+  int lftype = lua_getglobal(L, "HEADERS");
+  if (lftype != LUA_TTABLE && lftype != LUA_TNIL) {
     lua_remove(L, -1);
     throw std::runtime_error("zmienna HEADERS nie jest listą");
   }
 
-  int len = luaL_len(L, -1);
-  for (int i = 0; i < len; i++) {
-    if (lua_rawgeti(L, -1, i + 1) != LUA_TSTRING) {
-      lua_remove(L, -1);
-      lua_remove(L, -1);
-      throw std::runtime_error(
-          "element w liście HEADERS nie jest ciągiem znaków");
-    }
+  if (lftype == LUA_TTABLE) {
+    int len = luaL_len(L, -1);
+    for (int i = 0; i < len; i++) {
+      if (lua_rawgeti(L, -1, i + 1) != LUA_TSTRING) {
+        lua_remove(L, -1);
+        lua_remove(L, -1);
+        throw std::runtime_error(
+            "element w liście HEADERS nie jest ciągiem znaków");
+      }
 
-    const char *hdr = lua_tostring(L, -1);
-    sampler.sampler2sheet.push_back(-1);
-    sampler.header_names.push_back(hdr);
-    sampler.headers[hdr] = i;
-    sampler.values.push_back(NullCell{});
-    lua_remove(L, -1);
+      const char *hdr = lua_tostring(L, -1);
+      sampler.sampler2sheet.push_back(-1);
+      sampler.header_names.push_back(hdr);
+      sampler.headers[hdr] = i;
+      sampler.values.push_back(NullCell{});
+      lua_remove(L, -1);
+    }
   }
   lua_remove(L, -1);
 
@@ -484,18 +499,21 @@ bool Scene::Init(Renderer::Render &render) {
   glUseProgram(text_program);
   glUniform2fv(glGetUniformLocation(text_program, "bpos"), 6, text_bpos);
   glUniform2fv(glGetUniformLocation(text_program, "tpos"), 6, text_tpos);
+  glUniform4fv(glGetUniformLocation(text_program, "colors"),
+               sizeof(txt_colors) / sizeof(glm::vec4), (float *)txt_colors);
   m_text_pixel_size = glGetUniformLocation(text_program, "psize");
   m_text_view = glGetUniformLocation(text_program, "view");
   m_text_ID = glGetUniformLocation(text_program, "ID");
   m_text_projection = glGetUniformLocation(text_program, "projection");
   m_text_position = glGetUniformLocation(text_program, "pos");
   m_text_length = glGetUniformLocation(text_program, "length");
+  m_text_height = glGetUniformLocation(text_program, "height");
 
   auto res_img = Renderer::Render::sLoadTexture(
       Renderer::Image{.width = font_png_width,
                       .height = font_png_height,
                       .channels = font_png_channels,
-                      .mipmap_levels = 0,
+                      .mipmap_levels = 1,
                       .pixels = (unsigned char *)font_png_pixels},
       true);
 
@@ -659,7 +677,8 @@ bool Scene::init(Renderer::Render &render) {
        std::filesystem::directory_iterator(current_folder / "models")) {
     if (std::filesystem::is_directory(ent.path())) {
       FileUtils::path path = ent.path() / ent.path().filename();
-      auto res_model = Renderer::Model::LoadFromFile(FileUtils::RealFs{}, path, false);
+      auto res_model =
+          Renderer::Model::LoadFromFile(FileUtils::RealFs{}, path, false);
       if (!res_model.has_value()) {
         if (!res_img_read.has_value()) {
           std::string path = path;
@@ -994,6 +1013,16 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
       node->transform = glm::inverse(parentTransform) * world2local;
       modelTransform = parentTransform * node->transform;
     }
+  } else if (Text3D *otext3d = (Text3D *)std::get_if<Text3D>(&node->variant)) {
+    if (node->toHandle(idx) == selected_object) {
+      glm::mat4 world2local = parentTransform * node->transform;
+      ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection),
+                           ImGuizmo::TRANSLATE, mCurrentGizmoMode,
+                           glm::value_ptr(world2local), NULL, NULL, NULL);
+
+      node->transform = glm::inverse(parentTransform) * world2local;
+      modelTransform = parentTransform * node->transform;
+    }
   }
 
   for (int16_t i = 0; i < node->children.size(); i++) {
@@ -1022,6 +1051,20 @@ void Scene::draw_onscreen_recursive(int16_t idx, float delta,
       glUseProgram(text_program);
       glUniform3fv(m_text_ID, 1, glm::value_ptr(color));
       odatapoint->display_text.draw(modelTransform);
+    }
+  }
+
+  if (Text3D *otext3D = (Text3D *)std::get_if<Text3D>(&node->variant)) {
+
+    if (!otext3D->string().empty()) {
+
+      glm::vec3 color = glm::vec3(((float)parentObj.gen) / 256,
+                                  ((float)(parentObj.idx % 256)) / 256,
+                                  ((float)(parentObj.idx / 256)) / 256);
+
+      glUseProgram(text_program);
+      glUniform3fv(m_text_ID, 1, glm::value_ptr(color));
+      otext3D->draw(modelTransform);
     }
   }
 

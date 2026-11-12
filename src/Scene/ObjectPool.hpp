@@ -7,12 +7,21 @@
 #include <vector>
 
 class Text3D {
+  struct Char {
+    int charIdx;
+    int colorIdx;
+    int lineNr;
+    int columnNr;
+  };
 private:
   Renderer::rVBO vbo = 0;
   Renderer::rVAO vao = 0;
   size_t v_capacity = 0;
-  std::vector<int> buf;
-  std::string text;
+  std::vector<Char> buf;
+  int txt_len = 0;
+  int length = 0;
+  int height = 0;
+  std::string text = "\\7Test :) \\1\\\\\\7n\ncz\\5es\\7c\nhej\n\\00\\11\\22\\33\\44\\55\\66\\77";
 
 public:
   Text3D() = default;
@@ -141,7 +150,7 @@ struct Object {
   std::string name;
   std::vector<int16_t> children;
   std::vector<LuaParam> lua_params;
-  std::variant<oEmptySlot, oNode, oModel, oDataPoint2> variant;
+  std::variant<oEmptySlot, oNode, oModel, oDataPoint2, Text3D> variant;
 
   inline objH toHandle(int16_t idx) const {
     return objH{.gen = gen, .idx = idx};
@@ -206,4 +215,6 @@ public:
   objH add_node(objH obj);
 
   objH add_datapoint_node(objH obj);
+
+  objH add_text_node(objH obj);
 };

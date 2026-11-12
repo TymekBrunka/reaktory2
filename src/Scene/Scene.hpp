@@ -50,6 +50,7 @@ public:
   static Renderer::rProgram text_program;
   static Renderer::rProgram m_text_texture;
   static Renderer::rProgram m_text_length;
+  static Renderer::rProgram m_text_height;
   static Renderer::rProgram m_text_position;
 
 private:

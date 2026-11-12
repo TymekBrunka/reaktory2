@@ -731,6 +731,10 @@ void App::draw_gui() {
         selected_scene->objPool.add_datapoint_node(
             selected_scene->selected_object);
       }
+
+      if (ImGui::Selectable("tekst", false)) {
+        selected_scene->objPool.add_text_node(selected_scene->selected_object);
+      }
       ImGui::EndCombo();
     }
 
@@ -1129,6 +1133,8 @@ void App::draw_gui() {
                   if (ImGui::Selectable(hdr.c_str(), j == header.header_idx)) {
                     header.header = hdr;
                     header.header_idx = j;
+                    odatapoint->display_text.setText(
+                        odatapoint->display_text.string().c_str());
                   }
                 }
                 EndCustomCombo(wp, wp2);
@@ -1142,6 +1148,43 @@ void App::draw_gui() {
           ImGui::Dummy(ImVec2(2, 2));
         }
         if (!hidedatapointprop)
+          ImGui::EndChild();
+        ImGui::PopStyleColor(1);
+      } else if (Text3D *otext3d =
+                     (Text3D *)std::get_if<Text3D>(&node->variant)) {
+
+        static bool hidetext3dprop = false;
+        if (BeginSection(4, &hidetext3dprop, ICON_FA_DRAW_POLYGON " napis",
+                         0xFF0054DB, 0xFF0C1F3D)) {
+
+          ImGui::Dummy(ImVec2(2, 2));
+          ImVec2 wpos;
+          ImVec2 wpos2;
+
+          ImGui::SetCursorPosX(8);
+          InputAllignedText("Tekst");
+          ImGui::SameLine();
+          ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+
+          bool ud_requires_update = false;
+          ImGui::InputTextMultiline(
+              "##text3d##field", (std::string *)&otext3d->string(),
+              ImVec2(0, 0), ImGuiInputTextFlags_CallbackEdit,
+              [](ImGuiInputTextCallbackData *data) {
+                bool *requires_update = (bool *)data->UserData;
+                *requires_update = true;
+                return 0;
+              },
+              &ud_requires_update);
+
+          if (ud_requires_update) {
+            otext3d->setText(otext3d->string().c_str());
+            ud_requires_update = false;
+          }
+
+          ImGui::Dummy(ImVec2(2, 2));
+        }
+        if (!hidetext3dprop)
           ImGui::EndChild();
         ImGui::PopStyleColor(1);
       }

@@ -1,14 +1,18 @@
 #include "Model.hpp"
 #include "Renderer.hpp"
 #include "ResourceManager.hpp"
+#include "Sheet.hpp"
 #include "glm/ext/vector_float3.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include <LuaBindings.hpp>
 #include <ObjectPool.hpp>
 #include <Scene.hpp>
+#include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <glad/gl.h>
 #include <iostream>
+#include <sstream>
 
 Text3D::~Text3D() {
   if (vao)
@@ -21,11 +25,17 @@ Text3D::~Text3D() {
 Text3D::Text3D(Text3D &&other) noexcept {
   vbo = other.vbo;
   vao = other.vao;
+  txt_len = other.txt_len;
+  length = other.length;
+  height = other.height;
   v_capacity = other.v_capacity;
   text = std::move(other.text);
   buf = std::move(other.buf);
   other.vbo = 0;
   other.vao = 0;
+  other.txt_len = 0;
+  other.length = 0;
+  other.height = 0;
   other.v_capacity = 0;
 };
 
@@ -33,66 +43,177 @@ Text3D &Text3D::operator=(Text3D &&other) noexcept {
   if (this != &other) {
     vbo = other.vbo;
     vao = other.vao;
+    txt_len = other.txt_len;
+    length = other.length;
+    height = other.height;
     v_capacity = other.v_capacity;
     text = std::move(other.text);
     buf = std::move(other.buf);
     other.vbo = 0;
     other.vao = 0;
+    other.txt_len = 0;
+    other.length = 0;
+    other.height = 0;
     other.v_capacity = 0;
   }
   return *this;
 };
 
 void Text3D::setText(const char *text_) {
-  text = text_;
+  if (text_ != text.c_str())
+    text = text_;
   if (text.size() > v_capacity) {
     if (!vbo)
       glGenBuffers(1, &vbo);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     buf.resize(text.capacity() * 6); // 6 verticies per character
-    glBufferData(GL_ARRAY_BUFFER, sizeof(int) * text.capacity() * 6, buf.data(),
-                 GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Text3D::Char) * text.capacity() * 6,
+                 buf.data(), GL_DYNAMIC_DRAW);
     v_capacity = text.capacity();
 
     const Renderer::rLocation loc_charidx =
         glGetAttribLocation(Scene::text_program, "charIdx");
 
+    const Renderer::rLocation loc_coloridx =
+        glGetAttribLocation(Scene::text_program, "colorIdx");
+
+    const Renderer::rLocation loc_linenr =
+        glGetAttribLocation(Scene::text_program, "lineNr");
+
+    const Renderer::rLocation loc_columnnr =
+        glGetAttribLocation(Scene::text_program, "columnNr");
+
     if (!vao)
       glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
     glEnableVertexAttribArray(loc_charidx);
-    glVertexAttribIPointer(loc_charidx, 1, GL_INT, sizeof(int), (void *)0);
+    glVertexAttribIPointer(loc_charidx, 1, GL_INT, sizeof(Text3D::Char),
+                           (void *)offsetof(Text3D::Char, charIdx));
+    glEnableVertexAttribArray(loc_coloridx);
+    glVertexAttribIPointer(loc_coloridx, 1, GL_INT, sizeof(Text3D::Char),
+                           (void *)offsetof(Text3D::Char, colorIdx));
+    glEnableVertexAttribArray(loc_linenr);
+    glVertexAttribIPointer(loc_linenr, 1, GL_INT, sizeof(Text3D::Char),
+                           (void *)offsetof(Text3D::Char, lineNr));
+    glEnableVertexAttribArray(loc_columnnr);
+    glVertexAttribIPointer(loc_columnnr, 1, GL_INT, sizeof(Text3D::Char),
+                           (void *)offsetof(Text3D::Char, columnNr));
     glBindVertexArray(0);
   }
 
+  length = 0;
+  height = 0;
+  int column = 0;
+  int color = 7;
+  int charidx = 0;
+
+  // memset(buf.data(), 0, sizeof(Text3D::Char) * buf.size());
   for (int i = 0; i < text.size(); i++) {
-    buf[0 + (6 * i)] = text[i];
-    buf[1 + (6 * i)] = text[i];
-    buf[2 + (6 * i)] = text[i];
-    buf[3 + (6 * i)] = text[i];
-    buf[4 + (6 * i)] = text[i];
-    buf[5 + (6 * i)] = text[i];
+    char c = text[i];
+
+    if (c == '\\' && i + 1 < text.size()) {
+      if (text[i + 1] == '\\') {
+        i++;
+      } else {
+        color =
+            (text[i + 1] >= '0' && text[i + 1] <= '9')
+                ? (int)((text[i + 1] - '0') % 8) // currently 8 colors (0 - 7)
+                : 0;
+        i++;
+        continue;
+      }
+
+    } else if (c == '\n') {
+
+      if (column > length)
+        length = column;
+      column = 0;
+      height++;
+      continue;
+    }
+
+    for (int j = 0; j < 6; j++)
+      buf[(charidx * 6) + j] = Text3D::Char{
+          .charIdx = text[i],
+          .colorIdx = color,
+          .lineNr = height,
+          .columnNr = column,
+      };
+    charidx++;
+    column++;
   }
+
+  if (column > length)
+    length = column;
+  height++;
+  txt_len = charidx;
+
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
-  glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(int) * text.size() * 6,
+  glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(Text3D::Char) * text.size() * 6,
                   buf.data());
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 void Text3D::draw(const glm::mat4 &pos) {
   glUseProgram(Scene::text_program);
-  glUniform1i(Scene::m_text_length, text.size());
+  glUniform1i(Scene::m_text_length, length);
+  glUniform1i(Scene::m_text_height, height);
   glUniformMatrix4fv(Scene::m_text_position, 1, false, glm::value_ptr(pos));
   glBindVertexArray(vao);
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(GL_TEXTURE_2D, Scene::m_text_texture);
-  glDrawArrays(GL_TRIANGLES, 0, text.size() * 6);
+  glDrawArrays(GL_TRIANGLES, 0, txt_len * 6);
   glBindVertexArray(0);
   glBindTexture(GL_TEXTURE_2D, 0);
   glUseProgram(0);
 }
 
 void oDataPoint2::update_text(Sampler *displayed_row) {
+  std::stringstream s;
+  if (!displayed_row->ptr)
+    return;
+
+  int i = 0;
+  for (auto &header : headers) {
+    if (header.header_idx == -1) {
+      if (header.header.empty()) {
+        continue;
+      } else {
+        auto it = displayed_row->headers.find(header.header);
+        if (it != displayed_row->headers.end()) {
+          header.header_idx = it->second;
+        } else {
+          continue;
+        }
+      }
+    }
+
+    s << "\\4|\\7" << header.header << ":\\2";
+    const CellValue *cell = displayed_row->values.data() + header.header_idx;
+    if (const NullCell *value = std::get_if<NullCell>(cell)) {
+    } else if (const ErrorCell *value = std::get_if<ErrorCell>(cell)) {
+      s << "[Błąd: " << value->msg << "]";
+    } else if (const std::string *value = std::get_if<std::string>(cell)) {
+      s << value;
+    } else if (const int64_t *value = std::get_if<int64_t>(cell)) {
+      s << (int)*value;
+    } else if (const double *value = std::get_if<double>(cell)) {
+      s << *value;
+    } else if (const bool *value = std::get_if<bool>(cell)) {
+      s << (*value ? "true" : "false");
+    } else if (const tm *value = std::get_if<tm>(cell)) {
+      static char dtbuf[50] = {0};
+      if (value->tm_mday == 0)
+        strftime(dtbuf, sizeof(dtbuf), "%H:%M:%S", value);
+      else
+        strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", value);
+      s << dtbuf;
+    }
+    if (i < headers.size())
+      s << "\n";
+    i++;
+  }
+  display_text.setText(s.str().c_str());
   // if (header_idx < 1) {
   //   if (!header.empty() && !display_text.string().empty())
   //     display_text.setText("");
@@ -331,6 +452,12 @@ objH ObjectPool::add_node(objH obj) {
 objH ObjectPool::add_datapoint_node(objH obj) {
   objH child =
       add(Object{.parent = obj, .name = "dane", .variant = oDataPoint2{}});
+  get(obj)->children.push_back(child.idx);
+  return child;
+}
+
+objH ObjectPool::add_text_node(objH obj) {
+  objH child = add(Object{.parent = obj, .name = "napis", .variant = Text3D{}});
   get(obj)->children.push_back(child.idx);
   return child;
 }

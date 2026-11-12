@@ -58,8 +58,11 @@ ResourceManager::ImportModel(const FileUtils::Fs &fs,
     std::filesystem::create_directory(folder / "models" / filename);
 
     if (filename.ends_with(".obj")) {
-      const std::string path =
-          filepath.to_string().substr(0, filename.size() - 5) + ".mtl";
+      const std::string fp = filepath.to_string();
+      const std::string path = fp.substr(0, fp.size() - 4) + ".mtl";
+
+      std::cerr << filepath.to_string();
+      std::cerr << filepath.to_string();
 
       auto res_blob = ((FileUtils::Fs *)&fs)->ReadFile(path);
 
@@ -87,7 +90,7 @@ ResourceManager::ImportModel(const FileUtils::Fs &fs,
 
       auto err = FileUtils::WriteFileIfNotExists(
           folder / "models" / filename /
-              (filename.substr(0, filename.size() - 5) + ".mtl"),
+              (filename.substr(0, filename.size() - 4) + ".mtl"),
           res_blob.value().data, res_blob.value().length);
       if (!err.has_value()) {
         Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
@@ -126,16 +129,16 @@ ResourceManager::ImportModel(const FileUtils::Fs &fs,
         default:
           break;
         }
-      }
-
-      auto err = FileUtils::WriteFileIfNotExists(
-          folder / "models" / filename / matdata->diffuse1,
-          res_blob.value().data, res_blob.value().length);
-      if (!err.has_value()) {
-        Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
-                 err.error() == -1 ? TL(MSG_GENERIC_OPEN_ERROR)
-                                   : TL(MSG_GENERIC_WRITE_ERROR),
-                 std::make_format_args(path));
+      } else {
+        auto err = FileUtils::WriteFileIfNotExists(
+            folder / "models" / filename / matdata->diffuse1,
+            res_blob.value().data, res_blob.value().length);
+        if (!err.has_value()) {
+          Log::log(Log::ERROR | Log::SEV_MED, 0, "Resource manager",
+                   err.error() == -1 ? TL(MSG_GENERIC_OPEN_ERROR)
+                                     : TL(MSG_GENERIC_WRITE_ERROR),
+                   std::make_format_args(path));
+        }
       }
     }
   }
