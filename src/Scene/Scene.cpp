@@ -513,7 +513,7 @@ bool Scene::Init(Renderer::Render &render) {
       Renderer::Image{.width = font_png_width,
                       .height = font_png_height,
                       .channels = font_png_channels,
-                      .mipmap_levels = 1,
+                      .mipmap_levels = 2,
                       .pixels = (unsigned char *)font_png_pixels},
       true);
 
@@ -1024,6 +1024,7 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
       modelTransform = parentTransform * node->transform;
     }
   }
+  node->current_parent_transform = parentTransform;
 
   for (int16_t i = 0; i < node->children.size(); i++) {
     draw_models_recursive(node->children[i], delta, modelTransform, parentObj);

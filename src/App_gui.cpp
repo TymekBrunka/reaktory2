@@ -6,6 +6,7 @@
 #include "Renderer.hpp"
 #include "ResourceManager.hpp"
 #include "Sheet.hpp"
+#include "glm/gtc/type_ptr.hpp"
 #include "imgui.h"
 #include "pfd/pfd.hpp"
 #include "stdlib.h"
@@ -821,6 +822,34 @@ void App::draw_gui() {
           }
           EndCustomCombo(wpos, wpos2);
         }
+
+        float translation[3] = {0};
+        float rotation[3] = {0};
+        float scale[3] = {0};
+
+        glm::mat4 world2local =
+            node->current_parent_transform * node->transform;
+
+        ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(world2local),
+                                              translation, rotation, scale);
+
+        ImGui::SetCursorPosX(8);
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImU32(0xff0000ff));
+        ImGui::DragFloat3("pozycja", translation);
+        ImGui::SetCursorPosX(8);
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImU32(0xff00ff00));
+        ImGui::DragFloat3("obrót", rotation);
+        ImGui::SetCursorPosX(8);
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImU32(0xffff0000));
+        ImGui::DragFloat3("skala", scale);
+        ImGui::PopStyleColor(3);
+
+        ImGuizmo::RecomposeMatrixFromComponents(translation, rotation, scale,
+                                                glm::value_ptr(world2local));
+
+        node->transform =
+            glm::inverse(node->current_parent_transform) * world2local;
+
         ImGui::Dummy(ImVec2(2, 2));
       }
       if (!hideobjprop)
@@ -1139,6 +1168,10 @@ void App::draw_gui() {
                 }
                 EndCustomCombo(wp, wp2);
               }
+
+              ImGui::InputDouble("min", &header.min);
+              ImGui::InputDouble("max", &header.max);
+
               ImGui::PopID();
               i++;
             }

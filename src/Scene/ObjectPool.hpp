@@ -13,6 +13,7 @@ class Text3D {
     int lineNr;
     int columnNr;
   };
+
 private:
   Renderer::rVBO vbo = 0;
   Renderer::rVAO vao = 0;
@@ -21,7 +22,9 @@ private:
   int txt_len = 0;
   int length = 0;
   int height = 0;
-  std::string text = "\\7Test :) \\1\\\\\\7n\ncz\\5es\\7c\nhej\n\\00\\11\\22\\33\\44\\55\\66\\77";
+  std::string text =
+      "\\7Test :) "
+      "\\1\\\\\\7n\ncz\\5es\\7c\nhej\n\\00\\11\\22\\33\\44\\55\\66\\77";
 
 public:
   Text3D() = default;
@@ -79,7 +82,8 @@ struct oNode {
 class Sampler;
 // struct oDataPoint {
 //   int sheet_idx =
-//       -1; // sheet index is used for determining whether to update header index
+//       -1; // sheet index is used for determining whether to update header
+//       index
 //   int header_idx = -1;
 //   std::string header; // key
 //   Text3D display_text;
@@ -89,6 +93,8 @@ class Sampler;
 
 struct DPHeader {
   int header_idx = -1;
+  double min = 0;
+  double max = 0.5;
   std::string header; // key
 };
 
@@ -147,6 +153,7 @@ struct Object {
   int ref_to_self = -1;
   objH parent = objH{.gen = 1, .idx = 0};
   glm::mat4 transform = glm::mat4(1.0f);
+  glm::mat4 current_parent_transform = glm::mat4(1.0f);
   std::string name;
   std::vector<int16_t> children;
   std::vector<LuaParam> lua_params;

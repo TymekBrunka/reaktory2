@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstring>
 #include <glad/gl.h>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 
@@ -173,7 +174,7 @@ void oDataPoint2::update_text(Sampler *displayed_row) {
   if (!displayed_row->ptr)
     return;
 
-  int i = 0;
+  int max_hdr_len = 0;
   for (auto &header : headers) {
     if (header.header_idx == -1) {
       if (header.header.empty()) {
@@ -188,17 +189,30 @@ void oDataPoint2::update_text(Sampler *displayed_row) {
       }
     }
 
-    s << "\\4|\\7" << header.header << ":\\2";
+    if (header.header.size() > max_hdr_len)
+      max_hdr_len = header.header.size();
+  }
+
+  int i = 0;
+  for (auto &header : headers) {
+    if (header.header_idx == -1)
+      continue;
+
+    s << "\\4|\\3" << header.header << ":\\7"
+      << std::setw(max_hdr_len - header.header.size() + 1) << " ";
+
     const CellValue *cell = displayed_row->values.data() + header.header_idx;
     if (const NullCell *value = std::get_if<NullCell>(cell)) {
     } else if (const ErrorCell *value = std::get_if<ErrorCell>(cell)) {
       s << "[Błąd: " << value->msg << "]";
     } else if (const std::string *value = std::get_if<std::string>(cell)) {
-      s << value;
-    } else if (const int64_t *value = std::get_if<int64_t>(cell)) {
-      s << (int)*value;
-    } else if (const double *value = std::get_if<double>(cell)) {
       s << *value;
+    } else if (const int64_t *value = std::get_if<int64_t>(cell)) {
+      s << (*value >= header.min && *value <= header.max ? "\\2" : "\\1")
+        << (int)*value;
+    } else if (const double *value = std::get_if<double>(cell)) {
+      s << (*value >= header.min && *value <= header.max ? "\\2" : "\\1")
+        << std::fixed << std::setprecision(2) << *value;
     } else if (const bool *value = std::get_if<bool>(cell)) {
       s << (*value ? "true" : "false");
     } else if (const tm *value = std::get_if<tm>(cell)) {
@@ -214,41 +228,6 @@ void oDataPoint2::update_text(Sampler *displayed_row) {
     i++;
   }
   display_text.setText(s.str().c_str());
-  // if (header_idx < 1) {
-  //   if (!header.empty() && !display_text.string().empty())
-  //     display_text.setText("");
-  //   return;
-  // }
-  //
-  // if (!displayed_row->ptr)
-  //   return;
-  //
-  // static char fmt[256] = {0};
-  // const CellValue *cell = displayed_row->ptr + header_idx - 1;
-  // if (const NullCell *value = std::get_if<NullCell>(cell)) {
-  //   snprintf(fmt, sizeof(fmt), "");
-  //   display_text.setText(fmt);
-  // } else if (const ErrorCell *value = std::get_if<ErrorCell>(cell)) {
-  //   snprintf(fmt, sizeof(fmt), "Błąd: %s", value->msg.c_str());
-  //   display_text.setText(fmt);
-  // } else if (const std::string *value = std::get_if<std::string>(cell)) {
-  //   display_text.setText(value->c_str());
-  // } else if (const int64_t *value = std::get_if<int64_t>(cell)) {
-  //   snprintf(fmt, sizeof(fmt), "%d", (int)*value);
-  //   display_text.setText(fmt);
-  // } else if (const double *value = std::get_if<double>(cell)) {
-  //   snprintf(fmt, sizeof(fmt), "%.2lf", (double)*value);
-  //   display_text.setText(fmt);
-  // } else if (const bool *value = std::get_if<bool>(cell)) {
-  //   display_text.setText(*value ? "true" : "false");
-  // } else if (const tm *value = std::get_if<tm>(cell)) {
-  //   static char dtbuf[50] = {0};
-  //   if (value->tm_mday == 0)
-  //     strftime(dtbuf, sizeof(dtbuf), "%H:%M:%S", value);
-  //   else
-  //     strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", value);
-  //   display_text.setText(dtbuf);
-  // }
 }
 
 void Object::change_script_class(ObjectPool *pool, int new_script_class_idx) {
