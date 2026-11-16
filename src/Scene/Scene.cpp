@@ -6,28 +6,29 @@
 #include "glm/geometric.hpp"
 #include "glm/matrix.hpp"
 #include "images.h"
-#include <cstdio>
-#define GLFW_INCLUDE_NONE
-#include "GLFW/glfw3.h"
-
+#include <ctime>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+// #include <glm/ext/matrix_clip_space.hpp>
 #include "glm/common.hpp"
 #include "glm/trigonometric.hpp"
+#include <glm/ext/matrix_transform.hpp>
+#define GLFW_INCLUDE_NONE
+#include "GLFW/glfw3.h"
+#include <yyjson.h>
+
 #include <FileUtils.hpp>
 #include <Logging.hpp>
 #include <Renderer.hpp>
 #include <Renderer_internal.hpp>
 #include <Scene.hpp>
 #include <Sheet.hpp>
+#include <cstdio>
 #include <iostream>
 
 #include <shaders.h>
 #include <staticassets_scene.h>
 #include <stdatomic.h>
-
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-// #include <glm/ext/matrix_clip_space.hpp>
-#include <glm/ext/matrix_transform.hpp>
 
 #include <ImGuizmo.h>
 static ImGuizmo::OPERATION mCurrentGizmoOperation(
@@ -714,6 +715,7 @@ bool Scene::init(Renderer::Render &render) {
 
 void Scene::cleanup() {
   close_lua(L);
+  save();
 
   if (initialised) {
     glDeleteTextures(1, &skybox_texture);
@@ -881,6 +883,153 @@ void Scene::render(Renderer::Render &render) {
 
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+}
+
+bool Scene::save() {
+  yyjson_mut_doc *doc = yyjson_mut_doc_new(NULL);
+  yyjson_mut_val *root = yyjson_mut_obj(doc);
+  yyjson_mut_doc_set_root(doc, root);
+
+  yyjson_mut_obj_add_int(doc, root, "format-version", 0);
+  yyjson_mut_obj_add_int(doc, root, "app-version", 0);
+  yyjson_mut_obj_add_str(doc, root, "name", name.c_str());
+
+  char datebuf[50] = {0};
+  time_t t = time(NULL);
+  tm *time_ = localtime(&t);
+  strftime(datebuf, 50, "%Y-%m-%d %H-%M-%S", time_);
+  free(time_);
+
+  yyjson_mut_obj_add_str(doc, root, "last-modified", datebuf);
+  yyjson_mut_obj_add_str(doc, root, "selected-sheet", selected_sheet.c_str());
+
+  int16_t counter;
+  std::unordered_map<int16_t, int16_t> pool2json;
+  yyjson_mut_val *objects = yyjson_mut_obj_add_arr(doc, root, "objects");
+
+  save_object_pool_recursive(doc, objects, &counter, &pool2json, 0);
+
+  char *json_string =
+      yyjson_mut_write(doc, YYJSON_WRITE_PRETTY_TWO_SPACES, NULL);
+  yyjson_mut_doc_free(doc);
+  std::cerr << json_string << "\n";
+
+  return true;
+}
+
+static int16_t AddToPool2Json(std::unordered_map<int16_t, int16_t> *pool2json,
+                              int16_t idx, int16_t *counter) {
+
+  auto it = pool2json->find(idx);
+  if (it == pool2json->end())
+    (*pool2json)[idx] = (*counter)++;
+  return (*counter) - 1;
+}
+
+int16_t Scene::save_object_pool_recursive(
+    void *doc_, void *pool_, int16_t *counter,
+    std::unordered_map<int16_t, int16_t> *pool2json, int16_t idx) {
+
+  auto doc = (yyjson_mut_doc *)doc_;
+  auto pool = (yyjson_mut_val *)pool_;
+
+  Object *node = &objPool.get(objPool.rootH())[idx];
+  int16_t jdx = AddToPool2Json(pool2json, idx, counter);
+
+  yyjson_mut_val *node_json = yyjson_mut_arr_add_obj(doc, pool);
+  yyjson_mut_obj_add_str(doc, node_json, "name", node->name.c_str());
+  yyjson_mut_obj_add_bool(doc, node_json, "collapsed", node->collapsed);
+  yyjson_mut_obj_add_bool(doc, node_json, "script_class",
+                          node->script_class_idx);
+
+  float translation[3];
+  float rotation[3];
+  float scale[3];
+
+  ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(node->transform),
+                                        translation, rotation, scale);
+
+  yyjson_mut_val *translation_json =
+      yyjson_mut_obj_add_arr(doc, node_json, "translation");
+  yyjson_mut_val *rotation_json =
+      yyjson_mut_obj_add_arr(doc, node_json, "rotation");
+  yyjson_mut_val *scale_json = yyjson_mut_obj_add_arr(doc, node_json, "scale");
+
+  yyjson_mut_arr_add_float(doc, translation_json, translation[0]);
+  yyjson_mut_arr_add_float(doc, translation_json, translation[1]);
+  yyjson_mut_arr_add_float(doc, translation_json, translation[2]);
+
+  yyjson_mut_arr_add_float(doc, rotation_json, rotation[0]);
+  yyjson_mut_arr_add_float(doc, rotation_json, rotation[1]);
+  yyjson_mut_arr_add_float(doc, rotation_json, rotation[2]);
+
+  yyjson_mut_arr_add_float(doc, scale_json, scale[0]);
+  yyjson_mut_arr_add_float(doc, scale_json, scale[1]);
+  yyjson_mut_arr_add_float(doc, scale_json, scale[2]);
+
+  if (node->lua_params.size() > 0) {
+    yyjson_mut_val *params =
+        yyjson_mut_obj_add_arr(doc, node_json, "script-params");
+
+    for (const auto &param : node->lua_params) {
+
+      if (Nil *value = (Nil *)std::get_if<Nil>(&param)) {
+        yyjson_mut_arr_add_null(doc, params);
+
+      } else if (bool *value = (bool *)std::get_if<bool>(&param)) {
+        yyjson_mut_arr_add_bool(doc, params, *value);
+
+      } else if (int *value = (int *)std::get_if<int>(&param)) {
+        yyjson_mut_arr_add_int(doc, params, *value);
+
+      } else if (float *value = (float *)std::get_if<float>(&param)) {
+        yyjson_mut_arr_add_float(doc, params, *value);
+
+      } else if (std::string *value =
+                     (std::string *)std::get_if<std::string>(&param)) {
+        yyjson_mut_arr_add_str(doc, params, value->c_str());
+
+      } else if (Material *value = (Material *)std::get_if<Material>(&param)) {
+        yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
+        yyjson_mut_arr_add_str(doc, p, "MATERIAL");
+        yyjson_mut_arr_add_str(doc, p, value->diffuse1.c_str());
+        yyjson_mut_val *color = yyjson_mut_arr_add_arr(doc, p);
+        yyjson_mut_arr_add_float(doc, color,
+                                 glm::value_ptr(value->color_diffuse)[0]);
+        yyjson_mut_arr_add_float(doc, color,
+                                 glm::value_ptr(value->color_diffuse)[1]);
+        yyjson_mut_arr_add_float(doc, color,
+                                 glm::value_ptr(value->color_diffuse)[2]);
+        yyjson_mut_arr_add_float(doc, color,
+                                 glm::value_ptr(value->color_diffuse)[3]);
+
+      } else if (objH *value = (objH *)std::get_if<objH>(&param)) {
+
+        // yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
+        // yyjson_mut_arr_add_str(doc, p, "OBJH");
+        // yyjson_mut_arr_add_int(doc, p, value->gen);
+        // yyjson_mut_arr_add_int(doc, p, value->idx);
+
+      } else if (_ModelName *value =
+                     (_ModelName *)std::get_if<_ModelName>(&param)) {
+      } else if (_HeaderName *value =
+                     (_HeaderName *)std::get_if<_HeaderName>(&param)) {
+      }
+    }
+  }
+
+  if (node->children.size() > 0) {
+    yyjson_mut_val *children =
+        yyjson_mut_obj_add_arr(doc, node_json, "children");
+
+    for (int16_t i = 0; i < node->children.size(); i++) {
+      int16_t chidx = save_object_pool_recursive(doc, pool, counter, pool2json,
+                                                 node->children[i]);
+      yyjson_mut_arr_add_int(doc, children, chidx);
+    }
+  }
+
+  return jdx;
 }
 
 void Scene::draw_models_recursive(int16_t idx, float delta,

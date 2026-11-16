@@ -323,71 +323,34 @@ static void type_material_draw(Scene *selected_scene, ImVec2 *wpos,
   }
 }
 
-// static void type_datapoint_draw(Scene *selected_scene, ImVec2 *wpos,
-//                                 ImVec2 *wpos2, oDataPoint *odatapoint) {
-//
-//   ImDrawList *drawlist = ImGui::GetWindowDrawList();
-//   ImVec2 cpos = ImGui::GetCursorPos();
-//   bool ret = ImGui::Button("##datapoint_header_", ImVec2(16, 22));
-//   ImVec2 bpos = ImGui::GetItemRectMin();
-//   ImVec2 bpos2 = ImGui::GetItemRectMax();
-//   drawlist->AddRectFilled(bpos, ImVec2(bpos.x + 16, bpos2.y), 0xFF54371E);
-//   drawlist->AddTriangleFilled(
-//       ImVec2(bpos.x + 4, bpos.y + 8), ImVec2(bpos.x + 12, bpos.y + 8),
-//       ImVec2(bpos.x + 8, bpos.y + 16), ImColor(255, 255, 255));
-//
-//   ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
-//   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
-//
-//   bool ud_requires_update = false;
-//   ImGui::InputText(
-//       "##sheet##header", &odatapoint->header,
-//       ImGuiInputTextFlags_CallbackEdit,
-//       [](ImGuiInputTextCallbackData *data) {
-//         bool *requires_update = (bool *)data->UserData;
-//         *requires_update = true;
-//         return 0;
-//       },
-//       &ud_requires_update);
-//
-//   if (ud_requires_update) {
-//     int hdridx = odatapoint->header_idx;
-//     int sheetidx = odatapoint->sheet_idx;
-//     odatapoint->sheet_idx = selected_scene->sampler.sheet_idx;
-//     auto header =
-//         selected_scene->sampler.headers.find(odatapoint->header);
-//     if (header != selected_scene->sampler.headers.end())
-//       odatapoint->header_idx = header->second;
-//     else
-//       odatapoint->header_idx = -1;
-//     if (hdridx != odatapoint->header_idx || sheetidx !=
-//     odatapoint->sheet_idx)
-//       odatapoint->update_text(&selected_scene->sampler);
-//     odatapoint->display_text.setText("\x1b[32m");
-//
-//     ud_requires_update = false;
-//   }
-//
-//   if (ret)
-//     OpenCustomCombo("datapoint_header");
-//
-//   if (BeginCustomCombo("datapoint_header", wpos, wpos2)) {
-//     for (const auto &[name, idx] : selected_scene->sampler.headers) {
-//       if (ImGui::Selectable(name.c_str(), false)) {
-//         odatapoint->header = name;
-//         odatapoint->header_idx = idx;
-//         odatapoint->sheet_idx = selected_scene->sampler.sheet_idx;
-//         odatapoint->update_text(&selected_scene->sampler);
-//         // auto sheet =
-//         // selected_scene->get_sheets().find(selected_scene->selected_sheet);
-//         //
-//         // if (sheet != selected_scene->get_sheets().end())
-//         //   odatapoint->sheet_idx = sheet->second.idx;
-//       }
-//     }
-//     EndCustomCombo(*wpos, *wpos2);
-//   }
-// }
+static void type_datapoint_draw(Scene *selected_scene, ImVec2 *wpos,
+                                ImVec2 *wpos2, DPHeader &header,
+                                bool update_text = false,
+                                oDataPoint2 *odatapoint = nullptr) {
+
+  if (BeginCustomCombo2(wpos, wpos2, "header", ICON_FA_HEADING,
+                        header.header.c_str())) {
+
+    if (ImGui::Selectable("(brak)", header.header_idx == -1)) {
+      header.header = "";
+      header.header_idx = -1;
+      if (update_text)
+        odatapoint->update_text(&selected_scene->sampler);
+    }
+
+    int j = 0;
+    for (const auto &hdr : selected_scene->sampler.header_names) {
+      if (ImGui::Selectable(hdr.c_str(), j == header.header_idx)) {
+        header.header = hdr;
+        header.header_idx = j;
+        if (update_text)
+          odatapoint->update_text(&selected_scene->sampler);
+      }
+      j++;
+    }
+    EndCustomCombo(*wpos, *wpos2);
+  }
+}
 
 // -------------------------------------------------------------------------------------------------------------------
 
@@ -953,18 +916,18 @@ void App::draw_gui() {
               }
               EndCustomCombo(wpos, wpos2);
             }
+          } else if (_HeaderName *value =
+                         (_HeaderName *)std::get_if<_HeaderName>(&param)) {
+            ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+            static oDataPoint2 dp{.headers = {DPHeader{}}};
+            int hdridx = dp.headers[0].header_idx;
+            int sheetidx = dp.sheet_idx;
+            type_datapoint_draw(selected_scene, &wpos, &wpos2, dp.headers[0],
+                                false, &dp);
+            if (dp.headers[0].header_idx != hdridx || dp.sheet_idx != sheetidx)
+              value->header = dp.headers[0].header;
           }
-          // } else if (_HeaderName *value =
-          //                (_HeaderName *)std::get_if<_HeaderName>(&param)) {
-          //   ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
-          //   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
-          //   static oDataPoint dp{};
-          //   int hdridx = dp.header_idx;
-          //   int sheetidx = dp.sheet_idx;
-          //   type_datapoint_draw(selected_scene, &wpos, &wpos2, &dp);
-          //   if (dp.header_idx != hdridx || dp.sheet_idx != sheetidx)
-          //     value->header = dp.header;
-          // }
 
           ImVec2 bpos2 = ImGui::GetItemRectMax();
           drawlist->AddRectFilled(bpos, ImVec2(bpos.x + 16, bpos2.y),
@@ -1005,10 +968,10 @@ void App::draw_gui() {
               if (ImGui::Selectable("model"))
                 param = _ModelName{};
             }
-            // if (128 & scparam.types) {
-            //   if (ImGui::Selectable("nagłówek"))
-            //     param = _HeaderName{};
-            // }
+            if (128 & scparam.types) {
+              if (ImGui::Selectable("nagłówek"))
+                param = _HeaderName{};
+            }
             EndCustomCombo(wpos, wpos2);
           }
 
@@ -1140,8 +1103,8 @@ void App::draw_gui() {
 
             int i = 0;
             for (auto &header : odatapoint->headers) {
-              ImGui::SetCursorPosX(8);
               ImGui::PushID(i + 1);
+              ImGui::SetCursorPosX(8);
               if (ImGui::Button(ICON_FA_TRASH)) {
                 odatapoint->headers.erase(odatapoint->headers.begin() + i);
                 odatapoint->update_text(&selected_scene->sampler);
@@ -1153,28 +1116,9 @@ void App::draw_gui() {
               ImVec2 wp;
               ImVec2 wp2;
 
-              if (BeginCustomCombo2(&wp, &wp2, "header", ICON_FA_HEADING,
-                                    header.header.c_str())) {
+              type_datapoint_draw(selected_scene, &wp, &wp2, header, true,
+                                  odatapoint);
 
-                if (ImGui::Selectable("(brak)", header.header_idx == -1)) {
-                  header.header = "";
-                  header.header_idx = -1;
-                  odatapoint->update_text(&selected_scene->sampler);
-                }
-
-                int j = 0;
-                for (const auto &hdr : selected_scene->sampler.header_names) {
-                  if (ImGui::Selectable(hdr.c_str(), j == header.header_idx)) {
-                    header.header = hdr;
-                    header.header_idx = j;
-                    odatapoint->update_text(&selected_scene->sampler);
-                  }
-                  j++;
-                }
-                EndCustomCombo(wp, wp2);
-              }
-
-              ImGui::Text("%d", header.header_idx);
               ImGui::InputDouble("min", &header.min);
               ImGui::InputDouble("max", &header.max);
 
