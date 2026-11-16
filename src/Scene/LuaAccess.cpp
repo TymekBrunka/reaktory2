@@ -1068,7 +1068,7 @@ void Scene::add_lua(lua_State *L) {
     lua_pushnumber(L, 0);
     lua_setfield(L, -2, "NIL");
     const char *variant_enums[] = {"BOOL",     "INT",  "FLOAT", "STRING",
-                                   "MATERIAL", "OBJH", "MODEL", nullptr};
+                                   "MATERIAL", "OBJH", "MODEL", "HEADER", nullptr};
     int i = 1;
     for (const char **variant = variant_enums; *variant != nullptr; variant++) {
       lua_pushnumber(L, i);

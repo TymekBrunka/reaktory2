@@ -921,9 +921,12 @@ static int16_t AddToPool2Json(std::unordered_map<int16_t, int16_t> *pool2json,
                               int16_t idx, int16_t *counter) {
 
   auto it = pool2json->find(idx);
-  if (it == pool2json->end())
+  if (it == pool2json->end()) {
     (*pool2json)[idx] = (*counter)++;
-  return (*counter) - 1;
+    return (*counter) - 1;
+  } else {
+    return it->second;
+  }
 }
 
 int16_t Scene::save_object_pool_recursive(
@@ -1005,15 +1008,27 @@ int16_t Scene::save_object_pool_recursive(
 
       } else if (objH *value = (objH *)std::get_if<objH>(&param)) {
 
-        // yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
-        // yyjson_mut_arr_add_str(doc, p, "OBJH");
-        // yyjson_mut_arr_add_int(doc, p, value->gen);
-        // yyjson_mut_arr_add_int(doc, p, value->idx);
+        yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
+        yyjson_mut_arr_add_str(doc, p, "OBJH");
+        if (objPool.get(*value)) {
+          int16_t objidx = AddToPool2Json(pool2json, value->idx, counter);
+          yyjson_mut_arr_add_int(doc, p, objidx);
+        } else {
+          yyjson_mut_arr_add_int(doc, p, -1);
+        }
 
       } else if (_ModelName *value =
                      (_ModelName *)std::get_if<_ModelName>(&param)) {
+        yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
+        yyjson_mut_arr_add_str(doc, p, "MODEL");
+        yyjson_mut_arr_add_str(doc, p, value->model.c_str());
+
       } else if (_HeaderName *value =
                      (_HeaderName *)std::get_if<_HeaderName>(&param)) {
+
+        yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
+        yyjson_mut_arr_add_str(doc, p, "HEADER");
+        yyjson_mut_arr_add_str(doc, p, value->header.c_str());
       }
     }
   }
