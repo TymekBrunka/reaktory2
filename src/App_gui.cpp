@@ -830,25 +830,28 @@ void App::draw_gui() {
         glm::mat4 world2local =
             node->current_parent_transform * node->transform;
 
-        ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(world2local),
-                                              translation, rotation, scale);
+        if (selected_scene->selected_object !=
+            selected_scene->objPool.rootH()) {
+          ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(world2local),
+                                                translation, rotation, scale);
 
-        ImGui::SetCursorPosX(8);
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImU32(0xff0000ff));
-        ImGui::DragFloat3("pozycja", translation);
-        ImGui::SetCursorPosX(8);
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImU32(0xff00ff00));
-        ImGui::DragFloat3("obrót", rotation);
-        ImGui::SetCursorPosX(8);
-        ImGui::PushStyleColor(ImGuiCol_FrameBg, ImU32(0xffff0000));
-        ImGui::DragFloat3("skala", scale);
-        ImGui::PopStyleColor(3);
+          ImGui::SetCursorPosX(8);
+          ImGui::PushStyleColor(ImGuiCol_FrameBg, ImU32(0xff0000ff));
+          ImGui::DragFloat3("pozycja", translation);
+          ImGui::SetCursorPosX(8);
+          ImGui::PushStyleColor(ImGuiCol_FrameBg, ImU32(0xff00ff00));
+          ImGui::DragFloat3("obrót", rotation);
+          ImGui::SetCursorPosX(8);
+          ImGui::PushStyleColor(ImGuiCol_FrameBg, ImU32(0xffff0000));
+          ImGui::DragFloat3("skala", scale);
+          ImGui::PopStyleColor(3);
 
-        ImGuizmo::RecomposeMatrixFromComponents(translation, rotation, scale,
-                                                glm::value_ptr(world2local));
+          ImGuizmo::RecomposeMatrixFromComponents(translation, rotation, scale,
+                                                  glm::value_ptr(world2local));
 
-        node->transform =
-            glm::inverse(node->current_parent_transform) * world2local;
+          node->transform =
+              glm::inverse(node->current_parent_transform) * world2local;
+        }
 
         ImGui::Dummy(ImVec2(2, 2));
       }
@@ -1141,6 +1144,7 @@ void App::draw_gui() {
               ImGui::PushID(i + 1);
               if (ImGui::Button(ICON_FA_TRASH)) {
                 odatapoint->headers.erase(odatapoint->headers.begin() + i);
+                odatapoint->update_text(&selected_scene->sampler);
                 ImGui::PopID();
                 break;
               }
@@ -1155,6 +1159,7 @@ void App::draw_gui() {
                 if (ImGui::Selectable("(brak)", header.header_idx == -1)) {
                   header.header = "";
                   header.header_idx = -1;
+                  odatapoint->update_text(&selected_scene->sampler);
                 }
 
                 int j = 0;
@@ -1162,13 +1167,14 @@ void App::draw_gui() {
                   if (ImGui::Selectable(hdr.c_str(), j == header.header_idx)) {
                     header.header = hdr;
                     header.header_idx = j;
-                    odatapoint->display_text.setText(
-                        odatapoint->display_text.string().c_str());
+                    odatapoint->update_text(&selected_scene->sampler);
                   }
+                  j++;
                 }
                 EndCustomCombo(wp, wp2);
               }
 
+              ImGui::Text("%d", header.header_idx);
               ImGui::InputDouble("min", &header.min);
               ImGui::InputDouble("max", &header.max);
 

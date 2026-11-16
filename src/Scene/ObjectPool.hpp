@@ -30,8 +30,8 @@ public:
   Text3D() = default;
   ~Text3D();
 
-  Text3D(const Text3D &other) = delete;
-  Text3D &operator=(const Text3D &other) = delete;
+  Text3D(const Text3D &other);
+  Text3D &operator=(const Text3D &other);
   Text3D(Text3D &&other) noexcept;
   Text3D &operator=(Text3D &&other) noexcept;
 

@@ -990,16 +990,16 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
   } else if (oDataPoint2 *odatapoint =
                  (oDataPoint2 *)std::get_if<oDataPoint2>(&node->variant)) {
 
-    if (sampler.sheet_idx != odatapoint->sheet_idx) {
-      odatapoint->sheet_idx = sampler.sheet_idx;
-      for (auto &hdr : odatapoint->headers) {
-        auto header = sampler.headers.find(hdr.header);
-        if (header != sampler.headers.end())
-          hdr.header_idx = header->second;
-        else
-          hdr.header_idx = -1;
-      }
-    }
+    // if (sampler.sheet_idx != odatapoint->sheet_idx) {
+    //   odatapoint->sheet_idx = sampler.sheet_idx;
+    //   for (auto &hdr : odatapoint->headers) {
+    //     auto header = sampler.headers.find(hdr.header);
+    //     if (header != sampler.headers.end())
+    //       hdr.header_idx = header->second;
+    //     else
+    //       hdr.header_idx = -1;
+    //   }
+    // }
     if (sampler.emit_update) {
       odatapoint->update_text(&sampler);
     }

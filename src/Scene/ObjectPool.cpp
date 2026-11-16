@@ -23,22 +23,29 @@ Text3D::~Text3D() {
     glDeleteBuffers(1, &vbo);
 }
 
-Text3D::Text3D(Text3D &&other) noexcept {
-  vbo = other.vbo;
-  vao = other.vao;
-  txt_len = other.txt_len;
-  length = other.length;
-  height = other.height;
-  v_capacity = other.v_capacity;
-  text = std::move(other.text);
-  buf = std::move(other.buf);
-  other.vbo = 0;
-  other.vao = 0;
-  other.txt_len = 0;
-  other.length = 0;
-  other.height = 0;
-  other.v_capacity = 0;
+Text3D::Text3D(const Text3D &other) { *this = other; }
+
+Text3D &Text3D::operator=(const Text3D &other) {
+  if (this != &other) {
+    if (vao)
+      glDeleteVertexArrays(1, &vao);
+
+    if (vbo)
+      glDeleteBuffers(1, &vbo);
+    vbo = 0;
+    vao = 0;
+    // txt_len = other.txt_len;
+    // length = other.length;
+    // height = other.height;
+    // v_capacity = other.v_capacity;
+    text = other.text;
+    // buf = other.buf;
+    setText(text.c_str());
+  }
+  return *this;
 };
+
+Text3D::Text3D(Text3D &&other) noexcept { *this = std::move(other); };
 
 Text3D &Text3D::operator=(Text3D &&other) noexcept {
   if (this != &other) {
@@ -176,7 +183,9 @@ void oDataPoint2::update_text(Sampler *displayed_row) {
 
   int max_hdr_len = 0;
   for (auto &header : headers) {
-    if (header.header_idx == -1) {
+
+    if (header.header_idx == -1 || sheet_idx != displayed_row->sheet_idx) {
+      header.header_idx = -1;
       if (header.header.empty()) {
         continue;
       } else {
@@ -192,6 +201,7 @@ void oDataPoint2::update_text(Sampler *displayed_row) {
     if (header.header.size() > max_hdr_len)
       max_hdr_len = header.header.size();
   }
+  sheet_idx = displayed_row->sheet_idx;
 
   int i = 0;
   for (auto &header : headers) {
