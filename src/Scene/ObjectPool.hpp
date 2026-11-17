@@ -64,11 +64,11 @@ struct _HeaderName {
 };
 
 struct oModel {
-  std::string model;
-  std::vector<Material> materials;
   int animation_idx;
   float animation_time;
   float animation_speed;
+  std::string model;
+  std::vector<Material> materials;
 };
 
 struct oEmptySlot {

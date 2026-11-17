@@ -30,6 +30,8 @@
   "MSG_RENDER_CREATE_IMGUI_CTX": ["Created imgui context"],
   "MSG_RENDER_LOAD_IMAGE_ERROR": ["Cannot load image '{}'."],
 
+  "MSG_LOADING_JSON_ERROR": ["Error occured while loading scene (json) (condition '{}' not met)."],
+
   "MSG_GL_ERROR_SHADER": ["Cannot compile {} shader: {}."],
   "MSG_GL_ERROR_PROGRAM": ["Cannot link opengl program \"{}\" : {}."],
   "MSG_GL_ERROR_VALIDATION": ["Opengl program validation returned error: {}."],

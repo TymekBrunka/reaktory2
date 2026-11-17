@@ -205,4 +205,6 @@ public:
   void rename(const std::string &name);
   // void updateSkybox(Renderer::rCubeMap skybox);
   bool save();
+
+  bool load();
 };

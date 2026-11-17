@@ -6,6 +6,7 @@
 #include "glm/geometric.hpp"
 #include "glm/matrix.hpp"
 #include "images.h"
+#include <cstring>
 #include <ctime>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -199,10 +200,6 @@ bool Scene::create_folder_structure(const std::string &name,
     return false;
   }
 
-  if (!write_file_if_not_exists_reported(
-          path / "document.json", document_json_data, document_json_size))
-    return false;
-
   if (!write_file_if_not_exists_reported(path / "scene.json", scene_json_data,
                                          scene_json_size))
     return false;
@@ -332,6 +329,9 @@ Scene::Scene(const std::string &name) {
       }
     }
   }
+
+  if (!load())
+    throw std::runtime_error("");
 }
 
 bool Scene::create_framebuffer() {
@@ -617,8 +617,7 @@ bool Scene::init(Renderer::Render &render) {
   if (!create_framebuffer())
     return false;
 
-  std::filesystem::path filepath =
-      FileUtils::APP_ROOT / "scenes" / name / "skybox.png";
+  std::filesystem::path filepath = current_folder / "skybox.png";
   auto res_img_read = render.LoadImage(FileUtils::RealFs{}, filepath);
 
   if (!res_img_read.has_value()) {
@@ -898,7 +897,6 @@ bool Scene::save() {
   time_t t = time(NULL);
   tm *time_ = localtime(&t);
   strftime(datebuf, 50, "%Y-%m-%d %H-%M-%S", time_);
-  free(time_);
 
   yyjson_mut_obj_add_str(doc, root, "last-modified", datebuf);
   yyjson_mut_obj_add_str(doc, root, "selected-sheet", selected_sheet.c_str());
@@ -912,7 +910,18 @@ bool Scene::save() {
   char *json_string =
       yyjson_mut_write(doc, YYJSON_WRITE_PRETTY_TWO_SPACES, NULL);
   yyjson_mut_doc_free(doc);
-  std::cerr << json_string << "\n";
+  // std::cerr << json_string << "\n";
+
+  auto res_fs = FileUtils::WriteFile(current_folder / "scene.json", json_string,
+                                     strlen(json_string));
+  if (!res_fs.has_value()) {
+    std::string path = (current_folder / "scene.json").string();
+    Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+             res_fs.error() == -1 ? TL(MSG_GENERIC_OPEN_ERROR)
+                                  : TL(MSG_GENERIC_WRITE_ERROR),
+             std::make_format_args(path));
+    return false;
+  }
 
   return true;
 }
@@ -942,33 +951,82 @@ int16_t Scene::save_object_pool_recursive(
   yyjson_mut_val *node_json = yyjson_mut_arr_add_obj(doc, pool);
   yyjson_mut_obj_add_str(doc, node_json, "name", node->name.c_str());
   yyjson_mut_obj_add_bool(doc, node_json, "collapsed", node->collapsed);
-  yyjson_mut_obj_add_bool(doc, node_json, "script_class",
-                          node->script_class_idx);
+  if (node->script_class_idx != -1)
+    yyjson_mut_obj_add_int(doc, node_json, "script-class",
+                           node->script_class_idx);
 
-  float translation[3];
-  float rotation[3];
-  float scale[3];
+  if (idx) {
+    float translation[3];
+    float rotation[3];
+    float scale[3];
 
-  ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(node->transform),
-                                        translation, rotation, scale);
+    ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(node->transform),
+                                          translation, rotation, scale);
 
-  yyjson_mut_val *translation_json =
-      yyjson_mut_obj_add_arr(doc, node_json, "translation");
-  yyjson_mut_val *rotation_json =
-      yyjson_mut_obj_add_arr(doc, node_json, "rotation");
-  yyjson_mut_val *scale_json = yyjson_mut_obj_add_arr(doc, node_json, "scale");
+    yyjson_mut_val *translation_json =
+        yyjson_mut_obj_add_arr(doc, node_json, "translation");
+    yyjson_mut_val *rotation_json =
+        yyjson_mut_obj_add_arr(doc, node_json, "rotation");
+    yyjson_mut_val *scale_json =
+        yyjson_mut_obj_add_arr(doc, node_json, "scale");
 
-  yyjson_mut_arr_add_float(doc, translation_json, translation[0]);
-  yyjson_mut_arr_add_float(doc, translation_json, translation[1]);
-  yyjson_mut_arr_add_float(doc, translation_json, translation[2]);
+    yyjson_mut_arr_add_float(doc, translation_json, translation[0]);
+    yyjson_mut_arr_add_float(doc, translation_json, translation[1]);
+    yyjson_mut_arr_add_float(doc, translation_json, translation[2]);
 
-  yyjson_mut_arr_add_float(doc, rotation_json, rotation[0]);
-  yyjson_mut_arr_add_float(doc, rotation_json, rotation[1]);
-  yyjson_mut_arr_add_float(doc, rotation_json, rotation[2]);
+    yyjson_mut_arr_add_float(doc, rotation_json, rotation[0]);
+    yyjson_mut_arr_add_float(doc, rotation_json, rotation[1]);
+    yyjson_mut_arr_add_float(doc, rotation_json, rotation[2]);
 
-  yyjson_mut_arr_add_float(doc, scale_json, scale[0]);
-  yyjson_mut_arr_add_float(doc, scale_json, scale[1]);
-  yyjson_mut_arr_add_float(doc, scale_json, scale[2]);
+    yyjson_mut_arr_add_float(doc, scale_json, scale[0]);
+    yyjson_mut_arr_add_float(doc, scale_json, scale[1]);
+    yyjson_mut_arr_add_float(doc, scale_json, scale[2]);
+  }
+
+  if (const oEmptySlot *variant = std::get_if<oEmptySlot>(&node->variant)) {
+    yyjson_mut_obj_add_str(doc, node_json, "variant", "EMPTY");
+
+  } else if (const oNode *variant = std::get_if<oNode>(&node->variant)) {
+    yyjson_mut_obj_add_str(doc, node_json, "variant", "NODE");
+
+  } else if (const oModel *variant = std::get_if<oModel>(&node->variant)) {
+    yyjson_mut_val *v = yyjson_mut_obj_add_arr(doc, node_json, "variant");
+    yyjson_mut_arr_add_str(doc, v, "MODEL");
+    yyjson_mut_arr_add_str(doc, v, variant->model.c_str());
+    yyjson_mut_arr_add_int(doc, v, variant->animation_idx);
+    yyjson_mut_arr_add_float(doc, v, variant->animation_time);
+    yyjson_mut_arr_add_float(doc, v, variant->animation_speed);
+
+    yyjson_mut_val *materials = yyjson_mut_arr_add_arr(doc, v);
+    for (const auto &material : variant->materials) {
+      yyjson_mut_val *m = yyjson_mut_arr_add_arr(doc, materials);
+      yyjson_mut_arr_add_str(doc, m, material.diffuse1.c_str());
+      yyjson_mut_val *c = yyjson_mut_arr_add_arr(doc, m);
+      yyjson_mut_arr_add_float(doc, c,
+                               glm::value_ptr(material.color_diffuse)[0]);
+      yyjson_mut_arr_add_float(doc, c,
+                               glm::value_ptr(material.color_diffuse)[1]);
+      yyjson_mut_arr_add_float(doc, c,
+                               glm::value_ptr(material.color_diffuse)[2]);
+      yyjson_mut_arr_add_float(doc, c,
+                               glm::value_ptr(material.color_diffuse)[3]);
+    }
+
+  } else if (const oDataPoint2 *variant =
+                 std::get_if<oDataPoint2>(&node->variant)) {
+    yyjson_mut_val *v = yyjson_mut_obj_add_arr(doc, node_json, "variant");
+    yyjson_mut_arr_add_str(doc, v, "DATAPOINT");
+
+    yyjson_mut_val *headers = yyjson_mut_arr_add_arr(doc, v);
+    for (const auto &header : variant->headers) {
+      yyjson_mut_arr_add_str(doc, headers, header.header.c_str());
+    }
+
+  } else if (const Text3D *variant = std::get_if<Text3D>(&node->variant)) {
+    yyjson_mut_val *v = yyjson_mut_obj_add_arr(doc, node_json, "variant");
+    yyjson_mut_arr_add_str(doc, v, "TEXT3D");
+    yyjson_mut_arr_add_str(doc, v, variant->string().c_str());
+  }
 
   if (node->lua_params.size() > 0) {
     yyjson_mut_val *params =
@@ -976,23 +1034,23 @@ int16_t Scene::save_object_pool_recursive(
 
     for (const auto &param : node->lua_params) {
 
-      if (Nil *value = (Nil *)std::get_if<Nil>(&param)) {
+      if (const Nil *value = std::get_if<Nil>(&param)) {
         yyjson_mut_arr_add_null(doc, params);
 
-      } else if (bool *value = (bool *)std::get_if<bool>(&param)) {
+      } else if (const bool *value = std::get_if<bool>(&param)) {
         yyjson_mut_arr_add_bool(doc, params, *value);
 
-      } else if (int *value = (int *)std::get_if<int>(&param)) {
+      } else if (const int *value = std::get_if<int>(&param)) {
         yyjson_mut_arr_add_int(doc, params, *value);
 
-      } else if (float *value = (float *)std::get_if<float>(&param)) {
+      } else if (const float *value = std::get_if<float>(&param)) {
         yyjson_mut_arr_add_float(doc, params, *value);
 
-      } else if (std::string *value =
+      } else if (const std::string *value =
                      (std::string *)std::get_if<std::string>(&param)) {
         yyjson_mut_arr_add_str(doc, params, value->c_str());
 
-      } else if (Material *value = (Material *)std::get_if<Material>(&param)) {
+      } else if (const Material *value = std::get_if<Material>(&param)) {
         yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
         yyjson_mut_arr_add_str(doc, p, "MATERIAL");
         yyjson_mut_arr_add_str(doc, p, value->diffuse1.c_str());
@@ -1006,7 +1064,7 @@ int16_t Scene::save_object_pool_recursive(
         yyjson_mut_arr_add_float(doc, color,
                                  glm::value_ptr(value->color_diffuse)[3]);
 
-      } else if (objH *value = (objH *)std::get_if<objH>(&param)) {
+      } else if (const objH *value = std::get_if<objH>(&param)) {
 
         yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
         yyjson_mut_arr_add_str(doc, p, "OBJH");
@@ -1017,13 +1075,13 @@ int16_t Scene::save_object_pool_recursive(
           yyjson_mut_arr_add_int(doc, p, -1);
         }
 
-      } else if (_ModelName *value =
+      } else if (const _ModelName *value =
                      (_ModelName *)std::get_if<_ModelName>(&param)) {
         yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
         yyjson_mut_arr_add_str(doc, p, "MODEL");
         yyjson_mut_arr_add_str(doc, p, value->model.c_str());
 
-      } else if (_HeaderName *value =
+      } else if (const _HeaderName *value =
                      (_HeaderName *)std::get_if<_HeaderName>(&param)) {
 
         yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);

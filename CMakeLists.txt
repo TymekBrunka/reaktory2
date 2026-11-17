@@ -55,7 +55,6 @@ bytepack_(
 bytepack_(
   OUTPUT staticassets_scene
   SOURCES
-    assets/example/document.json
     assets/example/scene.json
     assets/example/skybox.png
     assets/example/excel_sheets/data.xlsx
@@ -255,6 +254,7 @@ add_library(Scene STATIC
   src/Scene/Scene.hpp
   src/Scene/Scene.cpp
   src/Scene/LuaAccess.cpp
+  src/Scene/Loader.cpp
   # src/Scene/LuaAccess.hpp
 )
 target_include_directories(Scene PUBLIC src/Scene/)
