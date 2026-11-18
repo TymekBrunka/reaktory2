@@ -901,6 +901,17 @@ bool Scene::save() {
   yyjson_mut_obj_add_str(doc, root, "last-modified", datebuf);
   yyjson_mut_obj_add_str(doc, root, "selected-sheet", selected_sheet.c_str());
 
+  yyjson_mut_val *sheet2sampler =
+      yyjson_mut_obj_add_obj(doc, root, "sheet2sampler");
+  for (const auto &[name, sheet] : sheets) {
+    yyjson_mut_val *sheet_json =
+        yyjson_mut_obj_add_obj(doc, sheet2sampler, name.c_str());
+    for (const auto &[sheetidx, sampleridx] : sheet.sheet2sampler) {
+      yyjson_mut_obj_add_int(doc, sheet_json, sheet.headers[sheetidx].c_str(),
+                             sampleridx);
+    }
+  }
+
   int16_t counter;
   std::unordered_map<int16_t, int16_t> pool2json;
   yyjson_mut_val *objects = yyjson_mut_obj_add_arr(doc, root, "objects");
@@ -1019,7 +1030,10 @@ int16_t Scene::save_object_pool_recursive(
 
     yyjson_mut_val *headers = yyjson_mut_arr_add_arr(doc, v);
     for (const auto &header : variant->headers) {
-      yyjson_mut_arr_add_str(doc, headers, header.header.c_str());
+      yyjson_mut_val *header_json = yyjson_mut_arr_add_arr(doc, headers);
+      yyjson_mut_arr_add_str(doc, header_json, header.header.c_str());
+      yyjson_mut_arr_add_float(doc, header_json, header.min);
+      yyjson_mut_arr_add_float(doc, header_json, header.max);
     }
 
   } else if (const Text3D *variant = std::get_if<Text3D>(&node->variant)) {
@@ -1109,7 +1123,7 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
                                   glm::mat4 parentTransform, objH parentObj) {
 
   Object *node = &objPool.get(objPool.rootH())[idx];
-  glm::mat4 modelTransform = node->transform * parentTransform;
+  glm::mat4 modelTransform = parentTransform * node->transform;
   parentObj = node->toHandle(idx) == selected_object || parentObj.idx == 0
                   ? node->toHandle(idx)
                   : parentObj;
@@ -1195,11 +1209,11 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
           glUniform3fv(selection_bb_max_loc, 1,
                        glm::value_ptr(model.GetBoundingBox().max));
           render_selection_bb = true;
+
+          modelTransform = parentTransform * node->transform;
         }
 
-        modelTransform = parentTransform * node->transform;
         model.transform = modelTransform;
-
         glm::vec3 color = glm::vec3(((float)parentObj.gen) / 256,
                                     ((float)(parentObj.idx % 256)) / 256,
                                     ((float)(parentObj.idx / 256)) / 256);
@@ -1257,7 +1271,7 @@ void Scene::draw_onscreen_recursive(int16_t idx, float delta,
                                     glm::mat4 parentTransform, objH parentObj) {
 
   Object *node = &objPool.get(objPool.rootH())[idx];
-  glm::mat4 modelTransform = node->transform * parentTransform;
+  glm::mat4 modelTransform = parentTransform * node->transform;
   parentObj = node->toHandle(idx) == selected_object || parentObj.idx == 0
                   ? node->toHandle(idx)
                   : parentObj;

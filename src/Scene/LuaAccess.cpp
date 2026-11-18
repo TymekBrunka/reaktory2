@@ -509,7 +509,7 @@ public:
                    (Material *)std::get_if<Material>(&param)) {
       lua_pushnumber(L, 16);
       Material *material = (Material *)lua_newuserdata(L, sizeof(Material));
-      memset(material, 0, sizeof(Material));
+      memset((void *)material, 0, sizeof(Material));
       auto tmptr = new (material) Material{};
       *material = *value;
       luaL_getmetatable(L, "Material");
@@ -621,6 +621,7 @@ public:
 
     default:
       luaL_argerror(L, 4, "invalid type index");
+      return 0;
     }
   }
 
@@ -955,7 +956,7 @@ public:
   static int row_tostring(lua_State *L) {
     auto ud = LUAB_METHODCHECK(Sampler *, "Row");
     LUAB_MCARGCHECK(0);
-    lua_pushfstring(L, "Row {sheet = %s, width = %d}", (*ud)->sheet_name,
+    lua_pushfstring(L, "Row {sheet = %s, width = %d}", (*ud)->sheet_name.c_str(),
                     (*ud)->width);
     return 1;
   }
@@ -1067,8 +1068,9 @@ void Scene::add_lua(lua_State *L) {
     lua_newtable(L);
     lua_pushnumber(L, 0);
     lua_setfield(L, -2, "NIL");
-    const char *variant_enums[] = {"BOOL",     "INT",  "FLOAT", "STRING",
-                                   "MATERIAL", "OBJH", "MODEL", "HEADER", nullptr};
+    const char *variant_enums[] = {"BOOL",   "INT",      "FLOAT",
+                                   "STRING", "MATERIAL", "OBJH",
+                                   "MODEL",  "HEADER",   nullptr};
     int i = 1;
     for (const char **variant = variant_enums; *variant != nullptr; variant++) {
       lua_pushnumber(L, i);

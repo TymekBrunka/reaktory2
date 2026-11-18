@@ -6,6 +6,16 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# msys2 hack
+set(IS_NOT_WINDOWS ON)
+set(IS_ON_WINDOWS OFF)
+if (CMAKE_SYSTEM_NAME MATCHES "(Windows)|(CYGWIN)|(MSYS)")
+  set(IS_NOT_WINDOWS OFF)
+  set(IS_ON_WINDOWS ON)
+  set(WIN32 TRUE CACHE BOOL "" FORCE)
+  set(UNIX FALSE CACHE BOOL "" FORCE)
+endif()
+
 if (SANS)
   set(CMAKE_CXX_FLAGS -fsanitize=address,undefined,memory)
   set(CMAKE_C_FLAGS -fsanitize=address,undefined,memory)

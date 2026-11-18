@@ -233,7 +233,7 @@ void oDataPoint2::update_text(Sampler *displayed_row) {
         strftime(dtbuf, sizeof(dtbuf), "%Y-%m-%d %H:%M:%S", value);
       s << dtbuf;
     }
-    if (i < headers.size())
+    if (i < headers.size() - 1)
       s << "\n";
     i++;
   }

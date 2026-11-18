@@ -28,11 +28,17 @@ void *Render::window_1st = nullptr;
 double Render::timeout = 0.016; // 60 fps
 bool Render::initialised = false;
 
+static void error_callback(int error, const char *description) {
+  fprintf(stderr, "GLFW Error (%d): %s\n", error, description);
+}
+
 bool Render::Init() {
   stbi_set_flip_vertically_on_load(1);
 
   if (initialised)
     return true;
+
+  glfwSetErrorCallback(error_callback);
 
   if (!glfwInit()) {
     Log::log_uform(Log::ERROR | Log::SEV_HIGH, 0, "RENDER",
