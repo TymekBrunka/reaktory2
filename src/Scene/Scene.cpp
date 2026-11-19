@@ -14,6 +14,8 @@
 #include "glm/common.hpp"
 #include "glm/trigonometric.hpp"
 #include <glm/ext/matrix_transform.hpp>
+#include <string>
+#include <string_view>
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
 #include <yyjson.h>
@@ -185,7 +187,7 @@ write_file_if_not_exists_reported(const std::filesystem::path &filepath,
   return true;
 }
 
-bool Scene::create_folder_structure(const std::string &name,
+bool Scene::create_folder_structure(const std::u8string &name,
                                     const std::filesystem::path &path) {
   try {
     std::filesystem::create_directory(path);
@@ -217,8 +219,9 @@ bool Scene::create_folder_structure(const std::string &name,
 
 Scene::Scene(const std::string &name) {
   this->name = name;
-  current_folder = FileUtils::APP_ROOT / "scenes" / std::filesystem::path(name);
-  if (!create_folder_structure(name, current_folder)) {
+  std::u8string name_ = std::u8string(name.begin(), name.end());
+  current_folder = FileUtils::APP_ROOT / "scenes" / name_;
+  if (!create_folder_structure(name_, current_folder)) {
     Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene", TL(MSG_SCENE_CREATE_ERROR),
              std::make_format_args(name));
     throw std::runtime_error("");
@@ -681,9 +684,10 @@ bool Scene::init(Renderer::Render &render) {
           Renderer::Model::LoadFromFile(FileUtils::RealFs{}, path, false);
       if (!res_model.has_value()) {
         if (!res_img_read.has_value()) {
-          std::string path = path;
+          std::string path_ = path;
           Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
-                   TL(MSG_GENERIC_FILE_NOT_FOUND), std::make_format_args(path));
+                   TL(MSG_GENERIC_FILE_NOT_FOUND),
+                   std::make_format_args(path_));
 
           free(res_img_read.value().pixels);
 
@@ -1112,7 +1116,9 @@ int16_t Scene::save_object_pool_recursive(
     for (int16_t i = 0; i < node->children.size(); i++) {
       int16_t chidx = save_object_pool_recursive(doc, pool, counter, pool2json,
                                                  node->children[i]);
-      yyjson_mut_arr_add_int(doc, children, chidx);
+
+      if (chidx >= 0)
+        yyjson_mut_arr_add_int(doc, children, (int)chidx);
     }
   }
 

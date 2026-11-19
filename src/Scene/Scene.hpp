@@ -146,7 +146,7 @@ private:
   void updateCamera();
   void updateCameraAndBody(float delta);
 
-  static bool create_folder_structure(const std::string &name,
+  static bool create_folder_structure(const std::u8string &name,
                                       const std::filesystem::path &path);
 
   void draw_models_recursive(int16_t idx, float delta,

@@ -23,7 +23,7 @@ void App::draw_popup() {
 
       if (ImGui::IsKeyPressed(ImGuiKey_Enter)) {
         std::filesystem::path path =
-            FileUtils::APP_ROOT / "scenes" / std::filesystem::path(name_buffer);
+            FileUtils::APP_ROOT / "scenes" / std::string(name_buffer);
 
         if (!add_scene(name_buffer)) {
           ImGui::EndPopup();
@@ -56,7 +56,9 @@ void App::draw_popup() {
         for (const auto &ent : std::filesystem::directory_iterator(
                  FileUtils::APP_ROOT / "scenes")) {
           if (std::filesystem::is_directory(ent.path())) {
-            std::string path_str = ent.path().string();
+            std::u8string path_str_ = ent.path().u8string();
+            std::string path_str =
+                std::string(path_str_.begin(), path_str_.end());
             if (filter.PassFilter(path_str.c_str())) {
               if (ImGui::Selectable(path_str.c_str(), false)) {
                 owned_string = path_str;

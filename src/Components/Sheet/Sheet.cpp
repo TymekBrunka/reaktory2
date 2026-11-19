@@ -90,10 +90,12 @@ static bool is_datetime(OpenXLSX::XLDocument &doc,
   return false;
 }
 
-std::expected<Sheet, bool> ReadXLSXfile(const std::filesystem::path &path_, int sheetidx) {
+std::expected<Sheet, bool> ReadXLSXfile(const std::filesystem::path &path_,
+                                        int sheetidx) {
 
   OpenXLSX::XLDocument doc;
-  doc.open(path_.string());
+  std::u8string str = path_.u8string();
+  doc.open(std::string(str.begin(), str.end()));
   std::vector<datetime_identity> datetime_ids;
   Sheet sheet{.idx = sheetidx};
 

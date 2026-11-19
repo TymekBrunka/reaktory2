@@ -81,6 +81,8 @@ private:
   void draw_gui();
   void draw_popup();
 
+  void add_element_items_gui();
+
 public:
   App() = default;
   ~App() = default;

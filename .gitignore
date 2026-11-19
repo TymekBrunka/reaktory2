@@ -1,6 +1,7 @@
 build/
 build_release/
 build_sans/
+build_llvm/
 Session.vim
 .cache/
 imgui.ini

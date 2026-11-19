@@ -14,6 +14,8 @@
 #include <iostream>
 // #include <stdatomic.h>
 #include <cstring>
+#include <string>
+#include <string_view>
 
 #include "GLFW/glfw3.h"
 #include "LogFileWriter.cpp"
@@ -137,7 +139,51 @@ bool App::init() {
       app->input.right = false;
       app->input.up = false;
       app->input.down = false;
-      return;
+    } else if (app->is_scene_window_selected()) {
+      if (action == GLFW_PRESS && app->get_selected_scene()) {
+        switch (key) {
+        case GLFW_KEY_W:
+          app->input.front = true;
+          break;
+        case GLFW_KEY_S:
+          app->input.back = true;
+          break;
+        case GLFW_KEY_A:
+          app->input.left = true;
+          break;
+        case GLFW_KEY_D:
+          app->input.right = true;
+          break;
+        case GLFW_KEY_SPACE:
+          app->input.up = true;
+          break;
+        case GLFW_KEY_LEFT_SHIFT:
+          app->input.down = true;
+          break;
+        }
+        app->set_movement_vec();
+      } else if (action == GLFW_RELEASE && app->get_selected_scene()) {
+        switch (key) {
+        case GLFW_KEY_W:
+          app->input.front = false;
+          break;
+        case GLFW_KEY_S:
+          app->input.back = false;
+          break;
+        case GLFW_KEY_A:
+          app->input.left = false;
+          break;
+        case GLFW_KEY_D:
+          app->input.right = false;
+          break;
+        case GLFW_KEY_SPACE:
+          app->input.up = false;
+          break;
+        case GLFW_KEY_LEFT_SHIFT:
+          app->input.down = false;
+        }
+        app->set_movement_vec();
+      }
     }
 
     if (action == GLFW_PRESS && mods == GLFW_MOD_CONTROL) {
@@ -149,48 +195,14 @@ bool App::init() {
         app->open_scene();
         break;
       }
-    } else if (action == GLFW_PRESS && app->get_selected_scene()) {
-      switch (key) {
-      case GLFW_KEY_W:
-        app->input.front = true;
-        break;
-      case GLFW_KEY_S:
-        app->input.back = true;
-        break;
-      case GLFW_KEY_A:
-        app->input.left = true;
-        break;
-      case GLFW_KEY_D:
-        app->input.right = true;
-        break;
-      case GLFW_KEY_SPACE:
-        app->input.up = true;
-        break;
-      case GLFW_KEY_LEFT_SHIFT:
-        app->input.down = true;
-      }
-      app->set_movement_vec();
-    } else if (action == GLFW_RELEASE && app->get_selected_scene()) {
-      switch (key) {
-      case GLFW_KEY_W:
-        app->input.front = false;
-        break;
-      case GLFW_KEY_S:
-        app->input.back = false;
-        break;
-      case GLFW_KEY_A:
-        app->input.left = false;
-        break;
-      case GLFW_KEY_D:
-        app->input.right = false;
-        break;
-      case GLFW_KEY_SPACE:
-        app->input.up = false;
-        break;
-      case GLFW_KEY_LEFT_SHIFT:
-        app->input.down = false;
-      }
-      app->set_movement_vec();
+    } else if (action == GLFW_PRESS) {
+
+      if (key == GLFW_KEY_DELETE)
+        if (app->get_selected_scene()->objPool.get(
+                app->get_selected_scene()->selected_object)) {
+          app->get_selected_scene()->objPool.remove(
+              app->get_selected_scene()->selected_object);
+        }
     }
   });
 
@@ -339,7 +351,9 @@ bool App::open_scene(const std::string &name) {
     return true;
   }
 
-  if (!std::filesystem::exists(FileUtils::APP_ROOT / "scenes" / name)) {
+  std::u8string name_ = std::u8string(name.begin(), name.end());
+  std::cerr << (FileUtils::APP_ROOT / "scenes" / name_) << "\n";
+  if (!std::filesystem::exists(FileUtils::APP_ROOT / "scenes" / name_)) {
     return false;
   }
 

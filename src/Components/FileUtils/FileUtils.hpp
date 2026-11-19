@@ -211,9 +211,9 @@ public:
     size_t fsize = file->FileSize();
     char *outbuffer;
     if (alloc)
-      outbuffer = alloc(allocator, fsize);
+      outbuffer = alloc(allocator, fsize + 1);
     else
-      outbuffer = new char[fsize];
+      outbuffer = new char[fsize + 1];
     outbuffer[fsize] = '\0';
 
     if (file->Read(outbuffer, fsize) < fsize) {

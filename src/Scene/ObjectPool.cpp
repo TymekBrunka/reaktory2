@@ -374,9 +374,6 @@ void ObjectPool::remove(objH obj) {
 }
 
 void ObjectPool::remove_impl(int16_t idx) {
-  for (int16_t child : objects[idx].children) {
-    remove_impl(child);
-  }
   Object &obj = objects[idx];
   obj.variant.emplace<oEmptySlot>(oEmptySlot{});
   if (obj.script_class_idx != -1) {
@@ -385,6 +382,24 @@ void ObjectPool::remove_impl(int16_t idx) {
     Scene *scene = (*(*(Scene ***)lua_touserdata(L, -1)));
     scene->objPool.script_data_freelist.push_back(obj.ref_to_self);
   }
+
+  if (Object *parent = get(obj.parent)) {
+    int i = 0;
+    for (int16_t child : parent->children) {
+      if (child == idx) {
+        parent->children.erase(parent->children.begin() + i);
+        break;
+      }
+      i++;
+    }
+  }
+
+  obj.children.clear();
+
+  for (int16_t child : objects[idx].children) {
+    remove_impl(child);
+  }
+
   free_indices.push_back(idx);
 }
 

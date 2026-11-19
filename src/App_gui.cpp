@@ -378,6 +378,23 @@ void show_cell_value(const CellValue *cv) {
   }
 }
 
+void App::add_element_items_gui() {
+  if (ImGui::Selectable("model", false)) {
+    selected_scene->objPool.add_model_node(selected_scene->resMan,
+                                           selected_scene->selected_object, "");
+  }
+  if (ImGui::Selectable("węzeł", false)) {
+    selected_scene->objPool.add_node(selected_scene->selected_object);
+  }
+  if (ImGui::Selectable("widok danych", false)) {
+    selected_scene->objPool.add_datapoint_node(selected_scene->selected_object);
+  }
+
+  if (ImGui::Selectable("tekst", false)) {
+    selected_scene->objPool.add_text_node(selected_scene->selected_object);
+  }
+}
+
 void App::draw_object_tree(Object *node, int idx, bool is_descendant) {
   ImGui::PushID(idx);
   ImDrawList *drawlist = ImGui::GetWindowDrawList();
@@ -426,6 +443,20 @@ void App::draw_object_tree(Object *node, int idx, bool is_descendant) {
   ImGui::SameLine();
   if (ImGui::Button("##baton", ImVec2(ImGui::GetContentRegionAvail().x, 18))) {
     selected_scene->selected_object = node->toHandle(idx);
+  }
+
+  if (ImGui::BeginPopupContextItem("node_ctx")) {
+    if (ImGui::Selectable("usuń")) {
+      selected_scene->objPool.remove(node->toHandle(idx));
+      ImGui::EndPopup();
+      ImGui::CloseCurrentPopup();
+      ImGui::PopID();
+      return;
+    }
+
+    ImGui::SeparatorText("dodaj");
+    add_element_items_gui();
+    ImGui::EndPopup();
   }
 
   if (ImGui::IsItemActive()) {
@@ -477,9 +508,15 @@ void App::draw_object_tree(Object *node, int idx, bool is_descendant) {
                       ImColor(200, 50, 25), ICON_FA_DRAW_POLYGON);
   } else if (const oDataPoint2 *odatapoint =
                  std::get_if<oDataPoint2>(&node->variant)) {
-    float char_vis_width = ImGui::CalcTextSize(ICON_FA_DRAW_POLYGON).x;
+    float char_vis_width = ImGui::CalcTextSize(ICON_FA_HAND_LIZARD).x;
     drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y + 1),
                       ImColor(100, 150, 25), ICON_FA_HAND_LIZARD);
+
+  } else if (const Text3D *text3d =
+                 std::get_if<Text3D>(&node->variant)) {
+    float char_vis_width = ImGui::CalcTextSize(ICON_FA_COMMENT_DOTS).x;
+    drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y + 1),
+                      ImColor(200, 200, 200), ICON_FA_COMMENT_DOTS);
   }
   drawlist->AddText(ImVec2(bpos2.x + 22 + 3, bpos2.y + 1),
                     ImColor(220, 220, 220), node->name.c_str());
@@ -684,21 +721,7 @@ void App::draw_gui() {
     ImGui::Text(ICON_FA_CUBE " Objekty (%d)", selected_scene->objPool.size());
     ImGui::SameLine();
     if (ImGui::BeginCombo("##dodaj_objekt", "dodaj objekt")) {
-      if (ImGui::Selectable("model", false)) {
-        selected_scene->objPool.add_model_node(
-            selected_scene->resMan, selected_scene->selected_object, "");
-      }
-      if (ImGui::Selectable("węzeł", false)) {
-        selected_scene->objPool.add_node(selected_scene->selected_object);
-      }
-      if (ImGui::Selectable("widok danych", false)) {
-        selected_scene->objPool.add_datapoint_node(
-            selected_scene->selected_object);
-      }
-
-      if (ImGui::Selectable("tekst", false)) {
-        selected_scene->objPool.add_text_node(selected_scene->selected_object);
-      }
+      add_element_items_gui();
       ImGui::EndCombo();
     }
 
