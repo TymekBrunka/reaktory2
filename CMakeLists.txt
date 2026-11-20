@@ -11,25 +11,25 @@ if (SANS)
   set(CMAKE_C_FLAGS -fsanitize=address,undefined)
 endif()
 
+if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC") # not sure if this project will build on msvc but regardless, ill set this flags for it just in case
+  set(CMAKE_C_FLAGS_RELEASE "/O2 /DNDEBUG" CACHE STRING "" FORCE)
+else()
+  set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG" CACHE STRING "" FORCE)
+endif()
+
+add_library(renderer_stb_image OBJECT
+  src/Renderer/stb_image.h
+  src/Renderer/stb_image.c
+)
+target_include_directories(renderer_stb_image PUBLIC src/Renderer)
+
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
   if (CMAKE_CXX_COMPILER_ID MATCHES "MSVC") # not sure if this project will build on msvc but regardless, ill set this flags for it just in case
-
-    if(NOT CMAKE_C_FLAGS_RELEASE)
-      set(CMAKE_C_FLAGS_RELEASE "/O2 /DNDEBUG")
-    endif()
-    if(NOT CMAKE_CXX_FLAGS_RELEASE)
-      set(CMAKE_CXX_FLAGS_RELEASE "/O2 /DNDEBUG")
-    endif()
-
+    set(CMAKE_C_FLAGS_RELEASE "/O2 /DNDEBUG /LTCG" CACHE STRING "" FORCE)
+    set(CMAKE_CXX_FLAGS_RELEASE "/O2 /DNDEBUG /LTCG" CACHE STRING "" FORCE)
   else()
-
-    if(NOT CMAKE_C_FLAGS_RELEASE)
-      set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG")
-    endif()
-    if(NOT CMAKE_CXX_FLAGS_RELEASE)
-      set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
-    endif()
-
+    set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG -flto" CACHE STRING "" FORCE)
+    set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG -flto" CACHE STRING "" FORCE)
   endif()
 endif()
 
@@ -68,13 +68,13 @@ imgpack_(
     assets/images/icons.png
     assets/images/keybind_icons.png
     assets/images/placeholder.png
-    assets/images/font.png
 )
 
 bytepack_(
   OUTPUT images_bigger
   SOURCES
     assets/images/scene_new.png
+    assets/images/font.png
 )
 
 imgpack_(
@@ -201,7 +201,7 @@ target_link_libraries(renderer
   PRIVATE
   placeholder_icon_img glad imgui
   PUBLIC
-  glfw logging fileutils imguizmo
+  glfw logging fileutils imguizmo renderer_stb_image
 )
 # target_precompile_headers(renderer REUSE_FROM pch_core)
 target_precompile_headers(renderer REUSE_FROM logging)
@@ -258,7 +258,7 @@ add_library(Scene STATIC
   # src/Scene/LuaAccess.hpp
 )
 target_include_directories(Scene PUBLIC src/Scene/)
-target_link_libraries(Scene PUBLIC logging renderer renderer_model fileutils glm::glm Scene_resource_manager Scene_object_pool LuaBindings Sheet PRIVATE imgui imguizmo staticassets_scene shaders glad imgui)
+target_link_libraries(Scene PUBLIC logging renderer renderer_model fileutils glm::glm Scene_resource_manager Scene_object_pool LuaBindings Sheet PRIVATE imgui imguizmo staticassets_scene shaders glad imgui images images_bigger)
 target_precompile_headers(Scene REUSE_FROM logging)
 
 add_library(App STATIC

@@ -6,6 +6,7 @@
 #include "glm/geometric.hpp"
 #include "glm/matrix.hpp"
 #include "images.h"
+#include "images_bigger.h"
 #include <cstring>
 #include <ctime>
 #include <glm/gtc/matrix_transform.hpp>
@@ -16,6 +17,7 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
 #include <yyjson.h>
@@ -513,15 +515,14 @@ bool Scene::Init(Renderer::Render &render) {
   m_text_length = glGetUniformLocation(text_program, "length");
   m_text_height = glGetUniformLocation(text_program, "height");
 
-  auto res_img = Renderer::Render::sLoadTexture(
-      Renderer::Image{.width = font_png_width,
-                      .height = font_png_height,
-                      .channels = font_png_channels,
-                      .mipmap_levels = 2,
-                      .pixels = (unsigned char *)font_png_pixels},
-      true);
+  auto res_img =
+      Renderer::Render::sLoadImageFromMemory(font_png_data, font_png_size);
+  Renderer::Image img = res_img.value();
+  img.mipmap_levels = 2;
 
-  if (!res_img.has_value()) {
+  auto res_tex = Renderer::Render::sLoadTexture(img, true);
+
+  if (!res_tex.has_value()) {
     render.UnloadProgram(tri_program);
     render.UnloadProgram(skybox_program);
     render.UnloadProgram(skinning_program);
@@ -535,7 +536,7 @@ bool Scene::Init(Renderer::Render &render) {
     glUseProgram(0);
     return false;
   }
-  m_text_texture = res_img.value();
+  m_text_texture = res_tex.value();
   glUniform1i(glGetUniformLocation(text_program, "text"), 0);
   glUseProgram(0);
 
@@ -831,6 +832,9 @@ void Scene::render(Renderer::Render &render) {
   // glUniformMatrix4fv(model_model_loc, 1, GL_FALSE, glm::value_ptr(model));
   // resMan.GetModel("CesiumMan.m3d")->model.Advance(render.GetDelta());
   // resMan.GetModel("CesiumMan.m3d")->model.Draw();
+
+  if (!objPool.get(selected_object))
+    selected_object = objPool.rootH();
 
   render_selection_bb = false;
   draw_models_recursive(objPool.rootH().idx, render.GetDelta(), glm::mat4(1.0f),
