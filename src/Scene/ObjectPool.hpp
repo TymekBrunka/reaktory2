@@ -41,9 +41,9 @@ public:
 };
 
 struct objH {
-  uint8_t gen;
+  uint8_t gen = 0;
   // uint16_t idx;
-  int16_t idx; // signed integer so -1 can be returned
+  int16_t idx = -1; // signed integer so -1 can be returned
 
   inline bool operator==(objH other) {
     return other.gen == gen && other.idx == idx;
@@ -107,6 +107,10 @@ struct oDataPoint2 {
   void update_text(Sampler *displayed_row);
 };
 
+struct oPrefab {
+  objH root;
+};
+
 class Scene;
 class ObjectPool;
 
@@ -157,7 +161,7 @@ struct Object {
   std::string name;
   std::vector<int16_t> children;
   std::vector<LuaParam> lua_params;
-  std::variant<oEmptySlot, oNode, oModel, oDataPoint2, Text3D> variant;
+  std::variant<oEmptySlot, oNode, oModel, oDataPoint2, Text3D, oPrefab> variant;
 
   inline objH toHandle(int16_t idx) const {
     return objH{.gen = gen, .idx = idx};
@@ -179,6 +183,7 @@ private:
 
   std::vector<int> script_class_free_list;
   std::vector<ScriptClass> script_classes;
+  void clone_impl(int16_t parentidx, int16_t childidx);
   void remove_impl(int16_t idx);
 
 public:
@@ -214,6 +219,7 @@ public:
 
   Object *get(objH obj);
   objH add(Object &&obj);
+  objH clone(objH obj);
   void remove(objH obj);
 
   objH add_model_node(ResourceManager &resMan, objH obj,

@@ -347,6 +347,59 @@ objH ObjectPool::add(Object &&obj) {
   return objH{.gen = gen, .idx = idx};
 }
 
+objH ObjectPool::clone(objH obj) {
+  if (obj.idx < 0 || obj.idx >= objects.size()) {
+    // Log::log(Log::ERROR | Log::SEV_MED, 0, "Object pool",
+    //          TL(MSG_OBJECT_POOL_GET_ERROR),
+    //          std::make_format_args(obj.idx, obj.gen));
+    return objH{};
+  }
+
+  if (std::get_if<oEmptySlot>(&objects[obj.idx].variant))
+    return objH{};
+
+  uint8_t gen = objects[obj.idx].gen;
+  if (gen != obj.gen) {
+    // Log::log(Log::ERROR | Log::SEV_MED, 0, "Object pool",
+    //          TL(MSG_OBJECT_POOL_GET_ERROR),
+    //          std::make_format_args(obj.idx, obj.gen));
+    return objH{};
+  }
+
+  Object &node = objects[obj.idx];
+  Object node_ = node;
+  objH cloned_ = add(std::move(node_));
+  int16_t size = objects[cloned_.idx].children.size();
+  for (int i = 0; i < size; i++) {
+    clone_impl(cloned_.idx, i);
+  }
+  return cloned_;
+}
+
+// passing parent as idx bc the array moves in memory
+void ObjectPool::clone_impl(int16_t parentidx, int16_t childidx) {
+  Object *parent = &objects[parentidx];
+  int16_t idx = parent->children[childidx];
+  //
+  // if (idx < 0 || idx >= objects.size())
+  //   return;
+  //
+  Object &node = objects[idx];
+  //
+  // if (std::get_if<oEmptySlot>(&node.variant))
+  //   return;
+
+  Object node_ = node;
+  node_.parent = parent->toHandle(parentidx);
+  objH cloned_ = add(std::move(node_));
+  parent = &objects[parentidx];
+  parent->children[childidx] = cloned_.idx;
+  int16_t size = objects[cloned_.idx].children.size();
+  for (int i = 0; i < size; i++) {
+    clone_impl(cloned_.idx, i);
+  }
+}
+
 void ObjectPool::remove(objH obj) {
   if (obj.idx <= 0 || obj.idx >= objects.size()) {
     Log::log(Log::ERROR | Log::SEV_MED, 0, "Object pool",
@@ -379,11 +432,11 @@ void ObjectPool::remove_impl(int16_t idx) {
   if (obj.script_class_idx != -1) {
     obj.change_script_class(this, -1);
     lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_IN_REG_IDX);
-    Scene *scene = (*(*(Scene ***)lua_touserdata(L, -1)));
+    Scene *scene = (*(Scene **)lua_touserdata(L, -1));
     scene->objPool.script_data_freelist.push_back(obj.ref_to_self);
   }
 
-  if (Object *parent = get(obj.parent)) {
+  if (Object *parent = &objects[obj.parent.idx]) {
     int i = 0;
     for (int16_t child : parent->children) {
       if (child == idx) {
@@ -394,11 +447,11 @@ void ObjectPool::remove_impl(int16_t idx) {
     }
   }
 
-  obj.children.clear();
-
-  for (int16_t child : objects[idx].children) {
+  for (int16_t child : obj.children) {
     remove_impl(child);
   }
+
+  obj.children.clear();
 
   free_indices.push_back(idx);
 }
