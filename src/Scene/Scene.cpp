@@ -836,14 +836,19 @@ void Scene::render(Renderer::Render &render) {
   if (!objPool.get(selected_object))
     selected_object = objPool.rootH();
 
+  if (!objPool.get(prefabs[current_prefab].obj)) {
+    current_prefab = 0;
+  }
+  objH tree_root = prefabs[current_prefab].obj;
+
   render_selection_bb = false;
-  draw_models_recursive(objPool.rootH().idx, render.GetDelta(), glm::mat4(1.0f),
-                        objPool.rootH());
+  draw_models_recursive(tree_root.idx, render.GetDelta(), glm::mat4(1.0f),
+                        tree_root);
 
   glClear(GL_DEPTH_BUFFER_BIT);
 
-  draw_onscreen_recursive(objPool.rootH().idx, render.GetDelta(),
-                          glm::mat4(1.0f), objPool.rootH());
+  draw_onscreen_recursive(tree_root.idx, render.GetDelta(), glm::mat4(1.0f),
+                          tree_root);
 
   glClear(GL_DEPTH_BUFFER_BIT);
 
@@ -1272,8 +1277,10 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
   }
   node->current_parent_transform = parentTransform;
 
-  for (int16_t i = 0; i < node->children.size(); i++) {
-    draw_models_recursive(node->children[i], delta, modelTransform, parentObj);
+  int size = objPool.get(objPool.rootH())[idx].children.size();
+  for (int16_t i = 0; i < size; i++) {
+    draw_models_recursive(objPool.get(objPool.rootH())[idx].children[i], delta,
+                          modelTransform, parentObj);
   }
 }
 
@@ -1315,9 +1322,10 @@ void Scene::draw_onscreen_recursive(int16_t idx, float delta,
     }
   }
 
+  int size = objPool.get(objPool.rootH())[idx].children.size();
   for (int16_t i = 0; i < node->children.size(); i++) {
-    draw_onscreen_recursive(node->children[i], delta, modelTransform,
-                            parentObj);
+    draw_onscreen_recursive(objPool.get(objPool.rootH())[idx].children[i],
+                            delta, modelTransform, parentObj);
   }
 }
 

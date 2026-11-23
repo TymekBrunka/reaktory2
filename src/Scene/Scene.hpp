@@ -2,6 +2,7 @@
 #include <Model.hpp>
 #include <Renderer.hpp>
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <glm/mat4x4.hpp>
 #include <glm/vec2.hpp>
@@ -12,6 +13,7 @@
 #include <ObjectPool.hpp>
 #include <ResourceManager.hpp>
 #include <Sheet.hpp>
+#include <vector>
 
 struct Sampler {
 
@@ -104,6 +106,7 @@ public:
   Renderer::rTexture2D screen_canvas = 0;
   Renderer::rTexture2D color_canvas = 0;
   objH selected_object = {.gen = 1, .idx = 0}; // scene node
+  int current_prefab = 0;
   std::string selected_sheet;
 
 private:
@@ -163,6 +166,13 @@ private:
                              int16_t idx);
 
 public:
+  struct Prefab {
+    uint32_t gen = 1;
+    objH obj;
+  };
+
+  std::vector<Prefab> prefabs{
+      {.obj = objH{.gen = 1, .idx = 0}}}; // + scene root
   ResourceManager resMan{};
   ObjectPool objPool{};
 

@@ -366,38 +366,28 @@ objH ObjectPool::clone(objH obj) {
     return objH{};
   }
 
-  Object &node = objects[obj.idx];
-  Object node_ = node;
-  objH cloned_ = add(std::move(node_));
-  int16_t size = objects[cloned_.idx].children.size();
-  for (int i = 0; i < size; i++) {
-    clone_impl(cloned_.idx, i);
-  }
-  return cloned_;
+  return clone_impl(obj.idx);
 }
 
 // passing parent as idx bc the array moves in memory
-void ObjectPool::clone_impl(int16_t parentidx, int16_t childidx) {
-  Object *parent = &objects[parentidx];
-  int16_t idx = parent->children[childidx];
-  //
-  // if (idx < 0 || idx >= objects.size())
-  //   return;
-  //
+objH ObjectPool::clone_impl(int16_t idx) {
   Object &node = objects[idx];
-  //
-  // if (std::get_if<oEmptySlot>(&node.variant))
-  //   return;
-
   Object node_ = node;
-  node_.parent = parent->toHandle(parentidx);
   objH cloned_ = add(std::move(node_));
-  parent = &objects[parentidx];
-  parent->children[childidx] = cloned_.idx;
   int16_t size = objects[cloned_.idx].children.size();
   for (int i = 0; i < size; i++) {
-    clone_impl(cloned_.idx, i);
+    objects[cloned_.idx].children[i] = clone_impl(cloned_.idx).idx;
   }
+
+  if (const oPrefab *oprefab =
+          std::get_if<oPrefab>(&objects[cloned_.idx].variant)) {
+    if (get(oprefab->root)) {
+      objH obj = clone_impl(oprefab->root.idx);
+      std::get_if<oPrefab>(&objects[cloned_.idx].variant)->root = obj;
+    }
+  }
+
+  return cloned_;
 }
 
 void ObjectPool::remove(objH obj) {
@@ -449,6 +439,12 @@ void ObjectPool::remove_impl(int16_t idx) {
 
   for (int16_t child : obj.children) {
     remove_impl(child);
+  }
+
+  if (const oPrefab *oprefab = std::get_if<oPrefab>(&obj.variant)) {
+    if (get(oprefab->root)) {
+      remove_impl(oprefab->root.idx);
+    }
   }
 
   obj.children.clear();
@@ -506,15 +502,9 @@ objH ObjectPool::add_node(objH obj) {
   return child;
 }
 
-objH ObjectPool::add_datapoint_node(objH obj) {
+objH ObjectPool::add_node(objH obj, decltype(Object::variant) &&variant) {
   objH child =
-      add(Object{.parent = obj, .name = "dane", .variant = oDataPoint2{}});
-  get(obj)->children.push_back(child.idx);
-  return child;
-}
-
-objH ObjectPool::add_text_node(objH obj) {
-  objH child = add(Object{.parent = obj, .name = "napis", .variant = Text3D{}});
+      add(Object{.parent = obj, .name = "dane", .variant = std::move(variant)});
   get(obj)->children.push_back(child.idx);
   return child;
 }

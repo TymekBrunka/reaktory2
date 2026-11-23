@@ -108,6 +108,8 @@ struct oDataPoint2 {
 };
 
 struct oPrefab {
+  uint32_t gen = 0;
+  int idx = 0;
   objH root;
 };
 
@@ -183,7 +185,7 @@ private:
 
   std::vector<int> script_class_free_list;
   std::vector<ScriptClass> script_classes;
-  void clone_impl(int16_t parentidx, int16_t childidx);
+  objH clone_impl(int16_t idx);
   void remove_impl(int16_t idx);
 
 public:
@@ -227,7 +229,5 @@ public:
 
   objH add_node(objH obj);
 
-  objH add_datapoint_node(objH obj);
-
-  objH add_text_node(objH obj);
+  objH add_node(objH obj, decltype(Object::variant) &&variant);
 };

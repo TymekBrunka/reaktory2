@@ -379,19 +379,43 @@ void show_cell_value(const CellValue *cv) {
 }
 
 void App::add_element_items_gui() {
-  if (ImGui::Selectable("model", false)) {
+  if (ImGui::Selectable(ICON_FA_CHESS_ROOK " model", false)) {
     selected_scene->objPool.add_model_node(selected_scene->resMan,
                                            selected_scene->selected_object, "");
   }
-  if (ImGui::Selectable("węzeł", false)) {
-    selected_scene->objPool.add_node(selected_scene->selected_object);
+  if (ImGui::Selectable(ICON_FA_CUBE " węzeł", false)) {
+    Object *node = selected_scene->objPool.get(
+        selected_scene->objPool.add_node(selected_scene->selected_object));
+    node->name = "węzeł";
   }
-  if (ImGui::Selectable("widok danych", false)) {
-    selected_scene->objPool.add_datapoint_node(selected_scene->selected_object);
+  if (ImGui::Selectable(ICON_FA_LOCATION_DOT " widok danych", false)) {
+    Object *node = selected_scene->objPool.get(selected_scene->objPool.add_node(
+        selected_scene->selected_object, oDataPoint2{}));
+    node->name = "widok danych";
   }
 
-  if (ImGui::Selectable("tekst", false)) {
-    selected_scene->objPool.add_text_node(selected_scene->selected_object);
+  if (ImGui::Selectable(ICON_FA_COMMENT_DOTS " napis w 3D", false)) {
+    Object *node = selected_scene->objPool.get(selected_scene->objPool.add_node(
+        selected_scene->selected_object, Text3D{}));
+    node->name = "napis w 3D";
+  }
+
+  ImGui::SeparatorText("gotowce");
+
+  for (int i = 1; i < selected_scene->prefabs.size(); i++) {
+    const auto &prefab = selected_scene->prefabs[i];
+    Object *obj = selected_scene->objPool.get(prefab.obj);
+    if (!obj)
+      continue;
+
+    ImGui::PushID(i);
+    if (ImGui::Selectable(obj->name.c_str())) {
+      Object *node =
+          selected_scene->objPool.get(selected_scene->objPool.add_node(
+              selected_scene->selected_object, oPrefab{.idx = i}));
+      node->name = "napis w 3D";
+    }
+    ImGui::PopID();
   }
 }
 
@@ -401,10 +425,11 @@ void App::draw_object_tree(Object *node, int idx, bool is_descendant) {
   static bool is_dragging = false;
   static objH object_to_drop = objH{.gen = 0, .idx = -1};
 
+  ImVec2 winpos = ImGui::GetWindowPos();
   ImVec2 wsize = ImGui::GetWindowSize();
-  ImVec2 cpos = ImGui::GetMousePos();
-  cpos = ImVec2(cpos.x - ImGui::GetWindowPos().x,
-                cpos.y - ImGui::GetWindowPos().y + 20);
+  ImVec2 mpos = ImGui::GetMousePos();
+  // ImVec2 cpos = ImVec2(mpos.x - winpos.x + ImGui::GetScrollX(),
+  //                      mpos.y - winpos.y + ImGui::GetScrollY());
 
   if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
     is_dragging = false;
@@ -446,16 +471,27 @@ void App::draw_object_tree(Object *node, int idx, bool is_descendant) {
   }
 
   if (ImGui::BeginPopupContextItem("node_ctx")) {
-    if (ImGui::Selectable("usuń")) {
-      selected_scene->objPool.remove(node->toHandle(idx));
-      ImGui::EndPopup();
-      ImGui::CloseCurrentPopup();
-      ImGui::PopID();
-      return;
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 4));
+    if (ImGui::Selectable(ICON_FA_TRASH_CAN " usuń")) {
+      if (idx !=
+          selected_scene->prefabs[selected_scene->current_prefab].obj.idx) {
+        selected_scene->objPool.remove(node->toHandle(idx));
+        ImGui::PopStyleVar(1);
+        ImGui::EndPopup();
+        ImGui::CloseCurrentPopup();
+        ImGui::PopID();
+        return;
+      }
     }
 
+    ImGui::SeparatorText("inne");
+    if (ImGui::Selectable("dodaj jako gotowiec")) {
+      selected_scene->prefabs.push_back(
+          Scene::Prefab{.obj = node->toHandle(idx)});
+    }
     ImGui::SeparatorText("dodaj");
     add_element_items_gui();
+    ImGui::PopStyleVar(1);
     ImGui::EndPopup();
   }
 
@@ -471,9 +507,10 @@ void App::draw_object_tree(Object *node, int idx, bool is_descendant) {
     drawlist->AddRectFilled(bpos2, bpos2_max,
                             ImGui::GetColorU32(ImGuiCol_WindowBg));
 
-  if (cpos.x <= wsize.x && cpos.x >= 0 && cpos.y <= wsize.y && cpos.y >= 0)
+  if (mpos.x <= winpos.x + wsize.x && mpos.x >= winpos.x &&
+      mpos.y <= winpos.y + wsize.y && mpos.y >= winpos.y)
     if (!is_descendant && node->toHandle(idx) != object_to_drop &&
-        cpos.y < bpos2_max.y && cpos.y > bpos2.y)
+        mpos.y < bpos2_max.y && mpos.y > bpos2.y)
 
       if (is_dragging)
         drawlist->AddRectFilled(ImVec2(bpos2.x, bpos2_max.y),
@@ -717,16 +754,53 @@ void App::draw_gui() {
     }
     ImGui::EndChild();
 
-    ImGui::Text(ICON_FA_CUBE " Objekty (%d)", selected_scene->objPool.size());
+    ImVec2 wpos;
+    ImVec2 wpos2;
+
+    InputAllignedText("zaznaczony 'gotowiec'");
     ImGui::SameLine();
-    if (ImGui::BeginCombo("##dodaj_objekt", "dodaj objekt")) {
-      add_element_items_gui();
-      ImGui::EndCombo();
+
+    Object *prefab = selected_scene->objPool.get(
+        selected_scene->prefabs[selected_scene->current_prefab].obj);
+    if (BeginCustomCombo2(
+            &wpos, &wpos2, "##objects##select_prefab_preview", ICON_FA_CUBE,
+            prefab ? prefab->name.c_str() : "(nie zaznaczono żadnego)", 2)) {
+
+      int i = 0;
+      for (Scene::Prefab prefab : selected_scene->prefabs) {
+        if (Object *prefab_obj = selected_scene->objPool.get(prefab.obj)) {
+          ImGui::PushID(i + 1);
+          if (ImGui::Selectable(prefab_obj->name.c_str(),
+                                i == selected_scene->current_prefab)) {
+            selected_scene->current_prefab = i;
+          }
+          ImGui::PopID();
+        }
+        i++;
+      }
+      EndCustomCombo(wpos, wpos2);
     }
 
-    Object *root = selected_scene->objPool.get(selected_scene->objPool.rootH());
+    ImGui::Text(ICON_FA_CUBE " Objekty (%d)", selected_scene->objPool.size());
+    ImGui::SameLine();
+
+    if (BeginCustomCombo2(&wpos, &wpos2, "##objects##add_object", "",
+                          "dodaj objekt", 1)) {
+      add_element_items_gui();
+      EndCustomCombo(wpos, wpos2);
+    }
+
+    // Object *root =
+    // selected_scene->objPool.get(selected_scene->objPool.rootH());
+    objH root = selected_scene->prefabs[selected_scene->current_prefab].obj;
+
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
-    draw_object_tree(root, 0);
+    if (selected_scene->objPool.get(root)) {
+      ImGui::BeginChild(1);
+      draw_object_tree(selected_scene->objPool.get(root), root.idx);
+      ImGui::EndChild();
+    } else
+      selected_scene->current_prefab = 0;
     ImGui::PopStyleVar(1);
   };
   ImGui::End();
@@ -738,6 +812,15 @@ void App::draw_gui() {
     Object *node = selected_scene->objPool.get(selected_scene->selected_object);
 
     if (node) {
+
+      Scene::Prefab &current_prefab =
+          selected_scene->prefabs[selected_scene->current_prefab];
+      if (selected_scene->selected_object == current_prefab.obj) {
+        if (ImGui::Button(ICON_FA_MOBILE_BUTTON " zaktualizuj gotowiec",
+                          ImVec2(ImGui::GetContentRegionAvail().x, 22)))
+          current_prefab.gen++;
+      }
+
       static bool hideobjprop = false;
 
       if (BeginSection(1, &hideobjprop, ICON_FA_CUBE " objekt",

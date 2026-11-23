@@ -139,7 +139,9 @@ bool App::init() {
       app->input.right = false;
       app->input.up = false;
       app->input.down = false;
-    } else if (app->is_scene_window_selected() && (mods & ~GLFW_MOD_SHIFT) == 0) {
+      app->set_movement_vec();
+    } else if (app->is_scene_window_selected() &&
+               (mods == GLFW_MOD_SHIFT || mods == 0)) {
       if (action == GLFW_PRESS && app->get_selected_scene()) {
         switch (key) {
         case GLFW_KEY_W:
@@ -184,23 +186,28 @@ bool App::init() {
         }
         app->set_movement_vec();
       }
-
-    } else if (action == GLFW_PRESS && app->get_selected_scene()) {
-
-      if (key == GLFW_KEY_DELETE)
-        if (app->get_selected_scene()->objPool.get(
-                app->get_selected_scene()->selected_object)) {
-          app->get_selected_scene()->objPool.remove(
-              app->get_selected_scene()->selected_object);
-        }
+    }
+    if (action == GLFW_PRESS && app->get_selected_scene()) {
+      if (key == GLFW_KEY_DELETE) {
+        if (app->get_selected_scene()->selected_object !=
+            app->get_selected_scene()
+                ->prefabs[app->get_selected_scene()->current_prefab]
+                .obj)
+          if (app->get_selected_scene()->objPool.get(
+                  app->get_selected_scene()->selected_object)) {
+            app->get_selected_scene()->objPool.remove(
+                app->get_selected_scene()->selected_object);
+          }
+      }
 
       if (mods == GLFW_MOD_CONTROL && key == GLFW_KEY_D) {
         objH so = app->get_selected_scene()->selected_object;
         auto &objPool = app->get_selected_scene()->objPool;
-        objH clone = objPool.clone(so);
-        objPool.get(objPool.get(so)->parent)
-            ->children.push_back(clone.idx);
-        app->get_selected_scene()->selected_object = clone;
+        if (so != objPool.rootH()) {
+          objH clone = objPool.clone(so);
+          objPool.get(objPool.get(so)->parent)->children.push_back(clone.idx);
+          app->get_selected_scene()->selected_object = clone;
+        }
       }
     }
 

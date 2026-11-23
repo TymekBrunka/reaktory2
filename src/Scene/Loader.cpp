@@ -127,7 +127,7 @@ bool Scene::load() {
 
     if (yyjson_val *obj_script_class = yyjson_obj_get(object, "script-class")) {
       json_assert(yyjson_is_int(obj_script_class));
-      node.script_class_idx = yyjson_get_int(obj_script_class);
+      node.change_script_class(&objPool, yyjson_get_int(obj_script_class));
     }
 
     if (yyjson_val *obj_children = yyjson_obj_get(object, "children")) {
@@ -190,6 +190,7 @@ bool Scene::load() {
 
       json_assert(yyjson_is_arr(obj_script_params));
 
+      int param_idx = 0;
       yyjson_arr_iter obj_script_params_iter =
           yyjson_arr_iter_with(obj_script_params);
       while (yyjson_val *obj_script_param =
@@ -294,7 +295,8 @@ bool Scene::load() {
                       script_param_type_ == "HEADER");
         }
 
-        node.lua_params.push_back(std::move(param));
+        node.lua_params[param_idx] = param;
+        param_idx++;
       }
     }
 
@@ -411,7 +413,7 @@ bool Scene::load() {
           header.min = yyjson_get_real(datapoint_header_min);
 
           yyjson_val *datapoint_header_max =
-              yyjson_arr_get(datapoint_header, 1);
+              yyjson_arr_get(datapoint_header, 2);
           json_assert(yyjson_is_num(datapoint_header_max));
           header.max = yyjson_get_real(datapoint_header_max);
 
