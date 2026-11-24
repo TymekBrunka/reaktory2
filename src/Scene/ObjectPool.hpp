@@ -8,10 +8,10 @@
 
 class Text3D {
   struct Char {
-    int charIdx;
-    int colorIdx;
-    int lineNr;
-    int columnNr;
+    int charIdx = 0;
+    int colorIdx = 0;
+    int lineNr = 0;
+    int columnNr = 0;
   };
 
 private:
@@ -51,7 +51,7 @@ struct objH {
 };
 
 struct Material {
-  glm::vec4 color_diffuse{};
+  glm::vec4 color_diffuse{1.0};
   std::string diffuse1;
 };
 
@@ -64,9 +64,9 @@ struct _HeaderName {
 };
 
 struct oModel {
-  int animation_idx;
-  float animation_time;
-  float animation_speed;
+  int animation_idx = -1;
+  float animation_time = 0;
+  float animation_speed = 1;
   std::string model;
   std::vector<Material> materials;
 };
@@ -122,9 +122,9 @@ static constexpr int SCENE_IN_REG_IDX = 7;
 
 class ScriptClass {
 public:
-  int tableidx;
-  lua_State *L;
-  Scene *scene;
+  int tableidx = -1;
+  lua_State *L = nullptr;
+  Scene *scene = nullptr;
   std::string name;
 
   struct Param {
@@ -170,8 +170,11 @@ struct Object {
   }
 
   void change_script_class(ObjectPool *pool, int new_script_class_idx);
+  void call_update(ObjectPool *pool);
+  void call_delete(ObjectPool *pool);
 };
 
+class Sampler;
 class ObjectPool {
   friend class SceneLuaBindings;
   friend class ScriptClass;
@@ -179,6 +182,7 @@ class ObjectPool {
 
 private:
   lua_State *L;
+  Sampler *sampler;
   std::vector<uint16_t> script_data_freelist;
   std::vector<Object> objects;
   std::vector<uint16_t> free_indices;
@@ -190,7 +194,7 @@ private:
 
 public:
   ObjectPool();
-  ObjectPool(lua_State *L);
+  ObjectPool(lua_State *L, Sampler *sampler);
 
   ~ObjectPool() = default;
   ObjectPool(const ObjectPool &other) = delete;

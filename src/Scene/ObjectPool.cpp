@@ -292,6 +292,36 @@ void Object::change_script_class(ObjectPool *pool, int new_script_class_idx) {
   }
 }
 
+void Object::call_update(ObjectPool *pool) {
+  if (script_class_idx != -1) {
+    auto L = pool->get_lua();
+    lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_SCRIPT_CLASSES_IDX);
+    lua_rawgeti(L, -1, script_class_idx + 1);
+    lua_remove(L, -2);
+    if (lua_getfield(L, -1, "on_update") == LUA_TFUNCTION) {
+      lua_remove(L, -1);
+      Object **obj = (Object **)lua_newuserdata(L, sizeof(Object *));
+      *obj = this;
+      luaL_getmetatable(L, "ObjectRef");
+      lua_setmetatable(L, -2);
+      Sampler **ud = (Sampler **)lua_newuserdata(L, sizeof(void *));
+      *ud = pool->sampler;
+      luaL_getmetatable(L, "Row");
+      lua_setmetatable(L, -2);
+      call_lua(L, 2);
+    } else
+      lua_remove(L, -1);
+  }
+}
+
+void Object::call_delete(ObjectPool *pool) {
+  if (script_class_idx != -1) {
+    auto L = pool->get_lua();
+    change_script_class(pool, -1);
+    pool->script_data_freelist.push_back(ref_to_self);
+  }
+}
+
 ObjectPool::ObjectPool() {
   objects.push_back(Object{.gen = 1,
                            .transform = glm::mat4(1.0f),
@@ -300,8 +330,9 @@ ObjectPool::ObjectPool() {
                            .variant = oNode{}});
 }
 
-ObjectPool::ObjectPool(lua_State *L) {
+ObjectPool::ObjectPool(lua_State *L, Sampler *sampler) {
   this->L = L;
+  this->sampler = sampler;
   objects.push_back(Object{.gen = 1,
                            .transform = glm::mat4(1.0f),
                            .name = "Scena",
@@ -376,12 +407,16 @@ objH ObjectPool::clone_impl(int16_t idx) {
   objH cloned_ = add(std::move(node_));
   int16_t size = objects[cloned_.idx].children.size();
   for (int i = 0; i < size; i++) {
-    objects[cloned_.idx].children[i] = clone_impl(cloned_.idx).idx;
+    std::cerr << "cloning (child) object #" << objects[cloned_.idx].children[i]
+              << "\n";
+    objects[cloned_.idx].children[i] =
+        clone_impl(objects[cloned_.idx].children[i]).idx;
   }
 
   if (const oPrefab *oprefab =
           std::get_if<oPrefab>(&objects[cloned_.idx].variant)) {
     if (get(oprefab->root)) {
+      std::cerr << "cloning (prefab) object #" << oprefab->root.idx << "\n";
       objH obj = clone_impl(oprefab->root.idx);
       std::get_if<oPrefab>(&objects[cloned_.idx].variant)->root = obj;
     }
@@ -419,12 +454,7 @@ void ObjectPool::remove(objH obj) {
 void ObjectPool::remove_impl(int16_t idx) {
   Object &obj = objects[idx];
   obj.variant.emplace<oEmptySlot>(oEmptySlot{});
-  if (obj.script_class_idx != -1) {
-    obj.change_script_class(this, -1);
-    lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_IN_REG_IDX);
-    Scene *scene = (*(Scene **)lua_touserdata(L, -1));
-    scene->objPool.script_data_freelist.push_back(obj.ref_to_self);
-  }
+  obj.call_delete(this);
 
   if (Object *parent = &objects[obj.parent.idx]) {
     int i = 0;

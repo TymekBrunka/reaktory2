@@ -3,6 +3,7 @@
 #include "ObjectPool.hpp"
 #include "ResourceManager.hpp"
 #include "glm/ext/matrix_float4x4.hpp"
+#include "glm/ext/vector_float4.hpp"
 #include "glm/geometric.hpp"
 #include "glm/matrix.hpp"
 #include "images.h"
@@ -236,7 +237,7 @@ Scene::Scene(const std::string &name) {
 
   init_lua(&L);
   add_lua(L);
-  objPool = ObjectPool(L);
+  objPool = ObjectPool(L, &sampler);
 
   for (auto &ent :
        std::filesystem::directory_iterator(current_folder / "scripts")) {
@@ -897,6 +898,18 @@ void Scene::render(Renderer::Render &render) {
   // glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
 }
 
+static int16_t AddToPool2Json(std::unordered_map<int16_t, int16_t> *pool2json,
+                              int16_t idx, int16_t *counter) {
+
+  auto it = pool2json->find(idx);
+  if (it == pool2json->end()) {
+    (*pool2json)[idx] = (*counter)++;
+    return (*counter) - 1;
+  } else {
+    return it->second;
+  }
+}
+
 bool Scene::save() {
   yyjson_mut_doc *doc = yyjson_mut_doc_new(NULL);
   yyjson_mut_val *root = yyjson_mut_obj(doc);
@@ -914,6 +927,25 @@ bool Scene::save() {
   yyjson_mut_obj_add_str(doc, root, "last-modified", datebuf);
   yyjson_mut_obj_add_str(doc, root, "selected-sheet", selected_sheet.c_str());
 
+  int16_t counter = 0;
+  std::unordered_map<int16_t, int16_t> pool2json;
+  int pcounter = 0;
+  std::unordered_map<int, int> prefab2json;
+
+  yyjson_mut_val *prefabs_json = yyjson_mut_obj_add_arr(doc, root, "prefabs");
+  int i = 0;
+  int j = 0;
+  for (const auto &prefab : prefabs) {
+    if (objPool.get(prefab.obj)) {
+      yyjson_mut_arr_add_int(
+          doc, prefabs_json,
+          (int)AddToPool2Json(&pool2json, prefab.obj.idx, &counter));
+      prefab2json[i] = j;
+      j++;
+    }
+    i++;
+  }
+
   yyjson_mut_val *sheet2sampler =
       yyjson_mut_obj_add_obj(doc, root, "sheet2sampler");
   for (const auto &[name, sheet] : sheets) {
@@ -925,11 +957,17 @@ bool Scene::save() {
     }
   }
 
-  int16_t counter;
-  std::unordered_map<int16_t, int16_t> pool2json;
   yyjson_mut_val *objects = yyjson_mut_obj_add_arr(doc, root, "objects");
 
-  save_object_pool_recursive(doc, objects, &counter, &pool2json, 0);
+  // // since prefab 0 is scene this part is commented out
+  // save_object_pool_recursive(doc, objects, &counter, &pool2json, &prefab2json,
+  //                            0);
+
+  for (const auto &prefab : prefabs) {
+    if (objPool.get(prefab.obj))
+      save_object_pool_recursive(doc, objects, &counter, &pool2json,
+                                 &prefab2json, prefab.obj.idx);
+  }
 
   char *json_string =
       yyjson_mut_write(doc, YYJSON_WRITE_PRETTY_TWO_SPACES, NULL);
@@ -950,21 +988,10 @@ bool Scene::save() {
   return true;
 }
 
-static int16_t AddToPool2Json(std::unordered_map<int16_t, int16_t> *pool2json,
-                              int16_t idx, int16_t *counter) {
-
-  auto it = pool2json->find(idx);
-  if (it == pool2json->end()) {
-    (*pool2json)[idx] = (*counter)++;
-    return (*counter) - 1;
-  } else {
-    return it->second;
-  }
-}
-
 int16_t Scene::save_object_pool_recursive(
     void *doc_, void *pool_, int16_t *counter,
-    std::unordered_map<int16_t, int16_t> *pool2json, int16_t idx) {
+    std::unordered_map<int16_t, int16_t> *pool2json,
+    std::unordered_map<int, int> *prefab2json, int16_t idx) {
 
   auto doc = (yyjson_mut_doc *)doc_;
   auto pool = (yyjson_mut_val *)pool_;
@@ -1053,6 +1080,11 @@ int16_t Scene::save_object_pool_recursive(
     yyjson_mut_val *v = yyjson_mut_obj_add_arr(doc, node_json, "variant");
     yyjson_mut_arr_add_str(doc, v, "TEXT3D");
     yyjson_mut_arr_add_str(doc, v, variant->string().c_str());
+
+  } else if (const oPrefab *variant = std::get_if<oPrefab>(&node->variant)) {
+    yyjson_mut_val *v = yyjson_mut_obj_add_arr(doc, node_json, "variant");
+    yyjson_mut_arr_add_str(doc, v, "PREFAB");
+    yyjson_mut_arr_add_int(doc, v, (*prefab2json)[variant->idx]);
   }
 
   if (node->lua_params.size() > 0) {
@@ -1123,8 +1155,8 @@ int16_t Scene::save_object_pool_recursive(
         yyjson_mut_obj_add_arr(doc, node_json, "children");
 
     for (int16_t i = 0; i < node->children.size(); i++) {
-      int16_t chidx = save_object_pool_recursive(doc, pool, counter, pool2json,
-                                                 node->children[i]);
+      int16_t chidx = save_object_pool_recursive(
+          doc, pool, counter, pool2json, prefab2json, node->children[i]);
 
       if (chidx >= 0)
         yyjson_mut_arr_add_int(doc, children, (int)chidx);
@@ -1152,18 +1184,7 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
     lua_remove(sc.L, -2);
 
     if (sampler.emit_update) {
-      if (lua_getfield(sc.L, -1, "on_update") == LUA_TFUNCTION) {
-        Object **obj = (Object **)lua_newuserdata(sc.L, sizeof(Object *));
-        *obj = node;
-        luaL_getmetatable(sc.L, "ObjectRef");
-        lua_setmetatable(sc.L, -2);
-        Sampler **ud = (Sampler **)lua_newuserdata(sc.L, sizeof(void *));
-        *ud = &sampler;
-        luaL_getmetatable(sc.L, "Row");
-        lua_setmetatable(sc.L, -2);
-        call_lua(sc.L, 2);
-      } else
-        lua_remove(sc.L, -1);
+      node->call_update(&objPool);
     }
 
     if (lua_getfield(sc.L, -1, "on_frame") == LUA_TFUNCTION) {
@@ -1274,6 +1295,38 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
       node->transform = glm::inverse(parentTransform) * world2local;
       modelTransform = parentTransform * node->transform;
     }
+  } else if (oPrefab *oprefab =
+                 (oPrefab *)std::get_if<oPrefab>(&node->variant)) {
+    if (node->toHandle(idx) == selected_object) {
+      glm::mat4 world2local = parentTransform * node->transform;
+      ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection),
+                           mCurrentGizmoOperation, mCurrentGizmoMode,
+                           glm::value_ptr(world2local), NULL, NULL, NULL);
+
+      node->transform = glm::inverse(parentTransform) * world2local;
+      modelTransform = parentTransform * node->transform;
+    }
+
+    Object *reference = objPool.get(prefabs[oprefab->idx].obj);
+    if (reference) {
+      oPrefab backup = *oprefab;
+
+      if (prefabs[backup.idx].gen != backup.gen) {
+        if (objPool.get(backup.root))
+          objPool.remove(backup.root);
+        backup.root = objPool.clone(prefabs[backup.idx].obj);
+        backup.gen = prefabs[backup.idx].gen;
+        node = &objPool.get(objPool.rootH())[idx];
+        node->variant = backup;
+        node->call_update(&objPool);
+        // node->transform = objPool.get(backup.root)->transform;
+        // objPool.get(backup.root)->transform = glm::mat4(1.0f);
+      }
+
+      if (objPool.get(backup.root))
+        draw_models_recursive(backup.root.idx, delta, modelTransform,
+                              parentObj);
+    }
   }
   node->current_parent_transform = parentTransform;
 
@@ -1319,6 +1372,13 @@ void Scene::draw_onscreen_recursive(int16_t idx, float delta,
       glUseProgram(text_program);
       glUniform3fv(m_text_ID, 1, glm::value_ptr(color));
       otext3D->draw(modelTransform);
+    }
+  } else if (oPrefab *oprefab =
+                 (oPrefab *)std::get_if<oPrefab>(&node->variant)) {
+
+    if (objPool.get(oprefab->root)) {
+      draw_onscreen_recursive(oprefab->root.idx, delta, modelTransform,
+                              parentObj);
     }
   }
 

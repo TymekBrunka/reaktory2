@@ -109,6 +109,21 @@ bool Scene::load() {
   for (int i = 0; i < (int)yyjson_arr_size(objects) - 1; i++)
     objPool.add(Object{});
 
+  if (yyjson_val *prefabs_json = yyjson_obj_get(root, "prefabs")) {
+    json_assert(yyjson_is_arr(prefabs_json));
+
+    yyjson_arr_iter prefabs_iter = yyjson_arr_iter_with(prefabs_json);
+    while (yyjson_val *prefab = yyjson_arr_iter_next(&prefabs_iter)) {
+      json_assert(yyjson_is_int(prefab));
+      int16_t prefab_obj = yyjson_get_int(prefab);
+      json_assert(prefab_obj >= 0 && prefab_obj < objPool.real_size());
+      prefabs.push_back(Scene::Prefab{
+          .gen = 1,
+          .obj =
+              objPool.get(objPool.rootH())[prefab_obj].toHandle(prefab_obj)});
+    }
+  }
+
   int16_t objidx = 0;
   yyjson_arr_iter objects_iter = yyjson_arr_iter_with(objects);
   while (yyjson_val *object = yyjson_arr_iter_next(&objects_iter)) {
@@ -434,11 +449,24 @@ bool Scene::load() {
 
         node.variant = text3d;
 
+      } else if (yyjson_equals_str(obj_variant_name_json, "PREFAB")) {
+        const char *obj_variant_name = "PREFAB";
+        json_assert(obj_variant_name == "PREFAB" &&
+                    obj_variant_arr_number_of_elements == 2);
+
+        yyjson_val *obj_prefab = yyjson_arr_get(obj_variant, 1);
+        json_assert(yyjson_is_int(obj_prefab));
+        int obj_prefab_idx = yyjson_get_int(obj_prefab);
+        json_assert(obj_prefab_idx > 0 && obj_prefab_idx < prefabs.size());
+
+        node.variant = oPrefab{.idx = obj_prefab_idx};
+
       } else {
         const char *obj_variant_name = NULL;
-        json_assert(obj_variant_name == "MODEL" ||
-                    obj_variant_name == "DATAPOINT" ||
-                    obj_variant_name == "TEXT3D");
+        json_assert(
+            yyjson_is_arr(obj_variant) &&
+            (obj_variant_name == "MODEL" || obj_variant_name == "DATAPOINT" ||
+             obj_variant_name == "TEXT3D" || obj_variant_name == "PREFAB"));
       }
     }
 

@@ -379,14 +379,14 @@ void show_cell_value(const CellValue *cv) {
 }
 
 void App::add_element_items_gui() {
-  if (ImGui::Selectable(ICON_FA_CHESS_ROOK " model", false)) {
-    selected_scene->objPool.add_model_node(selected_scene->resMan,
-                                           selected_scene->selected_object, "");
-  }
-  if (ImGui::Selectable(ICON_FA_CUBE " węzeł", false)) {
+  if (ImGui::Selectable(ICON_FA_FOLDER " węzeł", false)) {
     Object *node = selected_scene->objPool.get(
         selected_scene->objPool.add_node(selected_scene->selected_object));
     node->name = "węzeł";
+  }
+  if (ImGui::Selectable(ICON_FA_CHESS_ROOK " model", false)) {
+    selected_scene->objPool.add_model_node(selected_scene->resMan,
+                                           selected_scene->selected_object, "");
   }
   if (ImGui::Selectable(ICON_FA_LOCATION_DOT " widok danych", false)) {
     Object *node = selected_scene->objPool.get(selected_scene->objPool.add_node(
@@ -413,7 +413,8 @@ void App::add_element_items_gui() {
       Object *node =
           selected_scene->objPool.get(selected_scene->objPool.add_node(
               selected_scene->selected_object, oPrefab{.idx = i}));
-      node->name = "napis w 3D";
+      node->name = obj->name;
+      node->call_update(&selected_scene->objPool);
     }
     ImGui::PopID();
   }
@@ -536,9 +537,9 @@ void App::draw_object_tree(Object *node, int idx, bool is_descendant) {
       }
 
   if (const oNode *onode = std::get_if<oNode>(&node->variant)) {
-    float char_vis_width = ImGui::CalcTextSize(ICON_FA_CUBE).x;
+    float char_vis_width = ImGui::CalcTextSize(ICON_FA_FOLDER).x;
     drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y + 1),
-                      ImColor(50, 100, 200), ICON_FA_CUBE);
+                      ImColor(50, 100, 200), ICON_FA_FOLDER);
   } else if (const oModel *omodel = std::get_if<oModel>(&node->variant)) {
     float char_vis_width = ImGui::CalcTextSize(ICON_FA_CHESS_ROOK).x;
     drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y + 1),
@@ -553,6 +554,10 @@ void App::draw_object_tree(Object *node, int idx, bool is_descendant) {
     float char_vis_width = ImGui::CalcTextSize(ICON_FA_COMMENT_DOTS).x;
     drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y + 1),
                       ImColor(70, 190, 70), ICON_FA_COMMENT_DOTS);
+  } else if (const oPrefab *oprefab = std::get_if<oPrefab>(&node->variant)) {
+    float char_vis_width = ImGui::CalcTextSize(ICON_FA_CUBE).x;
+    drawlist->AddText(ImVec2(bpos2.x + 11 - (char_vis_width / 2), bpos2.y + 1),
+                      ImColor(50, 100, 200), ICON_FA_CUBE);
   }
   drawlist->AddText(ImVec2(bpos2.x + 22 + 3, bpos2.y + 1),
                     ImColor(220, 220, 220), node->name.c_str());
