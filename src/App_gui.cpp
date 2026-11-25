@@ -588,7 +588,8 @@ void App::draw_gui() {
       if (IconMenuItem(0, "      (ctrl+N) Utwórz nową scenę"))
         add_scene();
       IconMenuItem(9, "      (ctrl+I) Importuj scenę");
-      IconMenuItem(10, "      (ctrl+E) Eksportuj scenę");
+      if (IconMenuItem(10, "      (ctrl+E) Eksportuj scenę"))
+        auto e1 = export_scene();
       ImGui::EndMenu();
     }
 
@@ -1293,17 +1294,7 @@ void App::draw_gui() {
     ImGui::SameLine();
 
     if (ImGui::Button(" + ")) {
-      std::vector<std::string> models_to_load =
-          ipfd::open_file("Wybór modeli", "",
-                          {"Plik modelu (obj/m3d/fbx)", "*.obj;*.m3d;*.fbx",
-                           "Wszystkie pliki", "*"},
-                          ipfd::opt::multiselect);
-
-      for (const auto &model : models_to_load) {
-        auto e1 = selected_scene->resMan.ImportModel(
-            FileUtils::RealFs{std::filesystem::path{}},
-            std::filesystem::path{model});
-      }
+      add_model();
     }
     ImGui::SameLine();
 
@@ -1337,17 +1328,7 @@ void App::draw_gui() {
     ImGui::SameLine();
 
     if (ImGui::Button(" + ")) {
-      std::vector<std::string> textures_to_load =
-          ipfd::open_file("Wybór obrazka", "",
-                          {"Plik obrazka (png/jp(e)g/gif)",
-                           "*.png;*.jpg;*.jpeg;*.gif", "Wszystkie pliki", "*"},
-                          ipfd::opt::multiselect);
-
-      for (const auto &texture : textures_to_load) {
-        auto e1 = selected_scene->resMan.ImportTexture(
-            FileUtils::RealFs{std::filesystem::path{}},
-            std::filesystem::path{texture});
-      }
+      add_texture();
     }
     ImGui::SameLine();
 

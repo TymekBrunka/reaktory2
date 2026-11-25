@@ -721,7 +721,6 @@ bool Scene::init(Renderer::Render &render) {
 
 void Scene::cleanup() {
   close_lua(L);
-  save();
 
   if (initialised) {
     glDeleteTextures(1, &skybox_texture);

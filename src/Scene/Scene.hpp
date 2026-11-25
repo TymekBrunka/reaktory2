@@ -162,7 +162,8 @@ private:
 
   void populate_save_object_pool_recursive(
       int16_t *counter, int16_t idx,
-      std::unordered_map<int16_t, int16_t> *pool2json, std::vector<int16_t> *pool_array);
+      std::unordered_map<int16_t, int16_t> *pool2json,
+      std::vector<int16_t> *pool_array);
 
 public:
   struct Prefab {
@@ -191,6 +192,10 @@ public:
   inline const std::string &get_name() const { return name; }
 
   inline const decltype(sheets) &get_sheets() const { return sheets; }
+
+  inline const std::filesystem::path &get_folder() const {
+    return current_folder;
+  }
 
   static bool Init(Renderer::Render &render);
   bool init(Renderer::Render &render);

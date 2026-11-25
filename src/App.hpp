@@ -114,4 +114,9 @@ public:
 
   bool add_scene(const std::string &name = std::string());
   bool open_scene(const std::string &name = std::string());
+
+  void add_model();
+  void add_texture();
+
+  std::expected<bool, int> export_scene();
 };

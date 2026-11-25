@@ -268,7 +268,7 @@ add_library(App STATIC
   src/App_popups.cpp
 )
 target_include_directories(App PUBLIC src)
-target_link_libraries(App PUBLIC Scene icon_img logging renderer imgui fileutils images images_bigger mimalloc-static PRIVATE pfd)
+target_link_libraries(App PRIVATE pfd libzip::zip PUBLIC Scene icon_img logging renderer imgui fileutils images images_bigger mimalloc-static)
 target_precompile_headers(App REUSE_FROM logging)
 
 add_executable(main src/main.cpp)

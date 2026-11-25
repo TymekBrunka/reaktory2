@@ -7,12 +7,14 @@
 #include <FontsAwesome/IconsFontAwesome6.h>
 #include <FontsAwesome/RobotoRegular.h>
 #include <cstdlib>
+#include <expected>
 #include <icon_img.h>
 #include <images.h>
 #include <images_bigger.h>
 #include <imgui.h>
 #include <iostream>
 // #include <stdatomic.h>
+#include "pfd/pfd.hpp"
 #include <cstring>
 #include <string>
 #include <string_view>
@@ -20,6 +22,8 @@
 #include "GLFW/glfw3.h"
 #include "LogFileWriter.cpp"
 #include "Scene.hpp"
+
+#include <zip.h>
 
 // #include "App_gui.cpp"
 // #include "App_popups.cpp"
@@ -209,6 +213,14 @@ bool App::init() {
           app->get_selected_scene()->selected_object = clone;
         }
       }
+
+      if (mods == GLFW_MOD_ALT && key == GLFW_KEY_D) {
+        app->add_model();
+      }
+
+      if (mods == GLFW_MOD_ALT && key == GLFW_KEY_F) {
+        app->add_texture();
+      }
     }
 
     if (action == GLFW_PRESS && mods == GLFW_MOD_CONTROL) {
@@ -218,6 +230,10 @@ bool App::init() {
         break;
       case GLFW_KEY_O:
         app->open_scene();
+        break;
+      case GLFW_KEY_S:
+        for (auto &[name, scene] : app->scenes)
+          scene.save();
         break;
       }
     }
@@ -328,6 +344,34 @@ void App::draw_self() {
   render.EndFrame();
 }
 
+void App::add_model() {
+  std::vector<std::string> models_to_load =
+      ipfd::open_file("Wybór modeli", "",
+                      {"Plik modelu (obj/m3d/fbx)", "*.obj;*.m3d;*.fbx",
+                       "Wszystkie pliki", "*"},
+                      ipfd::opt::multiselect);
+
+  for (const auto &model : models_to_load) {
+    auto e1 = selected_scene->resMan.ImportModel(
+        FileUtils::RealFs{std::filesystem::path{}},
+        std::filesystem::path{model});
+  }
+}
+
+void App::add_texture() {
+  std::vector<std::string> textures_to_load =
+      ipfd::open_file("Wybór obrazka", "",
+                      {"Plik obrazka (png/jp(e)g/gif)",
+                       "*.png;*.jpg;*.jpeg;*.gif", "Wszystkie pliki", "*"},
+                      ipfd::opt::multiselect);
+
+  for (const auto &texture : textures_to_load) {
+    auto e1 = selected_scene->resMan.ImportTexture(
+        FileUtils::RealFs{std::filesystem::path{}},
+        std::filesystem::path{texture});
+  }
+}
+
 bool App::add_scene(const std::string &name) {
   if (name.empty()) {
     current_modal = "Nowa scena";
@@ -394,6 +438,57 @@ bool App::open_scene(const std::string &name) {
     std::cerr << "Error: " << err.what() << "\n";
     return false;
   }
+
+  return true;
+}
+
+std::expected<bool, int> App::export_scene() {
+  if (!selected_scene)
+    return false;
+
+  zip_t *z;
+  int err = 0;
+  z = zip_open("empty.zip", ZIP_CREATE, &err);
+  if (!z || err) {
+    std::cerr << "NOT OK\n";
+    return std::unexpected(-1);
+  }
+
+  size_t curfold_len = selected_scene->get_folder().u8string().size();
+  for (auto &ent : std::filesystem::recursive_directory_iterator(
+           selected_scene->get_folder())) {
+
+    auto res_fs = FileUtils::ReadFile(ent.path());
+    if (!res_fs.has_value()) {
+      std::string path = selected_scene->get_folder().string();
+      switch (res_fs.error()) {
+      case -2:
+        Log::log(Log::ERROR | Log::SEV_MED, 0, "App",
+                 TL(MSG_GENERIC_FILE_NOT_FOUND), std::make_format_args(path));
+        break;
+
+      case -1:
+        Log::log(Log::ERROR | Log::SEV_MED, 0, "App",
+                 TL(MSG_GENERIC_OPEN_ERROR), std::make_format_args(path));
+        break;
+
+      case 1:
+        Log::log(Log::ERROR | Log::SEV_MED, 0, "App",
+                 TL(MSG_GENERIC_READ_ERROR), std::make_format_args(path));
+        break;
+
+      default:
+        break;
+      }
+      zip_close(z);
+      return std::unexpected(1);
+    }
+
+    std::u8string path = ent.path().u8string();
+  }
+  // zip_source_t *source  = zip_source_buffer(z, "Cześć", sizeof("Cześć"), 0);
+  // zip_file_add(z, "test.txt", source, ZIP_FL_ENC_UTF_8);
+  zip_close(z);
 
   return true;
 }
