@@ -116,7 +116,7 @@ bool Scene::load() {
     while (yyjson_val *prefab = yyjson_arr_iter_next(&prefabs_iter)) {
       json_assert(yyjson_is_int(prefab));
       int16_t prefab_obj = yyjson_get_int(prefab);
-      json_assert(prefab_obj >= 0 && prefab_obj < objPool.real_size());
+      json_assert(prefab_obj > 0 && prefab_obj < objPool.real_size());
       prefabs.push_back(Scene::Prefab{
           .gen = 1,
           .obj =
@@ -457,9 +457,9 @@ bool Scene::load() {
         yyjson_val *obj_prefab = yyjson_arr_get(obj_variant, 1);
         json_assert(yyjson_is_int(obj_prefab));
         int obj_prefab_idx = yyjson_get_int(obj_prefab);
-        json_assert(obj_prefab_idx > 0 && obj_prefab_idx < prefabs.size());
+        json_assert(obj_prefab_idx >= 0 && obj_prefab_idx < prefabs.size());
 
-        node.variant = oPrefab{.idx = obj_prefab_idx};
+        node.variant = oPrefab{.idx = obj_prefab_idx + 1};
 
       } else {
         const char *obj_variant_name = NULL;

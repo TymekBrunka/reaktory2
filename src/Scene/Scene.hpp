@@ -160,11 +160,9 @@ private:
 
   void add_lua(lua_State *L);
 
-  int16_t
-  save_object_pool_recursive(void *doc_, void *pool_, int16_t *counter,
-                             std::unordered_map<int16_t, int16_t> *pool2json,
-                             std::unordered_map<int, int> *prefab2json,
-                             int16_t idx);
+  void populate_save_object_pool_recursive(
+      int16_t *counter, int16_t idx,
+      std::unordered_map<int16_t, int16_t> *pool2json, std::vector<int16_t> *pool_array);
 
 public:
   struct Prefab {

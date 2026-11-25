@@ -19,6 +19,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <vector>
 #define GLFW_INCLUDE_NONE
 #include "GLFW/glfw3.h"
 #include <yyjson.h>
@@ -899,10 +900,12 @@ void Scene::render(Renderer::Render &render) {
 }
 
 static int16_t AddToPool2Json(std::unordered_map<int16_t, int16_t> *pool2json,
-                              int16_t idx, int16_t *counter) {
+                              std::vector<int16_t> *pool_array, int16_t idx,
+                              int16_t *counter) {
 
   auto it = pool2json->find(idx);
   if (it == pool2json->end()) {
+    pool_array->push_back(idx);
     (*pool2json)[idx] = (*counter)++;
     return (*counter) - 1;
   } else {
@@ -929,22 +932,8 @@ bool Scene::save() {
 
   int16_t counter = 0;
   std::unordered_map<int16_t, int16_t> pool2json;
-  int pcounter = 0;
   std::unordered_map<int, int> prefab2json;
-
-  yyjson_mut_val *prefabs_json = yyjson_mut_obj_add_arr(doc, root, "prefabs");
-  int i = 0;
-  int j = 0;
-  for (const auto &prefab : prefabs) {
-    if (objPool.get(prefab.obj)) {
-      yyjson_mut_arr_add_int(
-          doc, prefabs_json,
-          (int)AddToPool2Json(&pool2json, prefab.obj.idx, &counter));
-      prefab2json[i] = j;
-      j++;
-    }
-    i++;
-  }
+  std::vector<int16_t> pool_array;
 
   yyjson_mut_val *sheet2sampler =
       yyjson_mut_obj_add_obj(doc, root, "sheet2sampler");
@@ -957,16 +946,201 @@ bool Scene::save() {
     }
   }
 
-  yyjson_mut_val *objects = yyjson_mut_obj_add_arr(doc, root, "objects");
+  // make sure that scene root is at idx 0
+  AddToPool2Json(&pool2json, &pool_array, 0, &counter);
 
-  // // since prefab 0 is scene this part is commented out
-  // save_object_pool_recursive(doc, objects, &counter, &pool2json, &prefab2json,
-  //                            0);
-
+  yyjson_mut_val *prefabs_json = yyjson_mut_obj_add_arr(doc, root, "prefabs");
+  int i = 0;
+  int j = 0;
+  bool skip_first_prefab = true;
   for (const auto &prefab : prefabs) {
-    if (objPool.get(prefab.obj))
-      save_object_pool_recursive(doc, objects, &counter, &pool2json,
-                                 &prefab2json, prefab.obj.idx);
+    if (skip_first_prefab) {
+      skip_first_prefab = false;
+      i++;
+      continue;
+    }
+
+    if (objPool.get(prefab.obj)) {
+      populate_save_object_pool_recursive(&counter, prefab.obj.idx, &pool2json,
+                                          &pool_array);
+      // AddToPool2Json(&pool2json, prefab.obj.idx, &counter);
+      yyjson_mut_arr_add_int(doc, prefabs_json, (int)pool2json[prefab.obj.idx]);
+      prefab2json[i] = j;
+      j++;
+    }
+    i++;
+  }
+
+  populate_save_object_pool_recursive(&counter, 0, &pool2json, &pool_array);
+
+  yyjson_mut_val *pool = yyjson_mut_obj_add_arr(doc, root, "objects");
+  for (i = 0; i < counter; i++) {
+    int16_t idx = pool_array[i];
+    Object *node = &objPool.get(objPool.rootH())[idx];
+
+    yyjson_mut_val *node_json = yyjson_mut_arr_add_obj(doc, pool);
+    yyjson_mut_obj_add_str(doc, node_json, "name", node->name.c_str());
+    yyjson_mut_obj_add_bool(doc, node_json, "collapsed", node->collapsed);
+    if (node->script_class_idx != -1)
+      yyjson_mut_obj_add_int(doc, node_json, "script-class",
+                             node->script_class_idx);
+
+    if (idx) {
+      float translation[3];
+      float rotation[3];
+      float scale[3];
+
+      ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(node->transform),
+                                            translation, rotation, scale);
+
+      yyjson_mut_val *translation_json =
+          yyjson_mut_obj_add_arr(doc, node_json, "translation");
+      yyjson_mut_val *rotation_json =
+          yyjson_mut_obj_add_arr(doc, node_json, "rotation");
+      yyjson_mut_val *scale_json =
+          yyjson_mut_obj_add_arr(doc, node_json, "scale");
+
+      yyjson_mut_arr_add_float(doc, translation_json, translation[0]);
+      yyjson_mut_arr_add_float(doc, translation_json, translation[1]);
+      yyjson_mut_arr_add_float(doc, translation_json, translation[2]);
+
+      yyjson_mut_arr_add_float(doc, rotation_json, rotation[0]);
+      yyjson_mut_arr_add_float(doc, rotation_json, rotation[1]);
+      yyjson_mut_arr_add_float(doc, rotation_json, rotation[2]);
+
+      yyjson_mut_arr_add_float(doc, scale_json, scale[0]);
+      yyjson_mut_arr_add_float(doc, scale_json, scale[1]);
+      yyjson_mut_arr_add_float(doc, scale_json, scale[2]);
+    }
+
+    if (const oEmptySlot *variant = std::get_if<oEmptySlot>(&node->variant)) {
+      yyjson_mut_obj_add_str(doc, node_json, "variant", "EMPTY");
+
+    } else if (const oNode *variant = std::get_if<oNode>(&node->variant)) {
+      yyjson_mut_obj_add_str(doc, node_json, "variant", "NODE");
+
+    } else if (const oModel *variant = std::get_if<oModel>(&node->variant)) {
+      yyjson_mut_val *v = yyjson_mut_obj_add_arr(doc, node_json, "variant");
+      yyjson_mut_arr_add_str(doc, v, "MODEL");
+      yyjson_mut_arr_add_str(doc, v, variant->model.c_str());
+      yyjson_mut_arr_add_int(doc, v, variant->animation_idx);
+      yyjson_mut_arr_add_float(doc, v, variant->animation_time);
+      yyjson_mut_arr_add_float(doc, v, variant->animation_speed);
+
+      yyjson_mut_val *materials = yyjson_mut_arr_add_arr(doc, v);
+      for (const auto &material : variant->materials) {
+        yyjson_mut_val *m = yyjson_mut_arr_add_arr(doc, materials);
+        yyjson_mut_arr_add_str(doc, m, material.diffuse1.c_str());
+        yyjson_mut_val *c = yyjson_mut_arr_add_arr(doc, m);
+        yyjson_mut_arr_add_float(doc, c,
+                                 glm::value_ptr(material.color_diffuse)[0]);
+        yyjson_mut_arr_add_float(doc, c,
+                                 glm::value_ptr(material.color_diffuse)[1]);
+        yyjson_mut_arr_add_float(doc, c,
+                                 glm::value_ptr(material.color_diffuse)[2]);
+        yyjson_mut_arr_add_float(doc, c,
+                                 glm::value_ptr(material.color_diffuse)[3]);
+      }
+
+    } else if (const oDataPoint2 *variant =
+                   std::get_if<oDataPoint2>(&node->variant)) {
+      yyjson_mut_val *v = yyjson_mut_obj_add_arr(doc, node_json, "variant");
+      yyjson_mut_arr_add_str(doc, v, "DATAPOINT");
+
+      yyjson_mut_val *headers = yyjson_mut_arr_add_arr(doc, v);
+      for (const auto &header : variant->headers) {
+        yyjson_mut_val *header_json = yyjson_mut_arr_add_arr(doc, headers);
+        yyjson_mut_arr_add_str(doc, header_json, header.header.c_str());
+        yyjson_mut_arr_add_float(doc, header_json, header.min);
+        yyjson_mut_arr_add_float(doc, header_json, header.max);
+      }
+
+    } else if (const Text3D *variant = std::get_if<Text3D>(&node->variant)) {
+      yyjson_mut_val *v = yyjson_mut_obj_add_arr(doc, node_json, "variant");
+      yyjson_mut_arr_add_str(doc, v, "TEXT3D");
+      yyjson_mut_arr_add_str(doc, v, variant->string().c_str());
+
+    } else if (const oPrefab *variant = std::get_if<oPrefab>(&node->variant)) {
+      yyjson_mut_val *v = yyjson_mut_obj_add_arr(doc, node_json, "variant");
+      yyjson_mut_arr_add_str(doc, v, "PREFAB");
+      yyjson_mut_arr_add_int(doc, v, prefab2json[variant->idx]);
+    }
+
+    if (node->lua_params.size() > 0) {
+      yyjson_mut_val *params =
+          yyjson_mut_obj_add_arr(doc, node_json, "script-params");
+
+      for (const auto &param : node->lua_params) {
+
+        if (const Nil *value = std::get_if<Nil>(&param)) {
+          yyjson_mut_arr_add_null(doc, params);
+
+        } else if (const bool *value = std::get_if<bool>(&param)) {
+          yyjson_mut_arr_add_bool(doc, params, *value);
+
+        } else if (const int *value = std::get_if<int>(&param)) {
+          yyjson_mut_arr_add_int(doc, params, *value);
+
+        } else if (const float *value = std::get_if<float>(&param)) {
+          yyjson_mut_arr_add_float(doc, params, *value);
+
+        } else if (const std::string *value =
+                       (std::string *)std::get_if<std::string>(&param)) {
+          yyjson_mut_arr_add_str(doc, params, value->c_str());
+
+        } else if (const Material *value = std::get_if<Material>(&param)) {
+          yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
+          yyjson_mut_arr_add_str(doc, p, "MATERIAL");
+          yyjson_mut_arr_add_str(doc, p, value->diffuse1.c_str());
+          yyjson_mut_val *color = yyjson_mut_arr_add_arr(doc, p);
+          yyjson_mut_arr_add_float(doc, color,
+                                   glm::value_ptr(value->color_diffuse)[0]);
+          yyjson_mut_arr_add_float(doc, color,
+                                   glm::value_ptr(value->color_diffuse)[1]);
+          yyjson_mut_arr_add_float(doc, color,
+                                   glm::value_ptr(value->color_diffuse)[2]);
+          yyjson_mut_arr_add_float(doc, color,
+                                   glm::value_ptr(value->color_diffuse)[3]);
+
+        } else if (const objH *value = std::get_if<objH>(&param)) {
+
+          yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
+          yyjson_mut_arr_add_str(doc, p, "OBJH");
+          if (objPool.get(*value)) {
+            populate_save_object_pool_recursive(&counter, idx, &pool2json,
+                                                &pool_array);
+            int16_t objidx = pool_array[pool_array.size() - 1];
+            yyjson_mut_arr_add_int(doc, p, objidx);
+          } else {
+            yyjson_mut_arr_add_int(doc, p, -1);
+          }
+
+        } else if (const _ModelName *value =
+                       (_ModelName *)std::get_if<_ModelName>(&param)) {
+          yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
+          yyjson_mut_arr_add_str(doc, p, "MODEL");
+          yyjson_mut_arr_add_str(doc, p, value->model.c_str());
+
+        } else if (const _HeaderName *value =
+                       (_HeaderName *)std::get_if<_HeaderName>(&param)) {
+
+          yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
+          yyjson_mut_arr_add_str(doc, p, "HEADER");
+          yyjson_mut_arr_add_str(doc, p, value->header.c_str());
+        }
+      }
+    }
+
+    if (node->children.size() > 0) {
+      yyjson_mut_val *children =
+          yyjson_mut_obj_add_arr(doc, node_json, "children");
+
+      for (int16_t child : node->children) {
+        int16_t chidx = pool2json[child];
+        if (chidx >= 0)
+          yyjson_mut_arr_add_int(doc, children, (int)chidx);
+      }
+    }
   }
 
   char *json_string =
@@ -988,182 +1162,17 @@ bool Scene::save() {
   return true;
 }
 
-int16_t Scene::save_object_pool_recursive(
-    void *doc_, void *pool_, int16_t *counter,
+void Scene::populate_save_object_pool_recursive(
+    int16_t *counter, int16_t idx,
     std::unordered_map<int16_t, int16_t> *pool2json,
-    std::unordered_map<int, int> *prefab2json, int16_t idx) {
+    std::vector<int16_t> *pool_array) {
 
-  auto doc = (yyjson_mut_doc *)doc_;
-  auto pool = (yyjson_mut_val *)pool_;
-
-  Object *node = &objPool.get(objPool.rootH())[idx];
-  int16_t jdx = AddToPool2Json(pool2json, idx, counter);
-
-  yyjson_mut_val *node_json = yyjson_mut_arr_add_obj(doc, pool);
-  yyjson_mut_obj_add_str(doc, node_json, "name", node->name.c_str());
-  yyjson_mut_obj_add_bool(doc, node_json, "collapsed", node->collapsed);
-  if (node->script_class_idx != -1)
-    yyjson_mut_obj_add_int(doc, node_json, "script-class",
-                           node->script_class_idx);
-
-  if (idx) {
-    float translation[3];
-    float rotation[3];
-    float scale[3];
-
-    ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(node->transform),
-                                          translation, rotation, scale);
-
-    yyjson_mut_val *translation_json =
-        yyjson_mut_obj_add_arr(doc, node_json, "translation");
-    yyjson_mut_val *rotation_json =
-        yyjson_mut_obj_add_arr(doc, node_json, "rotation");
-    yyjson_mut_val *scale_json =
-        yyjson_mut_obj_add_arr(doc, node_json, "scale");
-
-    yyjson_mut_arr_add_float(doc, translation_json, translation[0]);
-    yyjson_mut_arr_add_float(doc, translation_json, translation[1]);
-    yyjson_mut_arr_add_float(doc, translation_json, translation[2]);
-
-    yyjson_mut_arr_add_float(doc, rotation_json, rotation[0]);
-    yyjson_mut_arr_add_float(doc, rotation_json, rotation[1]);
-    yyjson_mut_arr_add_float(doc, rotation_json, rotation[2]);
-
-    yyjson_mut_arr_add_float(doc, scale_json, scale[0]);
-    yyjson_mut_arr_add_float(doc, scale_json, scale[1]);
-    yyjson_mut_arr_add_float(doc, scale_json, scale[2]);
+  AddToPool2Json(pool2json, pool_array, idx, counter);
+  Object &node = objPool.get(objPool.rootH())[idx];
+  for (int16_t i = 0; i < node.children.size(); i++) {
+    populate_save_object_pool_recursive(counter, node.children[i], pool2json,
+                                        pool_array);
   }
-
-  if (const oEmptySlot *variant = std::get_if<oEmptySlot>(&node->variant)) {
-    yyjson_mut_obj_add_str(doc, node_json, "variant", "EMPTY");
-
-  } else if (const oNode *variant = std::get_if<oNode>(&node->variant)) {
-    yyjson_mut_obj_add_str(doc, node_json, "variant", "NODE");
-
-  } else if (const oModel *variant = std::get_if<oModel>(&node->variant)) {
-    yyjson_mut_val *v = yyjson_mut_obj_add_arr(doc, node_json, "variant");
-    yyjson_mut_arr_add_str(doc, v, "MODEL");
-    yyjson_mut_arr_add_str(doc, v, variant->model.c_str());
-    yyjson_mut_arr_add_int(doc, v, variant->animation_idx);
-    yyjson_mut_arr_add_float(doc, v, variant->animation_time);
-    yyjson_mut_arr_add_float(doc, v, variant->animation_speed);
-
-    yyjson_mut_val *materials = yyjson_mut_arr_add_arr(doc, v);
-    for (const auto &material : variant->materials) {
-      yyjson_mut_val *m = yyjson_mut_arr_add_arr(doc, materials);
-      yyjson_mut_arr_add_str(doc, m, material.diffuse1.c_str());
-      yyjson_mut_val *c = yyjson_mut_arr_add_arr(doc, m);
-      yyjson_mut_arr_add_float(doc, c,
-                               glm::value_ptr(material.color_diffuse)[0]);
-      yyjson_mut_arr_add_float(doc, c,
-                               glm::value_ptr(material.color_diffuse)[1]);
-      yyjson_mut_arr_add_float(doc, c,
-                               glm::value_ptr(material.color_diffuse)[2]);
-      yyjson_mut_arr_add_float(doc, c,
-                               glm::value_ptr(material.color_diffuse)[3]);
-    }
-
-  } else if (const oDataPoint2 *variant =
-                 std::get_if<oDataPoint2>(&node->variant)) {
-    yyjson_mut_val *v = yyjson_mut_obj_add_arr(doc, node_json, "variant");
-    yyjson_mut_arr_add_str(doc, v, "DATAPOINT");
-
-    yyjson_mut_val *headers = yyjson_mut_arr_add_arr(doc, v);
-    for (const auto &header : variant->headers) {
-      yyjson_mut_val *header_json = yyjson_mut_arr_add_arr(doc, headers);
-      yyjson_mut_arr_add_str(doc, header_json, header.header.c_str());
-      yyjson_mut_arr_add_float(doc, header_json, header.min);
-      yyjson_mut_arr_add_float(doc, header_json, header.max);
-    }
-
-  } else if (const Text3D *variant = std::get_if<Text3D>(&node->variant)) {
-    yyjson_mut_val *v = yyjson_mut_obj_add_arr(doc, node_json, "variant");
-    yyjson_mut_arr_add_str(doc, v, "TEXT3D");
-    yyjson_mut_arr_add_str(doc, v, variant->string().c_str());
-
-  } else if (const oPrefab *variant = std::get_if<oPrefab>(&node->variant)) {
-    yyjson_mut_val *v = yyjson_mut_obj_add_arr(doc, node_json, "variant");
-    yyjson_mut_arr_add_str(doc, v, "PREFAB");
-    yyjson_mut_arr_add_int(doc, v, (*prefab2json)[variant->idx]);
-  }
-
-  if (node->lua_params.size() > 0) {
-    yyjson_mut_val *params =
-        yyjson_mut_obj_add_arr(doc, node_json, "script-params");
-
-    for (const auto &param : node->lua_params) {
-
-      if (const Nil *value = std::get_if<Nil>(&param)) {
-        yyjson_mut_arr_add_null(doc, params);
-
-      } else if (const bool *value = std::get_if<bool>(&param)) {
-        yyjson_mut_arr_add_bool(doc, params, *value);
-
-      } else if (const int *value = std::get_if<int>(&param)) {
-        yyjson_mut_arr_add_int(doc, params, *value);
-
-      } else if (const float *value = std::get_if<float>(&param)) {
-        yyjson_mut_arr_add_float(doc, params, *value);
-
-      } else if (const std::string *value =
-                     (std::string *)std::get_if<std::string>(&param)) {
-        yyjson_mut_arr_add_str(doc, params, value->c_str());
-
-      } else if (const Material *value = std::get_if<Material>(&param)) {
-        yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
-        yyjson_mut_arr_add_str(doc, p, "MATERIAL");
-        yyjson_mut_arr_add_str(doc, p, value->diffuse1.c_str());
-        yyjson_mut_val *color = yyjson_mut_arr_add_arr(doc, p);
-        yyjson_mut_arr_add_float(doc, color,
-                                 glm::value_ptr(value->color_diffuse)[0]);
-        yyjson_mut_arr_add_float(doc, color,
-                                 glm::value_ptr(value->color_diffuse)[1]);
-        yyjson_mut_arr_add_float(doc, color,
-                                 glm::value_ptr(value->color_diffuse)[2]);
-        yyjson_mut_arr_add_float(doc, color,
-                                 glm::value_ptr(value->color_diffuse)[3]);
-
-      } else if (const objH *value = std::get_if<objH>(&param)) {
-
-        yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
-        yyjson_mut_arr_add_str(doc, p, "OBJH");
-        if (objPool.get(*value)) {
-          int16_t objidx = AddToPool2Json(pool2json, value->idx, counter);
-          yyjson_mut_arr_add_int(doc, p, objidx);
-        } else {
-          yyjson_mut_arr_add_int(doc, p, -1);
-        }
-
-      } else if (const _ModelName *value =
-                     (_ModelName *)std::get_if<_ModelName>(&param)) {
-        yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
-        yyjson_mut_arr_add_str(doc, p, "MODEL");
-        yyjson_mut_arr_add_str(doc, p, value->model.c_str());
-
-      } else if (const _HeaderName *value =
-                     (_HeaderName *)std::get_if<_HeaderName>(&param)) {
-
-        yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
-        yyjson_mut_arr_add_str(doc, p, "HEADER");
-        yyjson_mut_arr_add_str(doc, p, value->header.c_str());
-      }
-    }
-  }
-
-  if (node->children.size() > 0) {
-    yyjson_mut_val *children =
-        yyjson_mut_obj_add_arr(doc, node_json, "children");
-
-    for (int16_t i = 0; i < node->children.size(); i++) {
-      int16_t chidx = save_object_pool_recursive(
-          doc, pool, counter, pool2json, prefab2json, node->children[i]);
-
-      if (chidx >= 0)
-        yyjson_mut_arr_add_int(doc, children, (int)chidx);
-    }
-  }
-
-  return jdx;
 }
 
 void Scene::draw_models_recursive(int16_t idx, float delta,
