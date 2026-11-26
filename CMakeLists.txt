@@ -248,7 +248,7 @@ add_library(LuaBindings STATIC
   src/Components/LuaBindings/LuaBindings.hpp
 )
 target_include_directories(LuaBindings PUBLIC src/Components/LuaBindings)
-target_link_libraries(LuaBindings PUBLIC lua lua_cpml)
+target_link_libraries(LuaBindings PUBLIC lua lua_cpml logging)
 
 add_library(Scene STATIC
   src/Scene/Scene.hpp

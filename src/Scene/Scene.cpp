@@ -260,8 +260,12 @@ Scene::Scene(const std::string &name) {
                               return (const char *)rr->data;
                             },
                             &rr, path.c_str(), "bt")) {
-            std::cerr << "\x1b[31m" << lua_tostring(L, -1) << "\x1b[0m\n";
+            const char *str = lua_tostring(L, -1);
+            Log::log(Log::ERROR | Log::SEV_MED, 0, "Lua", TL(MSG_RAW),
+                     std::make_format_args(str));
             lua_pop(L, 1);
+            delete[] res_fs.value().data;
+            throw std::runtime_error("");
           }
           call_lua(L);
           delete[] res_fs.value().data;
@@ -1322,11 +1326,11 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
       if (prefabs[backup.idx].gen != backup.gen) {
         if (objPool.get(backup.root))
           objPool.remove(backup.root);
-        backup.root = objPool.clone(prefabs[backup.idx].obj);
+        backup.root = prefabs[backup.idx].obj;
+        backup.root = objPool.clone_prefab_root(&backup, idx);
         backup.gen = prefabs[backup.idx].gen;
         node = &objPool.get(objPool.rootH())[idx];
         node->variant = backup;
-        node->call_update(&objPool);
         // node->transform = objPool.get(backup.root)->transform;
         // objPool.get(backup.root)->transform = glm::mat4(1.0f);
       }

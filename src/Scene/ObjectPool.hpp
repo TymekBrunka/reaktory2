@@ -107,10 +107,18 @@ struct oDataPoint2 {
   void update_text(Sampler *displayed_row);
 };
 
+struct Nil {
+  bool dummy = false;
+};
+
+using LuaParam = std::variant<Nil, bool, int, float, std::string, Material,
+                              objH, _ModelName, _HeaderName>;
+
 struct oPrefab {
   uint32_t gen = 0;
   int idx = 0;
   objH root;
+  std::vector<LuaParam> prefab_params;
 };
 
 class Scene;
@@ -145,13 +153,6 @@ public:
   void destroy();
 };
 
-struct Nil {
-  bool dummy = false;
-};
-
-using LuaParam = std::variant<Nil, bool, int, float, std::string, Material,
-                              objH, _ModelName, _HeaderName>;
-
 struct Object {
   uint8_t gen = 1;
   bool collapsed = false;
@@ -170,6 +171,7 @@ struct Object {
   }
 
   void change_script_class(ObjectPool *pool, int new_script_class_idx);
+  void call_attach(ObjectPool *pool);
   void call_update(ObjectPool *pool);
   void call_delete(ObjectPool *pool);
 };
@@ -222,6 +224,8 @@ public:
 
   inline int16_t size() const { return objects.size() - free_indices.size(); };
   inline int16_t real_size() const { return objects.size(); };
+
+  objH clone_prefab_root(const oPrefab *oprefab, int16_t idx);
 
   Object *get(objH obj);
   objH add(Object &&obj);

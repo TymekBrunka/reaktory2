@@ -1,4 +1,6 @@
 {
+  "MSG_RAW": ["{}"],
+
   "MSG_APP_HOME_DIR_ERROR": ["Nie można znaleźć folderu użytkownika."],
   "MSG_APP_ROOT_CREATE_ERROR": ["Nie można utworzyć folderu aplikacji."],
   "MSG_APP_ROOT_SUBDIR_CREATE_ERROR": ["Nie można utworzyć folderu '{}' aplikacji."],

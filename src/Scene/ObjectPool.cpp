@@ -273,6 +273,17 @@ void Object::change_script_class(ObjectPool *pool, int new_script_class_idx) {
   script_class_idx = new_script_class_idx;
 
   if (script_class_idx != -1) {
+    for (int i = 0;
+         i < pool->get_script_classes()[script_class_idx].params.size(); i++) {
+      lua_params.push_back(LuaParam{});
+    }
+
+    call_attach(pool);
+  }
+}
+
+void Object::call_attach(ObjectPool *pool) {
+  if (script_class_idx != -1) {
     auto L = pool->get_lua();
     lua_rawgeti(L, LUA_REGISTRYINDEX, SCENE_SCRIPT_CLASSES_IDX);
     lua_rawgeti(L, -1, script_class_idx + 1);
@@ -284,11 +295,6 @@ void Object::change_script_class(ObjectPool *pool, int new_script_class_idx) {
     luaL_getmetatable(L, "ObjectRef");
     lua_setmetatable(L, -2);
     call_lua(L, 1);
-
-    for (int i = 0;
-         i < pool->get_script_classes()[script_class_idx].params.size(); i++) {
-      lua_params.push_back(LuaParam{});
-    }
   }
 }
 
@@ -299,7 +305,7 @@ void Object::call_update(ObjectPool *pool) {
     lua_rawgeti(L, -1, script_class_idx + 1);
     lua_remove(L, -2);
     if (lua_getfield(L, -1, "on_update") == LUA_TFUNCTION) {
-      lua_remove(L, -1);
+      lua_remove(L, -2);
       Object **obj = (Object **)lua_newuserdata(L, sizeof(Object *));
       *obj = this;
       luaL_getmetatable(L, "ObjectRef");
@@ -309,8 +315,10 @@ void Object::call_update(ObjectPool *pool) {
       luaL_getmetatable(L, "Row");
       lua_setmetatable(L, -2);
       call_lua(L, 2);
-    } else
+    } else {
       lua_remove(L, -1);
+      lua_remove(L, -1);
+    }
   }
 }
 
@@ -400,11 +408,28 @@ objH ObjectPool::clone(objH obj) {
   return clone_impl(obj.idx);
 }
 
+objH ObjectPool::clone_prefab_root(const oPrefab *oprefab, int16_t idx) {
+  if (get(oprefab->root)) {
+    std::cerr << "cloning (prefab) object #" << oprefab->root.idx << "\n";
+    objH obj = clone_impl(oprefab->root.idx);
+    auto op = std::get_if<oPrefab>(&objects[idx].variant);
+    op->root = obj;
+    objects[obj.idx].lua_params = op->prefab_params;
+    objects[obj.idx].call_update(this);
+    return obj;
+  }
+
+  return oprefab->root;
+}
+
 // passing parent as idx bc the array moves in memory
 objH ObjectPool::clone_impl(int16_t idx) {
   Object &node = objects[idx];
   Object node_ = node;
   objH cloned_ = add(std::move(node_));
+  Object &cloned_node = objects[cloned_.idx];
+  if (cloned_node.script_class_idx != -1)
+    cloned_node.call_attach(this);
   int16_t size = objects[cloned_.idx].children.size();
   for (int i = 0; i < size; i++) {
     std::cerr << "cloning (child) object #" << objects[cloned_.idx].children[i]
@@ -415,11 +440,7 @@ objH ObjectPool::clone_impl(int16_t idx) {
 
   if (const oPrefab *oprefab =
           std::get_if<oPrefab>(&objects[cloned_.idx].variant)) {
-    if (get(oprefab->root)) {
-      std::cerr << "cloning (prefab) object #" << oprefab->root.idx << "\n";
-      objH obj = clone_impl(oprefab->root.idx);
-      std::get_if<oPrefab>(&objects[cloned_.idx].variant)->root = obj;
-    }
+    clone_prefab_root(oprefab, cloned_.idx);
   }
 
   return cloned_;

@@ -1,3 +1,4 @@
+#include <Logging.hpp>
 #include <LuaBindings.hpp>
 #include <cstring>
 #include <iostream>
@@ -67,6 +68,9 @@ void init_lua(lua_State **L_) {
 }
 
 bool call_lua(lua_State *L, int argc) {
+  if (lua_type(L, -1 - argc) != LUA_TFUNCTION) {
+    std::cerr << "NOT A FUNCTION\n";
+  }
   lua_rawgeti(L, LUA_REGISTRYINDEX, TRACELOG_IDX);
   lua_insert(L, -3 - argc);
   int tracelog_idx = lua_gettop(L) - 2 - argc;
@@ -75,7 +79,9 @@ bool call_lua(lua_State *L, int argc) {
   //   std::cerr << "lua type: " << (int)(lua_type(L, i) - LUA_TNIL) << "\n";
   // std::cerr << "current top: " << lua_gettop(L) << "\n";
   if (lua_pcall(L, argc, LUA_MULTRET, tracelog_idx) != LUA_OK) {
-    std::cerr << "\x1b[31m" << lua_tostring(L, -1) << "\x1b[0m\n";
+    const char *str = lua_tostring(L, -1);
+    Log::log(Log::ERROR | Log::SEV_MED, 0, "Lua", TL(MSG_RAW),
+             std::make_format_args(str));
     lua_pop(L, 1);
     return false;
   }
@@ -152,7 +158,9 @@ static int embeded_scripts_loader(lua_State *L) {
   lua_pushstring(L, path);
 
   if (lua_pcall(L, 1, LUA_MULTRET, 1) != LUA_OK) {
-    std::cerr << "luerror: " << lua_tostring(L, -1) << "\n";
+    const char *str = lua_tostring(L, -1);
+    Log::log(Log::ERROR | Log::SEV_MED, 0, "Lua", TL(MSG_RAW),
+             std::make_format_args(str));
     lua_pop(L, 1);
   }
 

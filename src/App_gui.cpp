@@ -1,10 +1,12 @@
 #include <App.hpp>
 
 #include "FileUtils.hpp"
+#include "Logging.hpp"
 #include "Model.hpp"
 #include "ObjectPool.hpp"
 #include "Renderer.hpp"
 #include "ResourceManager.hpp"
+#include "Scene.hpp"
 #include "Sheet.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include "imgui.h"
@@ -352,6 +354,155 @@ static void type_datapoint_draw(Scene *selected_scene, ImVec2 *wpos,
   }
 }
 
+static void draw_params_ui(Scene *selected_scene, ImVec2 *wpos, ImVec2 *wpos2,
+                           Object *node) {
+  int i = 1;
+  for (auto &param_ : node->lua_params) {
+
+    const ScriptClass &sc =
+        selected_scene->objPool.get_script_classes()[node->script_class_idx];
+
+    ImGui::PushID(i);
+    const ScriptClass::Param &scparam = sc.params[i - 1];
+    LuaParam &param = *(LuaParam *)&param_;
+
+    ImGui::SetCursorPosX(8);
+    InputAllignedText(scparam.name.c_str(), 26);
+    ImGui::SameLine();
+
+    ImDrawList *drawlist = ImGui::GetWindowDrawList();
+    ImVec2 cpos = ImGui::GetCursorPos();
+    // bool ret = ImGui::Button(
+    //     "##skrypt_", ImVec2(ImGui::GetContentRegionAvail().x - 8,
+    //     26));
+    bool ret = ImGui::Button("##skrypt_", ImVec2(16, 22));
+    ImVec2 bpos = ImGui::GetItemRectMin();
+
+    if (Nil *value = (Nil *)std::get_if<Nil>(&param)) {
+      ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
+      ret |= ImGui::Button("nil##nil",
+                           ImVec2(ImGui::GetContentRegionAvail().x - 8, 22));
+
+    } else if (bool *value = (bool *)std::get_if<bool>(&param)) {
+      ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
+      ImGui::Checkbox("##bool##bool", value);
+
+    } else if (int *value = (int *)std::get_if<int>(&param)) {
+      ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+      ImGui::InputInt("##int##int", value);
+
+    } else if (float *value = (float *)std::get_if<float>(&param)) {
+      ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+      ImGui::InputFloat("##float##float", value);
+
+    } else if (std::string *value =
+                   (std::string *)std::get_if<std::string>(&param)) {
+      ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+      ImGui::InputText("##string##string", value);
+
+    } else if (Material *value = (Material *)std::get_if<Material>(&param)) {
+      ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+      type_material_draw(selected_scene, wpos, wpos2, *value);
+
+    } else if (objH *value = (objH *)std::get_if<objH>(&param)) {
+      ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+      type_object_draw(selected_scene, wpos, wpos2, value);
+
+    } else if (_ModelName *value =
+                   (_ModelName *)std::get_if<_ModelName>(&param)) {
+      ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+
+      if (BeginCustomCombo2(wpos, wpos2, "model##model", ICON_FA_DRAW_POLYGON,
+                            value->model.c_str())) {
+
+        static ImGuiTextFilter filter;
+        if (ImGui::IsWindowAppearing()) {
+          ImGui::SetKeyboardFocusHere();
+          filter.Clear();
+        }
+        filter.Draw("model##model");
+
+        for (const auto &[name, model] :
+             selected_scene->resMan.GetModelsMap()) {
+
+          if (!filter.PassFilter(name.c_str()))
+            continue;
+
+          if (ImGui::Selectable(name.c_str(), value->model == name)) {
+            value->model = name;
+          }
+        }
+        EndCustomCombo(*wpos, *wpos2);
+      }
+    } else if (_HeaderName *value =
+                   (_HeaderName *)std::get_if<_HeaderName>(&param)) {
+      ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
+      ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
+      static oDataPoint2 dp{.headers = {DPHeader{}}};
+      int hdridx = dp.headers[0].header_idx;
+      int sheetidx = dp.sheet_idx;
+      type_datapoint_draw(selected_scene, wpos, wpos2, dp.headers[0], false,
+                          &dp);
+      if (dp.headers[0].header_idx != hdridx || dp.sheet_idx != sheetidx)
+        value->header = dp.headers[0].header;
+    }
+
+    ImVec2 bpos2 = ImGui::GetItemRectMax();
+    drawlist->AddRectFilled(bpos, ImVec2(bpos.x + 16, bpos2.y), 0xFF54371E);
+    drawlist->AddTriangleFilled(
+        ImVec2(bpos.x + 4, bpos.y + 8), ImVec2(bpos.x + 12, bpos.y + 8),
+        ImVec2(bpos.x + 8, bpos.y + 16), ImColor(255, 255, 255));
+
+    if (ret)
+      OpenCustomCombo("skrypt");
+
+    if (BeginCustomCombo("skrypt", wpos, wpos2)) {
+      if (1 & scparam.types) {
+        if (ImGui::Selectable("wartość logiczna"))
+          param = false;
+      }
+      if (2 & scparam.types) {
+        if (ImGui::Selectable("liczba całkowita"))
+          param = 0;
+      }
+      if (4 & scparam.types) {
+        if (ImGui::Selectable("liczba rzeczywista"))
+          param = 0.0f;
+      }
+      if (8 & scparam.types) {
+        if (ImGui::Selectable("łańcuch znaku"))
+          param = std::string();
+      }
+      if (16 & scparam.types) {
+        if (ImGui::Selectable("materiał"))
+          param = Material{};
+      }
+      if (32 & scparam.types) {
+        if (ImGui::Selectable("objekt"))
+          param = objH{};
+      }
+      if (64 & scparam.types) {
+        if (ImGui::Selectable("model"))
+          param = _ModelName{};
+      }
+      if (128 & scparam.types) {
+        if (ImGui::Selectable("nagłówek"))
+          param = _HeaderName{};
+      }
+      EndCustomCombo(*wpos, *wpos2);
+    }
+
+    ImGui::PopID();
+    i++;
+  }
+}
+
 // -------------------------------------------------------------------------------------------------------------------
 
 void show_cell_value(const CellValue *cv) {
@@ -412,7 +563,8 @@ void App::add_element_items_gui() {
     if (ImGui::Selectable(obj->name.c_str())) {
       Object *node =
           selected_scene->objPool.get(selected_scene->objPool.add_node(
-              selected_scene->selected_object, oPrefab{.idx = i}));
+              selected_scene->selected_object,
+              oPrefab{.idx = i, .prefab_params = obj->lua_params}));
       node->name = obj->name;
       node->call_update(&selected_scene->objPool);
     }
@@ -626,8 +778,10 @@ void App::draw_gui() {
         if (std::get_if<oEmptySlot>(&obj->variant))
           ImGui::Text("idx: %d (free slot)", i);
         else {
-          ImGui::Text("idx: %d, parent: %d:%d, name: %s", i, obj->parent.idx,
-                      obj->parent.gen, obj->name.c_str());
+          ImGui::Text(
+              "idx: %d, parent (i:g): %d:%d, script (i:np): %d:%d name: %s", i,
+              obj->parent.idx, obj->parent.gen, obj->script_class_idx,
+              obj->lua_params.size(), obj->name.c_str());
         }
       }
     } else
@@ -635,6 +789,29 @@ void App::draw_gui() {
   }
   ImGui::End();
 #endif
+
+  if (ImGui::Begin(ICON_FA_NEWSPAPER " Logi")) {
+    for (const auto &log : file_logger_data.logs) {
+      if (log.tag & Log::ERROR)
+        ImGui::TextColored(ImVec4(0.8, 0, 0, 1), "BŁĄD");
+      else if (log.tag & Log::WARNING)
+        ImGui::TextColored(ImVec4(1, 1, 0, 1), "UWAGA");
+      else if (log.tag & Log::VERBOSE)
+        ImGui::TextColored(ImVec4(0.2, 0.2, 0.2, 1), "SZCZEGÓŁ");
+      else if (log.tag & Log::DEBUG)
+        ImGui::TextColored(ImVec4(1, 0, 0.8, 1), "DEBUG");
+      else
+        ImGui::TextColored(ImVec4(0.2, 0.8, 0.2, 1), "INFO");
+
+      ImGui::SameLine();
+      ImGui::TextColored(ImVec4(0.2, 0.5, 1, 1), log.context);
+      ImGui::SameLine();
+      ImGui::TextColored(ImVec4(0.2, 0.2, 0.2, 1), log.timestamp.c_str());
+      ImGui::SetCursorPosX(16);
+      ImGui::TextWrapped("%s", log.message.c_str());
+    }
+  }
+  ImGui::End();
 
   if (ImGui::Begin("Scena")) {
     scene_window_selected = ImGui::IsWindowFocused();
@@ -942,153 +1119,27 @@ void App::draw_gui() {
         ImVec2 wpos;
         ImVec2 wpos2;
 
-        const ScriptClass &sc =
-            selected_scene->objPool
-                .get_script_classes()[node->script_class_idx];
+        draw_params_ui(selected_scene, &wpos, &wpos2, node);
 
-        int i = 1;
-        for (auto &param_ : node->lua_params) {
-          ImGui::PushID(i);
-          const ScriptClass::Param &scparam = sc.params[i - 1];
-          LuaParam &param = *(LuaParam *)&param_;
+        ImGui::Dummy(ImVec2(2, 2));
+      }
+      if (node->script_class_idx != -1 && !hidescriptprop)
+        ImGui::EndChild();
+      if (node->script_class_idx != -1)
+        ImGui::PopStyleColor(1);
 
-          ImGui::SetCursorPosX(8);
-          InputAllignedText(scparam.name.c_str(), 26);
-          ImGui::SameLine();
+      //-----------------prefab params
 
-          ImDrawList *drawlist = ImGui::GetWindowDrawList();
-          ImVec2 cpos = ImGui::GetCursorPos();
-          // bool ret = ImGui::Button(
-          //     "##skrypt_", ImVec2(ImGui::GetContentRegionAvail().x - 8,
-          //     26));
-          bool ret = ImGui::Button("##skrypt_", ImVec2(16, 22));
-          ImVec2 bpos = ImGui::GetItemRectMin();
+      static bool hidescriptprop = false;
 
-          if (Nil *value = (Nil *)std::get_if<Nil>(&param)) {
-            ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
-            ret |= ImGui::Button(
-                "nil##nil", ImVec2(ImGui::GetContentRegionAvail().x - 8, 22));
+      if (node->script_class_idx != -1 &&
+          BeginSection(2, &hidescriptprop, ICON_FA_MICROCHIP " skrypt",
+                       ImColor(25, 150, 25), ImColor(0, 75, 25))) {
+        ImGui::Dummy(ImVec2(2, 2));
+        ImVec2 wpos;
+        ImVec2 wpos2;
 
-          } else if (bool *value = (bool *)std::get_if<bool>(&param)) {
-            ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
-            ImGui::Checkbox("##bool##bool", value);
-
-          } else if (int *value = (int *)std::get_if<int>(&param)) {
-            ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
-            ImGui::InputInt("##int##int", value);
-
-          } else if (float *value = (float *)std::get_if<float>(&param)) {
-            ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
-            ImGui::InputFloat("##float##float", value);
-
-          } else if (std::string *value =
-                         (std::string *)std::get_if<std::string>(&param)) {
-            ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
-            ImGui::InputText("##string##string", value);
-
-          } else if (Material *value =
-                         (Material *)std::get_if<Material>(&param)) {
-            ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
-            type_material_draw(selected_scene, &wpos, &wpos2, *value);
-
-          } else if (objH *value = (objH *)std::get_if<objH>(&param)) {
-            ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
-            type_object_draw(selected_scene, &wpos, &wpos2, value);
-
-          } else if (_ModelName *value =
-                         (_ModelName *)std::get_if<_ModelName>(&param)) {
-            ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
-
-            if (BeginCustomCombo2(&wpos, &wpos2, "model##model",
-                                  ICON_FA_DRAW_POLYGON, value->model.c_str())) {
-
-              static ImGuiTextFilter filter;
-              if (ImGui::IsWindowAppearing()) {
-                ImGui::SetKeyboardFocusHere();
-                filter.Clear();
-              }
-              filter.Draw("model##model");
-
-              for (const auto &[name, model] :
-                   selected_scene->resMan.GetModelsMap()) {
-
-                if (!filter.PassFilter(name.c_str()))
-                  continue;
-
-                if (ImGui::Selectable(name.c_str(), value->model == name)) {
-                  value->model = name;
-                }
-              }
-              EndCustomCombo(wpos, wpos2);
-            }
-          } else if (_HeaderName *value =
-                         (_HeaderName *)std::get_if<_HeaderName>(&param)) {
-            ImGui::SetCursorPos(ImVec2(cpos.x + 16, cpos.y));
-            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 8);
-            static oDataPoint2 dp{.headers = {DPHeader{}}};
-            int hdridx = dp.headers[0].header_idx;
-            int sheetidx = dp.sheet_idx;
-            type_datapoint_draw(selected_scene, &wpos, &wpos2, dp.headers[0],
-                                false, &dp);
-            if (dp.headers[0].header_idx != hdridx || dp.sheet_idx != sheetidx)
-              value->header = dp.headers[0].header;
-          }
-
-          ImVec2 bpos2 = ImGui::GetItemRectMax();
-          drawlist->AddRectFilled(bpos, ImVec2(bpos.x + 16, bpos2.y),
-                                  0xFF54371E);
-          drawlist->AddTriangleFilled(
-              ImVec2(bpos.x + 4, bpos.y + 8), ImVec2(bpos.x + 12, bpos.y + 8),
-              ImVec2(bpos.x + 8, bpos.y + 16), ImColor(255, 255, 255));
-
-          if (ret)
-            OpenCustomCombo("skrypt");
-
-          if (BeginCustomCombo("skrypt", &wpos, &wpos2)) {
-            if (1 & scparam.types) {
-              if (ImGui::Selectable("wartość logiczna"))
-                param = false;
-            }
-            if (2 & scparam.types) {
-              if (ImGui::Selectable("liczba całkowita"))
-                param = 0;
-            }
-            if (4 & scparam.types) {
-              if (ImGui::Selectable("liczba rzeczywista"))
-                param = 0.0f;
-            }
-            if (8 & scparam.types) {
-              if (ImGui::Selectable("łańcuch znaku"))
-                param = std::string();
-            }
-            if (16 & scparam.types) {
-              if (ImGui::Selectable("materiał"))
-                param = Material{};
-            }
-            if (32 & scparam.types) {
-              if (ImGui::Selectable("objekt"))
-                param = objH{};
-            }
-            if (64 & scparam.types) {
-              if (ImGui::Selectable("model"))
-                param = _ModelName{};
-            }
-            if (128 & scparam.types) {
-              if (ImGui::Selectable("nagłówek"))
-                param = _HeaderName{};
-            }
-            EndCustomCombo(wpos, wpos2);
-          }
-
-          ImGui::PopID();
-          i++;
-        }
+        draw_params_ui(selected_scene, &wpos, &wpos2, node);
 
         ImGui::Dummy(ImVec2(2, 2));
       }

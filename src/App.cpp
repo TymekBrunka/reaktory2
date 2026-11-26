@@ -8,6 +8,7 @@
 #include <FontsAwesome/RobotoRegular.h>
 #include <cstdlib>
 #include <expected>
+#include <filesystem>
 #include <icon_img.h>
 #include <images.h>
 #include <images_bigger.h>
@@ -21,8 +22,10 @@
 
 #include "GLFW/glfw3.h"
 #include "LogFileWriter.cpp"
+#include "ImGuiConsoleLogger.cpp"
 #include "Scene.hpp"
 
+#include "pfd/pfd.hpp"
 #include <zip.h>
 
 // #include "App_gui.cpp"
@@ -94,8 +97,13 @@ void App::init_logger() {
                                    .data = &file_logger_data,
                                    .write = log_file_writer};
 
-    logger =
-        Log::Logger{Log::LANG_PL, {Log::ConsoleLog_Callback, LogFile_Callback}};
+    Log::Callback LogImGui_Callback{.tag = Log::ACCEPT_ALL & (~Log::VERBOSE),
+                                    .data = &file_logger_data,
+                                    .write = log_imgui_writer};
+
+    logger = Log::Logger{
+        Log::LANG_PL,
+        {Log::ConsoleLog_Callback, LogFile_Callback, LogImGui_Callback}};
     Log::Logger::Global = &logger;
     logger_initialised = true;
   }
@@ -446,17 +454,35 @@ std::expected<bool, int> App::export_scene() {
   if (!selected_scene)
     return false;
 
-  zip_t *z;
-  int err = 0;
-  z = zip_open("empty.zip", ZIP_CREATE, &err);
-  if (!z || err) {
-    std::cerr << "NOT OK\n";
-    return std::unexpected(-1);
+  std::string zip_to_save =
+      ipfd::save_file("Eksportowanie sceny", "",
+                      {"archiwum zip", "*.zip", "Wszystkie pliki", "*"});
+
+  if (FileUtils::FileExists(zip_to_save)) {
+    auto e1 = FileUtils::WriteFile(zip_to_save, "", sizeof(""));
   }
 
+  zip_error_t error;
+  zip_error_init(&error);
+  zip_source_t *z_src = zip_source_buffer_create("", 0, 0, &error);
+
+  zip_t *z;
+  z = zip_open_from_source(z_src, ZIP_CREATE, &error);
+  if (!z) {
+    std::cerr << "NOT OK: " << zip_error_strerror(&error) << "\n";
+    return std::unexpected(2);
+  }
+
+  // to keep data after zip_close
+  zip_source_keep(z_src);
+
+  std::vector<char *> data;
   size_t curfold_len = selected_scene->get_folder().u8string().size();
   for (auto &ent : std::filesystem::recursive_directory_iterator(
            selected_scene->get_folder())) {
+
+    if (!std::filesystem::is_regular_file(ent))
+      continue;
 
     auto res_fs = FileUtils::ReadFile(ent.path());
     if (!res_fs.has_value()) {
@@ -480,15 +506,88 @@ std::expected<bool, int> App::export_scene() {
       default:
         break;
       }
+      zip_error_fini(&error);
       zip_close(z);
-      return std::unexpected(1);
+      for (char *src : data)
+        delete[] src;
+      return std::unexpected(4);
     }
 
     std::u8string path = ent.path().u8string();
+    path = path.substr(curfold_len + 1, path.size() - curfold_len);
+#ifdef _WIN32
+    for (auto &c : path) {
+      if (*(char *)&c == '\\')
+        *(char *)&c = '/';
+    }
+#endif
+    std::cerr << "path is " << std::string(path.begin(), path.end()) << "\n";
+    zip_source_t *source =
+        zip_source_buffer(z, res_fs.value().data, res_fs.value().length, 0);
+    data.push_back(res_fs.value().data);
+
+    std::string path_ = std::string(path.begin(), path.end());
+    if (zip_file_add(z, path_.c_str(), source, ZIP_FL_ENC_UTF_8) < 0) {
+      zip_source_free(source);
+      zip_error_fini(&error);
+      zip_close(z);
+      for (char *src : data)
+        delete[] src;
+      std::cerr << "zip_file_add(): " << zip_strerror(z) << "\n";
+      return std::unexpected(5);
+    }
   }
   // zip_source_t *source  = zip_source_buffer(z, "Cześć", sizeof("Cześć"), 0);
   // zip_file_add(z, "test.txt", source, ZIP_FL_ENC_UTF_8);
-  zip_close(z);
+
+  if (zip_close(z) < 0) {
+    std::cerr << "Can't close zip archive: " << zip_strerror(z) << "\n";
+    zip_error_fini(&error);
+    for (char *src : data)
+      delete[] src;
+    return std::unexpected(6);
+  }
+
+  zip_error_fini(&error);
+  for (char *src : data)
+    delete[] src;
+
+  zip_stat_t stat;
+  if (zip_source_stat(z_src, &stat) < 0) {
+    std::cerr << "Can't stat source (zip archive): "
+              << zip_error_strerror(zip_source_error(z_src)) << "\n";
+    zip_source_free(z_src);
+    return std::unexpected(7);
+  }
+
+  if (zip_source_open(z_src) < 0) {
+    std::cerr << "Can't open source (zip archive): "
+              << zip_error_strerror(zip_source_error(z_src)) << "\n";
+    zip_source_free(z_src);
+    return std::unexpected(8);
+  }
+
+  char *buffer = new char[stat.size];
+
+  if ((zip_uint64_t)zip_source_read(z_src, buffer, stat.size) < stat.size) {
+    std::cerr << "Can't read data from source (zip archive): "
+              << zip_error_strerror(zip_source_error(z_src)) << "\n";
+    zip_source_free(z_src);
+    delete[] buffer;
+    return std::unexpected(9);
+  }
+  zip_source_free(z_src);
+
+  auto res_fs2 = FileUtils::WriteFile(zip_to_save, buffer, stat.size);
+  delete[] buffer;
+
+  if (!res_fs2.has_value()) {
+    Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+             res_fs2.error() == -1 ? TL(MSG_GENERIC_OPEN_ERROR)
+                                   : TL(MSG_GENERIC_WRITE_ERROR),
+             std::make_format_args(zip_to_save));
+    return std::unexpected(10);
+  }
 
   return true;
 }

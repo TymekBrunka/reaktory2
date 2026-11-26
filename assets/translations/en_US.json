@@ -1,4 +1,6 @@
 {
+  "MSG_RAW": ["{}"],
+
   "MSG_APP_HOME_DIR_ERROR": ["Cannot find home directory."],
   "MSG_APP_ROOT_CREATE_ERROR": ["Cannot create app root directory."],
   "MSG_APP_ROOT_SUBDIR_CREATE_ERROR": ["Cannot create app directory '{}'."],

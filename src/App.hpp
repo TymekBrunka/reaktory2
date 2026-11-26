@@ -10,12 +10,21 @@
 #include <imgui.h>
 // #include <stdatomic.h>
 
+struct LogMessage {
+  uint8_t tag;
+  const char *context;
+  std::string timestamp;
+  std::string message;
+};
+
 struct LogFileWriterData {
   std::chrono::year_month_day last_day;
   std::string filepath;
   std::string filepath_en;
   std::ofstream file;
   std::ofstream file_en;
+
+  std::vector<LogMessage> logs;
 };
 
 class App {
@@ -23,6 +32,7 @@ private:
   static bool translations_initialised;
   static bool logger_initialised;
   static Log::write_fun log_file_writer;
+  static Log::write_fun log_imgui_writer;
 
   static Log::Logger logger;
   static LogFileWriterData file_logger_data;
