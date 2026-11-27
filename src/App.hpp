@@ -129,4 +129,5 @@ public:
   void add_texture();
 
   std::expected<bool, int> export_scene();
+  std::expected<bool, int> import_scenes();
 };

@@ -6,6 +6,7 @@
 
 #include <FontsAwesome/IconsFontAwesome6.h>
 #include <FontsAwesome/RobotoRegular.h>
+#include <cstdint>
 #include <cstdlib>
 #include <expected>
 #include <filesystem>
@@ -21,11 +22,12 @@
 #include <string_view>
 
 #include "GLFW/glfw3.h"
-#include "LogFileWriter.cpp"
 #include "ImGuiConsoleLogger.cpp"
+#include "LogFileWriter.cpp"
 #include "Scene.hpp"
 
 #include "pfd/pfd.hpp"
+#include "yyjson.h"
 #include <zip.h>
 
 // #include "App_gui.cpp"
@@ -470,6 +472,7 @@ std::expected<bool, int> App::export_scene() {
   z = zip_open_from_source(z_src, ZIP_CREATE, &error);
   if (!z) {
     std::cerr << "NOT OK: " << zip_error_strerror(&error) << "\n";
+    zip_error_fini(&error);
     return std::unexpected(2);
   }
 
@@ -553,6 +556,7 @@ std::expected<bool, int> App::export_scene() {
     delete[] src;
 
   zip_stat_t stat;
+  zip_stat_init(&stat);
   if (zip_source_stat(z_src, &stat) < 0) {
     std::cerr << "Can't stat source (zip archive): "
               << zip_error_strerror(zip_source_error(z_src)) << "\n";
@@ -587,6 +591,225 @@ std::expected<bool, int> App::export_scene() {
                                    : TL(MSG_GENERIC_WRITE_ERROR),
              std::make_format_args(zip_to_save));
     return std::unexpected(10);
+  }
+
+  return true;
+}
+
+#define ZIPERR(x)                                                              \
+  zip_close(z);                                                                \
+  zip_error_fini(&error);                                                      \
+  return std::unexpected(x);
+
+#define json_assert(assert_)                                                   \
+  if (!(assert_)) {                                                            \
+    Log::log(Log::ERROR | Log::SEV_MED, 0, "App", TL(MSG_LOADING_JSON_ERROR),  \
+             std::make_format_args(#assert_));                                 \
+    yyjson_doc_free(doc);                                                      \
+    delete[] scene_data;                                                       \
+    zip_source_close(scene_src);                                               \
+    ZIPERR(10);                                                                \
+  }
+
+#define RMSCENEDIR()                                                           \
+  try {                                                                        \
+    std::filesystem::remove_all(scene_folder);                                 \
+  } catch (std::filesystem::filesystem_error & err) {                          \
+    std::string path1 = err.path1().string();                                  \
+    std::cerr << "Can't delete directory '" << path1 << "'\n";                 \
+  }
+
+std::expected<bool, int> App::import_scenes() {
+  std::vector<std::string> zips_to_open =
+      ipfd::open_file("Wybór archiwuw", "",
+                      {"Archiwum zip (.zip)", "*.zip", "Wszystkie pliki", "*"},
+                      ipfd::opt::multiselect);
+
+  for (const auto &archive : zips_to_open) {
+    std::cerr << "Importing archive " << archive << "\n";
+    auto res_fs =
+        FileUtils::ReadFile(std::u8string(archive.begin(), archive.end()));
+    if (!res_fs.has_value()) {
+      const std::string &path = archive;
+      switch (res_fs.error()) {
+      case -2:
+        Log::log(Log::ERROR | Log::SEV_MED, 0, "App",
+                 TL(MSG_GENERIC_FILE_NOT_FOUND), std::make_format_args(path));
+        break;
+
+      case -1:
+        Log::log(Log::ERROR | Log::SEV_MED, 0, "App",
+                 TL(MSG_GENERIC_OPEN_ERROR), std::make_format_args(path));
+        break;
+
+      case 1:
+        Log::log(Log::ERROR | Log::SEV_MED, 0, "App",
+                 TL(MSG_GENERIC_READ_ERROR), std::make_format_args(path));
+        break;
+
+      default:
+        break;
+      }
+      return std::unexpected(res_fs.error());
+    }
+
+    zip_error_t error;
+    zip_error_init(&error);
+    zip_source_t *z_src = zip_source_buffer_create(
+        res_fs.value().data, res_fs.value().length, 0, &error);
+
+    zip_t *z;
+    z = zip_open_from_source(z_src, ZIP_RDONLY, &error);
+    if (!z) {
+      std::cerr << "NOT OK: " << zip_error_strerror(&error) << "\n";
+      zip_source_close(z_src);
+      zip_error_fini(&error);
+      return std::unexpected(2);
+    }
+
+    if (zip_source_is_deleted(z_src)) {
+      std::cerr << "Archive '" << archive << "' is empty\n";
+      zip_source_close(z_src);
+      zip_error_fini(&error);
+      return std::unexpected(3);
+    }
+
+    zip_int64_t scenejson_loc =
+        zip_name_locate(z, "scene.json", ZIP_FL_ENC_UTF_8);
+    if (scenejson_loc == -1) {
+      std::cerr << "Can't find file 'scene.json' inside zip archive '"
+                << archive << "': " << zip_error_strerror(&error) << "\n";
+      ZIPERR(4);
+    }
+
+    std::filesystem::path scene_folder;
+    // stat json file and check if it can be loaded
+    {
+      zip_stat_t jsonstat;
+      zip_stat_init(&jsonstat);
+      if (zip_stat_index(z, scenejson_loc, 0, &jsonstat) < 0) {
+        std::cerr << "Can't stat scene.json inside zip archive '" << archive
+                  << "': " << zip_error_strerror(&error) << "\n";
+        ZIPERR(5);
+      }
+
+      zip_source_t *scene_src =
+          zip_source_zip_file(z, z, scenejson_loc, 0, 0, -1, NULL);
+      if (!scene_src) {
+        std::cerr << "Can't create source of scene.json inside zip archive '"
+                  << archive << "': " << zip_error_strerror(&error) << "\n";
+        ZIPERR(6);
+      }
+
+      if (zip_source_open(scene_src) < 0) {
+        std::cerr << "Can't open source of scene.json inside zip archive '"
+                  << archive << "': " << zip_error_strerror(&error) << "\n";
+        ZIPERR(7);
+      }
+
+      char *scene_data = new char[jsonstat.size + 1];
+      scene_data[jsonstat.size] = '\0';
+      if (zip_source_read(scene_src, scene_data, jsonstat.size) <
+          jsonstat.size) {
+        std::cerr
+            << "Can't read entire source of scene.json inside zip archive '"
+            << archive << "': " << zip_error_strerror(&error) << "\n";
+        ZIPERR(8);
+      }
+
+      yyjson_read_err jsonerr;
+      yyjson_doc *doc = yyjson_read_opts(scene_data, jsonstat.size,
+                                         YYJSON_READ_ALLOW_COMMENTS |
+                                             YYJSON_READ_ALLOW_TRAILING_COMMAS,
+                                         NULL, &jsonerr);
+
+      if (!doc) {
+        Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene",
+                 TL(MSG_PARSING_JSON_ERROR),
+                 std::make_format_args(jsonerr.msg, jsonerr.code, jsonerr.pos));
+        ZIPERR(9);
+      }
+
+      std::cerr << "scene.json contents:\n" << scene_data << "\n";
+
+      yyjson_val *root = yyjson_doc_get_root(doc);
+      json_assert(yyjson_is_obj(root));
+
+      yyjson_val *format_version_json = yyjson_obj_get(root, "format-version");
+      json_assert(format_version_json != NULL);
+      json_assert(yyjson_is_num(format_version_json));
+      int format_version = yyjson_get_int(format_version_json);
+
+      yyjson_val *app_version_json = yyjson_obj_get(root, "app-version");
+      json_assert(app_version_json != NULL);
+      json_assert(yyjson_is_num(app_version_json));
+      int app_version = yyjson_get_int(app_version_json);
+
+      yyjson_val *selected_sheet_json = yyjson_obj_get(root, "selected-sheet");
+      json_assert(selected_sheet_json != NULL);
+      json_assert(yyjson_is_str(selected_sheet_json));
+      std::string selected_sheet = yyjson_get_str(selected_sheet_json);
+
+      if (yyjson_val *sheet2sampler = yyjson_obj_get(root, "sheet2sampler"))
+        json_assert(yyjson_is_obj(sheet2sampler));
+
+      yyjson_val *objects = yyjson_obj_get(root, "objects");
+      json_assert(objects != NULL);
+      json_assert(yyjson_is_arr(objects));
+
+      if (yyjson_val *prefabs_json = yyjson_obj_get(root, "prefabs"))
+        json_assert(yyjson_is_arr(prefabs_json));
+
+      yyjson_val *scene_name_json = yyjson_obj_get(root, "name");
+      json_assert(scene_name_json != NULL);
+      json_assert(yyjson_is_str(scene_name_json));
+      std::string scene_name = yyjson_get_str(scene_name_json);
+
+      // TODO: add safety check so it doesnt escape out off ~/.reaktory/scenes/
+      scene_folder = FileUtils::APP_ROOT / "scenes" /
+                     std::u8string(scene_name.begin(), scene_name.end());
+
+      if (std::filesystem::exists(scene_folder)) {
+        std::cerr << "Scene '" << scene_name << "' already exists\n";
+        ZIPERR(11);
+      }
+
+      try {
+        std::filesystem::create_directory(scene_folder);
+      } catch (std::filesystem::filesystem_error &err) {
+        std::string path1 = err.path1().string();
+        Log::log(Log::ERROR | Log::SEV_MED, 0, "App",
+                 TL(MSG_SCENE_DIR_CREATE_ERROR), std::make_format_args(path1));
+        ZIPERR(12);
+      }
+    }
+
+    zip_int16_t numfiles = zip_get_num_entries(z, 0);
+    zip_stat_t stat;
+    for (int64_t i = 0; i < numfiles; i++) {
+      zip_stat_init(&stat);
+      if (zip_stat_index(z, i, 0, &stat) < 0) {
+        std::cerr << "Can't stat file #" << i << " inside zip archive '"
+                  << archive << "': " << zip_error_strerror(&error) << "\n";
+        RMSCENEDIR();
+        ZIPERR(5);
+      }
+
+      zip_source_t *zf_src = zip_source_zip_file(z, z, i, 0, 0, -1, NULL);
+      if (!zf_src) {
+        std::cerr << "Can't create source of file '" << stat.name
+                  << "' inside zip archive '" << archive
+                  << "': " << zip_error_strerror(&error) << "\n";
+        ZIPERR(6);
+      }
+
+      if (zip_source_open(zf_src) < 0) {
+        std::cerr << "Can't open source of file '" << stat.name
+                  << "' inside zip archive '" << archive
+                  << "': " << zip_error_strerror(&error) << "\n";
+        ZIPERR(7);
+      }
+    }
   }
 
   return true;

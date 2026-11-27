@@ -35,6 +35,7 @@
   "MSG_RENDER_CREATE_IMGUI_CTX": ["Created imgui context"],
   "MSG_RENDER_LOAD_IMAGE_ERROR": ["Cannot load image '{}'."],
 
+  "MSG_PARSING_JSON_ERROR": ["Syntax error in json file ('{}', error code: {}, position: {})."],
   "MSG_LOADING_JSON_ERROR": ["Error occured while loading scene (json) (condition '{}' not met)."],
 
   "MSG_GL_ERROR_SHADER": ["Cannot compile {} shader: {}."],

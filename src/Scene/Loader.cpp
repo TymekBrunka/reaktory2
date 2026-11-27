@@ -1,8 +1,11 @@
 #include "FileUtils.hpp"
+#include "Logging.hpp"
 #include "ObjectPool.hpp"
+#include "Translations.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include <Scene.hpp>
 #include <cstring>
+#include <format>
 #include <iostream>
 #include <vector>
 #include <yyjson.h>
@@ -154,10 +157,17 @@ bool Scene::load() {
       return false;
     }
   }
+  yyjson_read_err jsonerr;
+  yyjson_doc *doc = yyjson_read_opts(res_fs.value().data, res_fs.value().length,
+                                     YYJSON_READ_ALLOW_COMMENTS |
+                                         YYJSON_READ_ALLOW_TRAILING_COMMAS,
+                                     NULL, &jsonerr);
 
-  yyjson_doc *doc = yyjson_read(res_fs.value().data, res_fs.value().length,
-                                YYJSON_READ_ALLOW_COMMENTS |
-                                    YYJSON_READ_ALLOW_TRAILING_COMMAS);
+  if (!doc) {
+    Log::log(Log::ERROR | Log::SEV_MED, 0, "Scene", TL(MSG_PARSING_JSON_ERROR),
+             std::make_format_args(jsonerr.msg, jsonerr.code, jsonerr.pos));
+    return false;
+  }
 
   yyjson_val *root = yyjson_doc_get_root(doc);
   json_assert(yyjson_is_obj(root));
@@ -464,7 +474,8 @@ bool Scene::load() {
         yyjson_val *obj_prefab = yyjson_arr_get(obj_variant, 1);
         json_assert(yyjson_is_int(obj_prefab));
         int obj_prefab_idx = yyjson_get_int(obj_prefab);
-        json_assert(obj_prefab_idx == -1 || (obj_prefab_idx >= 0 && obj_prefab_idx < prefabs.size()));
+        json_assert(obj_prefab_idx == -1 ||
+                    (obj_prefab_idx >= 0 && obj_prefab_idx < prefabs.size()));
 
         oPrefab prefab{.initialised = false,
                        .idx = obj_prefab_idx == -1 ? -1 : obj_prefab_idx + 1};

@@ -741,7 +741,8 @@ void App::draw_gui() {
         open_scene();
       if (IconMenuItem(0, "      (ctrl+N) Utwórz nową scenę"))
         add_scene();
-      IconMenuItem(9, "      (ctrl+I) Importuj scenę");
+      if (IconMenuItem(9, "      (ctrl+I) Importuj sceny"))
+        auto e1 = import_scenes();
       if (IconMenuItem(10, "      (ctrl+E) Eksportuj scenę"))
         auto e1 = export_scene();
       ImGui::EndMenu();

@@ -35,6 +35,7 @@
   "MSG_RENDER_CREATE_IMGUI_CTX": ["Utworzono kontekst imgui"],
   "MSG_RENDER_LOAD_IMAGE_ERROR": ["Nie można załadować zdjęcia '{}'."],
 
+  "MSG_PARSING_JSON_ERROR": ["Błąd składni w pliku json ('{}', kod błędu: {}, pozycja: {})."],
   "MSG_LOADING_JSON_ERROR": ["Wystąpił błąd podczas ładowania sceny (json) (warunek '{}' nie spełniony)."],
 
   "MSG_GL_ERROR_SHADER": ["Nie można skompilować {} shader'a: {}."],
