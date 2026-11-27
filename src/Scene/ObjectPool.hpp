@@ -115,8 +115,10 @@ using LuaParam = std::variant<Nil, bool, int, float, std::string, Material,
                               objH, _ModelName, _HeaderName>;
 
 struct oPrefab {
-  uint32_t gen = 0;
-  int idx = 0;
+  bool initialised = true;
+  uint16_t gen = 0;
+  int idx = -1;
+  int script_class_idx = -1;
   objH root;
   std::vector<LuaParam> prefab_params;
 };

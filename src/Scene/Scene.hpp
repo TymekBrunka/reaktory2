@@ -165,6 +165,14 @@ private:
       std::unordered_map<int16_t, int16_t> *pool2json,
       std::vector<int16_t> *pool_array);
 
+  void save_script_param(const LuaParam &param, int16_t idx,
+                         yyjson_mut_doc *doc, yyjson_mut_val *params,
+                         std::unordered_map<int16_t, int16_t> *pool2json,
+                         std::vector<int16_t> *pool_array, int16_t *counter);
+
+  bool load_script_params(void *obj_script_params_iter_, void *doc_,
+                          std::vector<LuaParam> &params);
+
 public:
   struct Prefab {
     uint32_t gen = 1;

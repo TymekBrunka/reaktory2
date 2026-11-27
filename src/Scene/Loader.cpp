@@ -4,6 +4,7 @@
 #include <Scene.hpp>
 #include <cstring>
 #include <iostream>
+#include <vector>
 #include <yyjson.h>
 
 #include "imgui.h"
@@ -17,6 +18,116 @@
     yyjson_doc_free(doc);                                                      \
     return false;                                                              \
   }
+
+bool Scene::load_script_params(void *obj_script_params_iter_, void *doc_,
+                               std::vector<LuaParam> &params) {
+  auto doc = (yyjson_doc *)doc_;
+  auto obj_script_params_iter = (yyjson_arr_iter *)obj_script_params_iter_;
+
+  int param_idx = 0;
+  while (yyjson_val *script_param =
+             yyjson_arr_iter_next(obj_script_params_iter)) {
+
+    LuaParam param;
+    if (yyjson_is_null(script_param)) {
+      param = Nil{};
+
+    } else if (yyjson_is_int(script_param)) {
+      param = (int)yyjson_get_int(script_param);
+
+    } else if (yyjson_is_real(script_param)) {
+      param = (float)yyjson_get_real(script_param);
+
+    } else if (yyjson_is_str(script_param)) {
+      param = std::string(yyjson_get_str(script_param));
+
+    } else if (yyjson_is_arr(script_param)) {
+
+      int script_param_number_of_elements = yyjson_arr_size(script_param);
+      json_assert(script_param_number_of_elements > 1);
+      yyjson_val *script_param_type = yyjson_arr_get(script_param, 0);
+      json_assert(yyjson_is_str(script_param_type));
+
+      if (yyjson_equals_str(script_param_type, "MATERIAL")) {
+        const char *script_param_type_ = "MATERIAL";
+        json_assert(script_param_type_ == "MATERIAL" &&
+                    script_param_number_of_elements == 3);
+
+        Material material;
+        yyjson_val *script_param_material_texture =
+            yyjson_arr_get(script_param, 1);
+        json_assert(yyjson_is_str(script_param_material_texture));
+        material.diffuse1 = yyjson_get_str(script_param_material_texture);
+
+        yyjson_val *script_param_material_color =
+            yyjson_arr_get(script_param, 2);
+        json_assert(yyjson_is_arr(script_param_material_color));
+        int script_param_material_color_number_of_elements =
+            yyjson_arr_size(script_param_material_color);
+        json_assert(script_param_material_color_number_of_elements == 4);
+
+        for (int i = 0; i < 4; i++) {
+          yyjson_val *material_color_element =
+              yyjson_arr_get(script_param_material_color, i);
+          json_assert(yyjson_is_num(material_color_element));
+          glm::value_ptr(material.color_diffuse)[i] =
+              yyjson_get_real(material_color_element);
+        }
+
+        param = material;
+
+      } else if (yyjson_equals_str(script_param_type, "OBJH")) {
+        const char *script_param_type_ = "OBJH";
+        json_assert(script_param_type_ == "OBJH" &&
+                    script_param_number_of_elements == 2);
+
+        objH objh;
+        yyjson_val *script_param_objh = yyjson_arr_get(script_param, 1);
+        json_assert(yyjson_is_int(script_param_objh));
+        int16_t script_param_objh_ = yyjson_get_int(script_param_objh);
+        objh.idx = script_param_objh_;
+        json_assert(script_param_objh_ == -1 ||
+                    script_param_number_of_elements < objPool.real_size());
+
+        if (script_param_objh_ >= 0) {
+          Object &object = objPool.get(objPool.rootH())[script_param_objh_];
+          bool object_ = !(std::get_if<oEmptySlot>(&object.variant));
+          json_assert(script_param_objh_ && object_ != NULL);
+          objh.gen = object.gen;
+        }
+
+        param = objh;
+
+      } else if (yyjson_equals_str(script_param_type, "MODEL")) {
+        const char *script_param_type_ = "MODEL";
+        json_assert(script_param_type_ == "MODEL" &&
+                    script_param_number_of_elements == 2);
+
+        yyjson_val *script_param_model = yyjson_arr_get(script_param, 1);
+        json_assert(yyjson_is_str(script_param_model));
+        param = _ModelName{.model = yyjson_get_str(script_param_model)};
+
+      } else if (yyjson_equals_str(script_param_type, "HEADER")) {
+        const char *script_param_type_ = "HEADER";
+        json_assert(script_param_type_ == "HEADER" &&
+                    script_param_number_of_elements == 2);
+
+        yyjson_val *script_param_header = yyjson_arr_get(script_param, 1);
+        json_assert(yyjson_is_str(script_param_header));
+        param = _HeaderName{.header = yyjson_get_str(script_param_header)};
+      }
+    } else {
+      const char *script_param_type_ = nullptr;
+      json_assert(
+          script_param_type_ == "MATERIAL" || script_param_type_ == "OBJH" ||
+          script_param_type_ == "MODEL" || script_param_type_ == "HEADER");
+    }
+
+    params[param_idx] = param;
+    param_idx++;
+  }
+  return true;
+}
 
 bool Scene::load() {
   auto res_fs = FileUtils::ReadFile(current_folder / "scene.json");
@@ -202,117 +313,12 @@ bool Scene::load() {
 
     if (yyjson_val *obj_script_params =
             yyjson_obj_get(object, "script-params")) {
-
       json_assert(yyjson_is_arr(obj_script_params));
 
-      int param_idx = 0;
       yyjson_arr_iter obj_script_params_iter =
           yyjson_arr_iter_with(obj_script_params);
-      while (yyjson_val *obj_script_param =
-                 yyjson_arr_iter_next(&obj_script_params_iter)) {
-
-        LuaParam param;
-        if (yyjson_is_null(obj_script_param)) {
-          param = Nil{};
-
-        } else if (yyjson_is_int(obj_script_param)) {
-          param = (int)yyjson_get_int(obj_script_param);
-
-        } else if (yyjson_is_real(obj_script_param)) {
-          param = (float)yyjson_get_real(obj_script_param);
-
-        } else if (yyjson_is_str(obj_script_param)) {
-          param = std::string(yyjson_get_str(obj_script_param));
-
-        } else if (yyjson_is_arr(obj_script_param)) {
-
-          int script_param_number_of_elements =
-              yyjson_arr_size(obj_script_param);
-          json_assert(script_param_number_of_elements > 1);
-          yyjson_val *script_param_type = yyjson_arr_get(obj_script_param, 0);
-          json_assert(yyjson_is_str(script_param_type));
-
-          if (yyjson_equals_str(script_param_type, "MATERIAL")) {
-            const char *script_param_type_ = "MATERIAL";
-            json_assert(script_param_type_ == "MATERIAL" &&
-                        script_param_number_of_elements == 3);
-
-            Material material;
-            yyjson_val *script_param_material_texture =
-                yyjson_arr_get(obj_script_param, 1);
-            json_assert(yyjson_is_str(script_param_material_texture));
-            material.diffuse1 = yyjson_get_str(script_param_material_texture);
-
-            yyjson_val *script_param_material_color =
-                yyjson_arr_get(obj_script_param, 2);
-            json_assert(yyjson_is_arr(script_param_material_color));
-            int script_param_material_color_number_of_elements =
-                yyjson_arr_size(script_param_material_color);
-            json_assert(script_param_material_color_number_of_elements == 4);
-
-            for (int i = 0; i < 4; i++) {
-              yyjson_val *material_color_element =
-                  yyjson_arr_get(script_param_material_color, i);
-              json_assert(yyjson_is_num(material_color_element));
-              glm::value_ptr(material.color_diffuse)[i] =
-                  yyjson_get_real(material_color_element);
-            }
-
-            param = material;
-
-          } else if (yyjson_equals_str(script_param_type, "OBJH")) {
-            const char *script_param_type_ = "OBJH";
-            json_assert(script_param_type_ == "OBJH" &&
-                        script_param_number_of_elements == 2);
-
-            objH objh;
-            yyjson_val *script_param_objh = yyjson_arr_get(obj_script_param, 1);
-            json_assert(yyjson_is_int(script_param_objh));
-            int16_t script_param_objh_ = yyjson_get_int(script_param_objh);
-            objh.idx = script_param_objh_;
-            json_assert(script_param_objh_ == -1 ||
-                        script_param_number_of_elements < objPool.real_size());
-
-            if (script_param_objh_ >= 0) {
-              Object &object = objPool.get(objPool.rootH())[script_param_objh_];
-              bool object_ = !(std::get_if<oEmptySlot>(&object.variant));
-              json_assert(script_param_objh_ && object_ != NULL);
-              objh.gen = object.gen;
-            }
-
-            param = objh;
-
-          } else if (yyjson_equals_str(script_param_type, "MODEL")) {
-            const char *script_param_type_ = "MODEL";
-            json_assert(script_param_type_ == "MODEL" &&
-                        script_param_number_of_elements == 2);
-
-            yyjson_val *script_param_model =
-                yyjson_arr_get(obj_script_param, 1);
-            json_assert(yyjson_is_str(script_param_model));
-            param = _ModelName{.model = yyjson_get_str(script_param_model)};
-
-          } else if (yyjson_equals_str(script_param_type, "HEADER")) {
-            const char *script_param_type_ = "HEADER";
-            json_assert(script_param_type_ == "HEADER" &&
-                        script_param_number_of_elements == 2);
-
-            yyjson_val *script_param_header =
-                yyjson_arr_get(obj_script_param, 1);
-            json_assert(yyjson_is_str(script_param_header));
-            param = _HeaderName{.header = yyjson_get_str(script_param_header)};
-          }
-        } else {
-          const char *script_param_type_ = nullptr;
-          json_assert(script_param_type_ == "MATERIAL" ||
-                      script_param_type_ == "OBJH" ||
-                      script_param_type_ == "MODEL" ||
-                      script_param_type_ == "HEADER");
-        }
-
-        node.lua_params[param_idx] = param;
-        param_idx++;
-      }
+      if (!load_script_params(&obj_script_params_iter, doc, node.lua_params))
+        return false;
     }
 
     yyjson_val *obj_variant = yyjson_obj_get(object, "variant");
@@ -452,14 +458,30 @@ bool Scene::load() {
       } else if (yyjson_equals_str(obj_variant_name_json, "PREFAB")) {
         const char *obj_variant_name = "PREFAB";
         json_assert(obj_variant_name == "PREFAB" &&
-                    obj_variant_arr_number_of_elements == 2);
+                    (obj_variant_arr_number_of_elements == 2 ||
+                     obj_variant_arr_number_of_elements == 3));
 
         yyjson_val *obj_prefab = yyjson_arr_get(obj_variant, 1);
         json_assert(yyjson_is_int(obj_prefab));
         int obj_prefab_idx = yyjson_get_int(obj_prefab);
-        json_assert(obj_prefab_idx >= 0 && obj_prefab_idx < prefabs.size());
+        json_assert(obj_prefab_idx == -1 || (obj_prefab_idx >= 0 && obj_prefab_idx < prefabs.size()));
 
-        node.variant = oPrefab{.idx = obj_prefab_idx + 1};
+        oPrefab prefab{.initialised = false,
+                       .idx = obj_prefab_idx == -1 ? -1 : obj_prefab_idx + 1};
+
+        if (obj_variant_arr_number_of_elements == 3) {
+          yyjson_val *prefab_script_params = yyjson_arr_get(obj_variant, 2);
+          json_assert(yyjson_is_arr(prefab_script_params));
+
+          prefab.prefab_params.resize(yyjson_arr_size(prefab_script_params));
+          yyjson_arr_iter prefab_script_params_iter =
+              yyjson_arr_iter_with(prefab_script_params);
+          if (!load_script_params(&prefab_script_params_iter, doc,
+                                  prefab.prefab_params))
+            return false;
+        }
+
+        node.variant = std::move(prefab);
 
       } else {
         const char *obj_variant_name = NULL;

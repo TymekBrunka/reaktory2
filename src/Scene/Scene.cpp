@@ -916,6 +916,69 @@ static int16_t AddToPool2Json(std::unordered_map<int16_t, int16_t> *pool2json,
   }
 }
 
+void Scene::save_script_param(const LuaParam &param, int16_t idx,
+                              yyjson_mut_doc *doc, yyjson_mut_val *params,
+                              std::unordered_map<int16_t, int16_t> *pool2json,
+                              std::vector<int16_t> *pool_array,
+                              int16_t *counter) {
+
+  if (const Nil *value = std::get_if<Nil>(&param)) {
+    yyjson_mut_arr_add_null(doc, params);
+
+  } else if (const bool *value = std::get_if<bool>(&param)) {
+    yyjson_mut_arr_add_bool(doc, params, *value);
+
+  } else if (const int *value = std::get_if<int>(&param)) {
+    yyjson_mut_arr_add_int(doc, params, *value);
+
+  } else if (const float *value = std::get_if<float>(&param)) {
+    yyjson_mut_arr_add_float(doc, params, *value);
+
+  } else if (const std::string *value =
+                 (std::string *)std::get_if<std::string>(&param)) {
+    yyjson_mut_arr_add_str(doc, params, value->c_str());
+
+  } else if (const Material *value = std::get_if<Material>(&param)) {
+    yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
+    yyjson_mut_arr_add_str(doc, p, "MATERIAL");
+    yyjson_mut_arr_add_str(doc, p, value->diffuse1.c_str());
+    yyjson_mut_val *color = yyjson_mut_arr_add_arr(doc, p);
+    yyjson_mut_arr_add_float(doc, color,
+                             glm::value_ptr(value->color_diffuse)[0]);
+    yyjson_mut_arr_add_float(doc, color,
+                             glm::value_ptr(value->color_diffuse)[1]);
+    yyjson_mut_arr_add_float(doc, color,
+                             glm::value_ptr(value->color_diffuse)[2]);
+    yyjson_mut_arr_add_float(doc, color,
+                             glm::value_ptr(value->color_diffuse)[3]);
+
+  } else if (const objH *value = std::get_if<objH>(&param)) {
+
+    yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
+    yyjson_mut_arr_add_str(doc, p, "OBJH");
+    if (objPool.get(*value)) {
+      populate_save_object_pool_recursive(counter, idx, pool2json, pool_array);
+      int16_t objidx = (*pool_array)[pool_array->size() - 1];
+      yyjson_mut_arr_add_int(doc, p, objidx);
+    } else {
+      yyjson_mut_arr_add_int(doc, p, -1);
+    }
+
+  } else if (const _ModelName *value =
+                 (_ModelName *)std::get_if<_ModelName>(&param)) {
+    yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
+    yyjson_mut_arr_add_str(doc, p, "MODEL");
+    yyjson_mut_arr_add_str(doc, p, value->model.c_str());
+
+  } else if (const _HeaderName *value =
+                 (_HeaderName *)std::get_if<_HeaderName>(&param)) {
+
+    yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
+    yyjson_mut_arr_add_str(doc, p, "HEADER");
+    yyjson_mut_arr_add_str(doc, p, value->header.c_str());
+  }
+}
+
 bool Scene::save() {
   yyjson_mut_doc *doc = yyjson_mut_doc_new(NULL);
   yyjson_mut_val *root = yyjson_mut_obj(doc);
@@ -1063,10 +1126,29 @@ bool Scene::save() {
       yyjson_mut_arr_add_str(doc, v, "TEXT3D");
       yyjson_mut_arr_add_str(doc, v, variant->string().c_str());
 
-    } else if (const oPrefab *variant = std::get_if<oPrefab>(&node->variant)) {
+    } else if (oPrefab *variant =
+                   (oPrefab *)std::get_if<oPrefab>(&node->variant)) {
       yyjson_mut_val *v = yyjson_mut_obj_add_arr(doc, node_json, "variant");
       yyjson_mut_arr_add_str(doc, v, "PREFAB");
-      yyjson_mut_arr_add_int(doc, v, prefab2json[variant->idx]);
+      if (variant->idx == -1) {
+        yyjson_mut_arr_add_int(doc, v, -1);
+      } else if (Object *reference = objPool.get(prefabs[variant->idx].obj)) {
+        if (reference->script_class_idx != variant->script_class_idx) {
+          variant->script_class_idx = reference->script_class_idx;
+          reference->lua_params = variant->prefab_params;
+        } else if (Object *obj = objPool.get(variant->root)) {
+          variant->prefab_params = obj->lua_params;
+        }
+        yyjson_mut_arr_add_int(doc, v, prefab2json[variant->idx]);
+      } else {
+        yyjson_mut_arr_add_int(doc, v, -1);
+      }
+
+      yyjson_mut_val *params = yyjson_mut_arr_add_arr(doc, v);
+      for (const auto &param : variant->prefab_params) {
+        save_script_param(param, idx, doc, params, &pool2json, &pool_array,
+                          &counter);
+      }
     }
 
     if (node->lua_params.size() > 0) {
@@ -1074,63 +1156,8 @@ bool Scene::save() {
           yyjson_mut_obj_add_arr(doc, node_json, "script-params");
 
       for (const auto &param : node->lua_params) {
-
-        if (const Nil *value = std::get_if<Nil>(&param)) {
-          yyjson_mut_arr_add_null(doc, params);
-
-        } else if (const bool *value = std::get_if<bool>(&param)) {
-          yyjson_mut_arr_add_bool(doc, params, *value);
-
-        } else if (const int *value = std::get_if<int>(&param)) {
-          yyjson_mut_arr_add_int(doc, params, *value);
-
-        } else if (const float *value = std::get_if<float>(&param)) {
-          yyjson_mut_arr_add_float(doc, params, *value);
-
-        } else if (const std::string *value =
-                       (std::string *)std::get_if<std::string>(&param)) {
-          yyjson_mut_arr_add_str(doc, params, value->c_str());
-
-        } else if (const Material *value = std::get_if<Material>(&param)) {
-          yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
-          yyjson_mut_arr_add_str(doc, p, "MATERIAL");
-          yyjson_mut_arr_add_str(doc, p, value->diffuse1.c_str());
-          yyjson_mut_val *color = yyjson_mut_arr_add_arr(doc, p);
-          yyjson_mut_arr_add_float(doc, color,
-                                   glm::value_ptr(value->color_diffuse)[0]);
-          yyjson_mut_arr_add_float(doc, color,
-                                   glm::value_ptr(value->color_diffuse)[1]);
-          yyjson_mut_arr_add_float(doc, color,
-                                   glm::value_ptr(value->color_diffuse)[2]);
-          yyjson_mut_arr_add_float(doc, color,
-                                   glm::value_ptr(value->color_diffuse)[3]);
-
-        } else if (const objH *value = std::get_if<objH>(&param)) {
-
-          yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
-          yyjson_mut_arr_add_str(doc, p, "OBJH");
-          if (objPool.get(*value)) {
-            populate_save_object_pool_recursive(&counter, idx, &pool2json,
-                                                &pool_array);
-            int16_t objidx = pool_array[pool_array.size() - 1];
-            yyjson_mut_arr_add_int(doc, p, objidx);
-          } else {
-            yyjson_mut_arr_add_int(doc, p, -1);
-          }
-
-        } else if (const _ModelName *value =
-                       (_ModelName *)std::get_if<_ModelName>(&param)) {
-          yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
-          yyjson_mut_arr_add_str(doc, p, "MODEL");
-          yyjson_mut_arr_add_str(doc, p, value->model.c_str());
-
-        } else if (const _HeaderName *value =
-                       (_HeaderName *)std::get_if<_HeaderName>(&param)) {
-
-          yyjson_mut_val *p = yyjson_mut_arr_add_arr(doc, params);
-          yyjson_mut_arr_add_str(doc, p, "HEADER");
-          yyjson_mut_arr_add_str(doc, p, value->header.c_str());
-        }
+        save_script_param(param, idx, doc, params, &pool2json, &pool_array,
+                          &counter);
       }
     }
 
@@ -1319,25 +1346,29 @@ void Scene::draw_models_recursive(int16_t idx, float delta,
       modelTransform = parentTransform * node->transform;
     }
 
-    Object *reference = objPool.get(prefabs[oprefab->idx].obj);
-    if (reference) {
-      oPrefab backup = *oprefab;
+    if (oprefab->idx != -1) {
+      Object *reference = objPool.get(prefabs[oprefab->idx].obj);
+      if (reference) {
+        oPrefab backup = *oprefab;
 
-      if (prefabs[backup.idx].gen != backup.gen) {
+        if (prefabs[backup.idx].gen != backup.gen) {
+          if (Object *obj = objPool.get(backup.root)) {
+            oprefab->prefab_params = obj->lua_params;
+            objPool.remove(backup.root);
+          }
+          backup.root = prefabs[backup.idx].obj;
+          backup.root = objPool.clone_prefab_root(&backup, idx);
+          node = &objPool.get(objPool.rootH())[idx];
+          std::get_if<oPrefab>(&node->variant)->gen = prefabs[backup.idx].gen;
+          // node->variant = backup;
+          // node->transform = objPool.get(backup.root)->transform;
+          // objPool.get(backup.root)->transform = glm::mat4(1.0f);
+        }
+
         if (objPool.get(backup.root))
-          objPool.remove(backup.root);
-        backup.root = prefabs[backup.idx].obj;
-        backup.root = objPool.clone_prefab_root(&backup, idx);
-        backup.gen = prefabs[backup.idx].gen;
-        node = &objPool.get(objPool.rootH())[idx];
-        node->variant = backup;
-        // node->transform = objPool.get(backup.root)->transform;
-        // objPool.get(backup.root)->transform = glm::mat4(1.0f);
+          draw_models_recursive(backup.root.idx, delta, modelTransform,
+                                parentObj);
       }
-
-      if (objPool.get(backup.root))
-        draw_models_recursive(backup.root.idx, delta, modelTransform,
-                              parentObj);
     }
   }
   node->current_parent_transform = parentTransform;

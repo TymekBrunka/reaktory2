@@ -388,9 +388,9 @@ objH ObjectPool::add(Object &&obj) {
 
 objH ObjectPool::clone(objH obj) {
   if (obj.idx < 0 || obj.idx >= objects.size()) {
-    // Log::log(Log::ERROR | Log::SEV_MED, 0, "Object pool",
-    //          TL(MSG_OBJECT_POOL_GET_ERROR),
-    //          std::make_format_args(obj.idx, obj.gen));
+    Log::log(Log::ERROR | Log::SEV_MED, 0, "Object pool",
+             TL(MSG_OBJECT_POOL_GET_ERROR),
+             std::make_format_args(obj.idx, obj.gen));
     return objH{};
   }
 
@@ -399,9 +399,9 @@ objH ObjectPool::clone(objH obj) {
 
   uint8_t gen = objects[obj.idx].gen;
   if (gen != obj.gen) {
-    // Log::log(Log::ERROR | Log::SEV_MED, 0, "Object pool",
-    //          TL(MSG_OBJECT_POOL_GET_ERROR),
-    //          std::make_format_args(obj.idx, obj.gen));
+    Log::log(Log::ERROR | Log::SEV_MED, 0, "Object pool",
+             TL(MSG_OBJECT_POOL_GET_ERROR),
+             std::make_format_args(obj.idx, obj.gen));
     return objH{};
   }
 
@@ -414,8 +414,17 @@ objH ObjectPool::clone_prefab_root(const oPrefab *oprefab, int16_t idx) {
     objH obj = clone_impl(oprefab->root.idx);
     auto op = std::get_if<oPrefab>(&objects[idx].variant);
     op->root = obj;
-    objects[obj.idx].lua_params = op->prefab_params;
-    objects[obj.idx].call_update(this);
+    Object &obj_ = objects[obj.idx];
+    if (op->script_class_idx != obj_.script_class_idx && op->initialised)
+      op->script_class_idx = obj_.script_class_idx;
+    else {
+      obj_.lua_params = op->prefab_params;
+      if (!op->initialised) {
+        op->script_class_idx = obj_.script_class_idx;
+        op->initialised = true;
+      }
+    }
+    obj_.call_update(this);
     return obj;
   }
 

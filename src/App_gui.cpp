@@ -564,7 +564,9 @@ void App::add_element_items_gui() {
       Object *node =
           selected_scene->objPool.get(selected_scene->objPool.add_node(
               selected_scene->selected_object,
-              oPrefab{.idx = i, .prefab_params = obj->lua_params}));
+              oPrefab{.idx = i,
+                      .script_class_idx = obj->script_class_idx,
+                      .prefab_params = obj->lua_params}));
       node->name = obj->name;
       node->call_update(&selected_scene->objPool);
     }
@@ -1128,26 +1130,6 @@ void App::draw_gui() {
       if (node->script_class_idx != -1)
         ImGui::PopStyleColor(1);
 
-      //-----------------prefab params
-
-      static bool hidescriptprop = false;
-
-      if (node->script_class_idx != -1 &&
-          BeginSection(2, &hidescriptprop, ICON_FA_MICROCHIP " skrypt",
-                       ImColor(25, 150, 25), ImColor(0, 75, 25))) {
-        ImGui::Dummy(ImVec2(2, 2));
-        ImVec2 wpos;
-        ImVec2 wpos2;
-
-        draw_params_ui(selected_scene, &wpos, &wpos2, node);
-
-        ImGui::Dummy(ImVec2(2, 2));
-      }
-      if (node->script_class_idx != -1 && !hidescriptprop)
-        ImGui::EndChild();
-      if (node->script_class_idx != -1)
-        ImGui::PopStyleColor(1);
-
       if (oModel *omodel = (oModel *)std::get_if<oModel>(&node->variant)) {
         static bool hidemodelprop = false;
         if (BeginSection(3, &hidemodelprop, ICON_FA_DRAW_POLYGON " model",
@@ -1332,6 +1314,26 @@ void App::draw_gui() {
         if (!hidetext3dprop)
           ImGui::EndChild();
         ImGui::PopStyleColor(1);
+      } else if (oPrefab *oprefab =
+                     (oPrefab *)std::get_if<oPrefab>(&node->variant)) {
+
+        static bool hideprefabparamprop = false;
+        Object *obj = selected_scene->objPool.get(oprefab->root);
+        if (obj &&
+            BeginSection(2, &hideprefabparamprop, ICON_FA_MICROCHIP " skrypt",
+                         ImColor(50, 100, 200), ImColor(25, 50, 100))) {
+          ImGui::Dummy(ImVec2(2, 2));
+          ImVec2 wpos;
+          ImVec2 wpos2;
+
+          draw_params_ui(selected_scene, &wpos, &wpos2, obj);
+
+          ImGui::Dummy(ImVec2(2, 2));
+        }
+        if (obj && !hideprefabparamprop)
+          ImGui::EndChild();
+        if (obj)
+          ImGui::PopStyleColor(1);
       }
     }
   }
